@@ -1,16 +1,22 @@
+# Frontend
+
 Aplikacja kliencka oparta na frameworku React.
 
 ## Instalacja lokalna
 
-1. Zainstaluj zaleznosci:
-   npm install
+Zainstaluj zaleznosci:
+```bash
+npm install
+```
 
 ## Uruchamianie
 
 Uruchom serwer deweloperski:
+```bash
 npm run dev
+```
 
-Po uruchomieniu aplikacja dostepna pod adresem:
+Po uruchomieniu aplikacja dostępna pod adresem:
 http://localhost:5173
 
 ## Struktura projektu
@@ -25,5 +31,7 @@ http://localhost:5173
 
 ## Budowanie wersji produkcyjnej
 
-Przygotowanie paczki do wdrozenia:
+Przygotowanie paczki do wdrożenia:
+```bash
 npm run build
+```

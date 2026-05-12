@@ -20,3 +20,14 @@ yarn-error.log*
 
 # db
 *.sqlite3
+
+# docker
+docker-compose.override.yml
+
+# ide
+.idea/
+.vscode/
+
+# os
+.DS_Store
+Thumbs.db

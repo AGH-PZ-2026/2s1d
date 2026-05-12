@@ -1,4 +1,4 @@
-# Stack Technologiczny i Uzasadnienie
+# Stack technologiczny i uzasadnienie
 
 Wybraliśmy poniższe technologie na podstawie analizy umiejętności członków zespołu oraz wymagań projektu:
 

@@ -2,24 +2,36 @@ Serwer API oparty na frameworku FastAPI.
 
 ## Instalacja lokalna
 
-1. Stworz srodowisko wirtualne:
-   cd backend
-   python -m venv .venv
-
+1. Stwórz środowisko wirtualne:
+```bash
+cd backend
+python -m venv .venv
+```
 2. Aktywuj srodowisko:
-   - Windows: .venv\Scripts\activate
-   - Linux/macOS: source .venv/bin/activate
+- Windows: 
+```powershell
+.venv\Scripts\activate
+```
+- Linux/macOS: 
+```bash
+source .venv/bin/activate
+```
 
 3. Zainstaluj zaleznosci:
-   pip install -r requirements.txt
+```bash
+pip install -r requirements.txt
+```
 
 4. Ustaw zmienne środowiskowe ( uzupełnij .env )
-   cp ../.env.example ../.env
-
+```bash
+cp ../.env.example ../.env
+```
 ## Uruchamianie
 
 Uruchom serwer:
+```bash
 uvicorn app.main:app --reload
+```
 
 Po uruchomieniu serwera:
 http://127.0.0.1:8000
