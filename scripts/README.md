@@ -18,9 +18,3 @@ Pierwsza konfiguracja projektu. Przy pierwszym uruchomieniu kopiowane jest `.env
 ```bash
 sh scripts/setup.sh
 ```
-
-## reset-db.sh
-Kasuje wszystkie dane z bazy. UŻYWAĆ TYLKO LOKALNIE.
-```bash
-sh scripts/reset-db.sh
-```

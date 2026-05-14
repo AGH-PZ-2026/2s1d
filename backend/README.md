@@ -2,24 +2,15 @@ Serwer API oparty na frameworku FastAPI.
 
 ## Instalacja lokalna
 
-1. Stwórz środowisko wirtualne:
+1. Zainstaluj uv:
 ```bash
-cd backend
-python -m venv .venv
-```
-2. Aktywuj srodowisko:
-- Windows: 
-```powershell
-.venv\Scripts\activate
-```
-- Linux/macOS: 
-```bash
-source .venv/bin/activate
+pip install uv
 ```
 
 3. Zainstaluj zaleznosci:
 ```bash
-pip install -r requirements.txt
+cd backend
+uv sync
 ```
 
 4. Ustaw zmienne środowiskowe ( uzupełnij .env )
@@ -30,7 +21,7 @@ cp ../.env.example ../.env
 
 Uruchom serwer:
 ```bash
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 Po uruchomieniu serwera:
