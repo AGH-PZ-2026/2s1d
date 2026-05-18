@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     
     @property
     def DATABASE_URL(self) -> str:
-        # Skleja zmienne z .env w jeden link dla SQLAlchemy
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         
     model_config = {"env_file": BASE_DIR / ".env", "extra": "ignore"}
