@@ -9,3 +9,20 @@ ignore = []
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+[project]
+name = "inventory-backend"
+version = "0.1.0"
+description = "System zarządzania - backend"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "psycopg2-binary",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "httpx",
+]
