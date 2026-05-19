@@ -12,9 +12,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     DEBUG: bool = False
     
-    @property
-    def DATABASE_URL(self) -> str:
-        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    DATABASE_URL: str
         
     model_config = {"env_file": BASE_DIR / ".env", "extra": "ignore"}
     
