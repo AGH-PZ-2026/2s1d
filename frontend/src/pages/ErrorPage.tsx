@@ -1,12 +1,21 @@
-import { useRouteError, Link } from 'react-router-dom';
+import { useRouteError, Link, isRouteErrorResponse } from 'react-router-dom';
 
 export const ErrorPage = () => {
-    const error = useRouteError() as any;
-    return (
-      <div style={{ textAlign: 'center', marginTop: '50px' }}>
+  const error = useRouteError();
+  let errorMessage: string;
+  if (isRouteErrorResponse(error)) {
+    errorMessage = error.statusText;
+  } else if (error instanceof Error) {
+    errorMessage = error.message;
+  } else {
+    errorMessage = 'Unknown error occurred';
+  }
+
+  return (
+    <div style={{ textAlign: 'center', marginTop: '50px' }}>
       <h1>Something went wrong.</h1>
-      <p>{error.statusText || error.message}</p>
+      <p>{errorMessage}</p>
       <Link to="/">Back to main page</Link>
     </div>
-    );
+  );
 };

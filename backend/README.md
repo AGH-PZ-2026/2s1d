@@ -3,23 +3,28 @@ Serwer API oparty na frameworku FastAPI.
 ## Instalacja lokalna
 
 1. Zainstaluj uv:
+
 ```bash
 pip install uv
 ```
 
 3. Zainstaluj zaleznosci:
+
 ```bash
 cd backend
 uv sync
 ```
 
 4. Ustaw zmienne środowiskowe ( uzupełnij .env )
+
 ```bash
 cp ../.env.example ../.env
 ```
+
 ## Uruchamianie
 
 Uruchom serwer:
+
 ```bash
 uv run uvicorn app.main:app --reload
 ```
@@ -30,6 +35,7 @@ http://127.0.0.1:8000
 ## Testowanie
 
 Uruchom testy:
+
 ```bash
 uv run pytest -v
 ```
