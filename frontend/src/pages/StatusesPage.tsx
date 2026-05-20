@@ -123,15 +123,17 @@ export default function StatusesPage() {
                     {status.type === 'system' ? 'Systemowy' : 'Własny'}
                   </span>
                 </td>
-                <td className="td-actions">
-                  {status.type === 'custom' ? (
-                    <>
-                      <button className="btn btn-sm btn-secondary" onClick={() => openEdit(status)}>Edytuj</button>
-                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(status)}>Usuń</button>
-                    </>
-                  ) : (
-                    <span className="locked">🔒 Chroniony</span>
-                  )}
+                <td>
+                  <div className="td-actions">
+                    {status.type === 'custom' ? (
+                      <>
+                        <button className="btn btn-sm btn-secondary" onClick={() => openEdit(status)}>Edytuj</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(status)}>Usuń</button>
+                      </>
+                    ) : (
+                      <span className="locked">🔒 Chroniony</span>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
