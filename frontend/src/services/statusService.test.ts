@@ -60,4 +60,9 @@ describe('statusService', () => {
       statusService.remove(system.id)
     ).rejects.toThrow('systemowych')
   })
+  it('rzuca błąd gdy slug zawiera niedozwolone znaki', async () => {
+    await expect(
+      statusService.create({ name: 'Zły slug', slug: 'Zły slug!' })
+    ).rejects.toThrow('małe litery')
+  })
 })

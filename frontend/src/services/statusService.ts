@@ -25,14 +25,24 @@ let mockStatuses: Status[] = [
 
 let nextId = 8
 
+const _fetchStatuses = (): Status[] => {
+  return [...mockStatuses]
+}
+
 export const statusService = {
   async getAll(): Promise<Status[]> {
     await delay(100)
-    return [...mockStatuses]
+    return _fetchStatuses()
   },
 
   async create(payload: CreateStatusPayload): Promise<Status> {
     await delay(300)
+
+    const slugValid = /^[a-z0-9_]+$/.test(payload.slug)
+    if (!slugValid) {
+      throw new Error('Identyfikator może zawierać tylko małe litery, cyfry i podkreślniki.')
+    }
+    
     const slugExists = mockStatuses.some(s => s.slug === payload.slug)
     if (slugExists) throw new Error('Status o takim identyfikatorze już istnieje.')
     const newStatus: Status = { id: nextId++, name: payload.name, slug: payload.slug, type: 'custom', description: payload.description }
