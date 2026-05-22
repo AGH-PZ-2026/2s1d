@@ -27,7 +27,7 @@ export default function StatusesPage() {
     try {
       const data = await statusService.getAll();
       setStatuses(data);
-    } catch (e) {
+    } catch {
       setError('Nie udało się pobrać statusów.');
     } finally {
       setLoading(false);
@@ -35,7 +35,8 @@ export default function StatusesPage() {
   }, []);
 
   useEffect(() => {
-    fetchStatuses();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchStatuses();
   }, [fetchStatuses]);
 
   const handleCreate = async (payload: CreateStatusPayload) => {
