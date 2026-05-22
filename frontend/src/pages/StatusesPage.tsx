@@ -1,93 +1,99 @@
-import { useState, useEffect, useCallback } from 'react'
-import { statusService } from '../services/statusService'
-import type { Status, CreateStatusPayload, UpdateStatusPayload } from '../types/status'
+import { useState, useEffect, useCallback } from 'react';
+import { statusService } from '../services/statusService';
+import type {
+  Status,
+  CreateStatusPayload,
+  UpdateStatusPayload,
+} from '../types/status';
 
-type ModalMode = 'create' | 'edit'
+type ModalMode = 'create' | 'edit';
 
 interface ModalState {
-  mode: ModalMode
-  status?: Status
+  mode: ModalMode;
+  status?: Status;
 }
 
 export default function StatusesPage() {
-  const [statuses, setStatuses] = useState<Status[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [modal, setModal] = useState<ModalState | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [formLoading, setFormLoading] = useState(false)
+  const [statuses, setStatuses] = useState<Status[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [modal, setModal] = useState<ModalState | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
 
   const fetchStatuses = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const data = await statusService.getAll()
-      setStatuses(data)
+      const data = await statusService.getAll();
+      setStatuses(data);
     } catch (e) {
-      setError('Nie udało się pobrać statusów.')
+      setError('Nie udało się pobrać statusów.');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    fetchStatuses()
-  }, [fetchStatuses])
+    fetchStatuses();
+  }, [fetchStatuses]);
 
   const handleCreate = async (payload: CreateStatusPayload) => {
-    setFormLoading(true)
-    setFormError(null)
+    setFormLoading(true);
+    setFormError(null);
     try {
-      await statusService.create(payload)
-      await fetchStatuses()
-      setModal(null)
+      await statusService.create(payload);
+      await fetchStatuses();
+      setModal(null);
     } catch (e: unknown) {
-      setFormError(e instanceof Error ? e.message : 'Wystąpił błąd.')
+      setFormError(e instanceof Error ? e.message : 'Wystąpił błąd.');
     } finally {
-      setFormLoading(false)
+      setFormLoading(false);
     }
-  }
+  };
 
   const handleUpdate = async (id: number, payload: UpdateStatusPayload) => {
-    setFormLoading(true)
-    setFormError(null)
+    setFormLoading(true);
+    setFormError(null);
     try {
-      await statusService.update(id, payload)
-      await fetchStatuses()
-      setModal(null)
+      await statusService.update(id, payload);
+      await fetchStatuses();
+      setModal(null);
     } catch (e: unknown) {
-      setFormError(e instanceof Error ? e.message : 'Wystąpił błąd.')
+      setFormError(e instanceof Error ? e.message : 'Wystąpił błąd.');
     } finally {
-      setFormLoading(false)
+      setFormLoading(false);
     }
-  }
+  };
 
   const handleDelete = async (status: Status) => {
-    if (!confirm(`Usunąć status "${status.name}"?`)) return
+    if (!confirm(`Usunąć status "${status.name}"?`)) return;
     try {
-      await statusService.remove(status.id)
-      await fetchStatuses()
+      await statusService.remove(status.id);
+      await fetchStatuses();
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Nie udało się usunąć statusu.')
+      alert(e instanceof Error ? e.message : 'Nie udało się usunąć statusu.');
     }
-  }
+  };
 
   const openCreate = () => {
-    setFormError(null)
-    setModal({ mode: 'create' })
-  }
+    setFormError(null);
+    setModal({ mode: 'create' });
+  };
 
   const openEdit = (status: Status) => {
-    setFormError(null)
-    setModal({ mode: 'edit', status })
-  }
+    setFormError(null);
+    setModal({ mode: 'edit', status });
+  };
 
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1 className="page-title">Statusy i flagi</h1>
-          <p className="page-subtitle">Zarządzaj statusami systemowymi i własnymi flagami przedmiotów</p>
+          <p className="page-subtitle">
+            Zarządzaj statusami systemowymi i własnymi flagami przedmiotów
+          </p>
         </div>
         <button className="btn btn-primary" onClick={openCreate}>
           + Dodaj flagę
@@ -113,10 +119,12 @@ export default function StatusesPage() {
             </tr>
           </thead>
           <tbody>
-            {statuses.map(status => (
+            {statuses.map((status) => (
               <tr key={status.id}>
                 <td className="td-name">{status.name}</td>
-                <td><code className="slug">{status.slug}</code></td>
+                <td>
+                  <code className="slug">{status.slug}</code>
+                </td>
                 <td className="td-desc">{status.description ?? '—'}</td>
                 <td>
                   <span className={`badge badge-${status.type}`}>
@@ -127,8 +135,18 @@ export default function StatusesPage() {
                   <div className="td-actions">
                     {status.type === 'custom' ? (
                       <>
-                        <button className="btn btn-sm btn-secondary" onClick={() => openEdit(status)}>Edytuj</button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(status)}>Usuń</button>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => openEdit(status)}
+                        >
+                          Edytuj
+                        </button>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => handleDelete(status)}
+                        >
+                          Usuń
+                        </button>
                       </>
                     ) : (
                       <span className="locked">🔒 Chroniony</span>
@@ -143,10 +161,12 @@ export default function StatusesPage() {
 
       {modal && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{modal.mode === 'create' ? 'Nowa flaga' : 'Edytuj flagę'}</h2>
-              <button className="modal-close" onClick={() => setModal(null)}>✕</button>
+              <button className="modal-close" onClick={() => setModal(null)}>
+                ✕
+              </button>
             </div>
 
             {formError && <div className="alert alert-error">{formError}</div>}
@@ -164,77 +184,130 @@ export default function StatusesPage() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ---------- Formularz tworzenia ----------
 
-function CreateForm({ onSubmit, loading }: {
-  onSubmit: (p: CreateStatusPayload) => void
-  loading: boolean
+function CreateForm({
+  onSubmit,
+  loading,
+}: {
+  onSubmit: (p: CreateStatusPayload) => void;
+  loading: boolean;
 }) {
-  const [name, setName] = useState('')
-  const [slug, setSlug] = useState('')
-  const [description, setDescription] = useState('')
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [description, setDescription] = useState('');
 
   const handleNameChange = (val: string) => {
-    setName(val)
-    setSlug(val.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''))
-  }
+    setName(val);
+    setSlug(
+      val
+        .toLowerCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^a-z0-9_]/g, '')
+    );
+  };
 
   const submit = () => {
-    if (!name.trim() || !slug.trim()) return
-    onSubmit({ name: name.trim(), slug: slug.trim(), description: description.trim() || undefined })
-  }
+    if (!name.trim() || !slug.trim()) return;
+    onSubmit({
+      name: name.trim(),
+      slug: slug.trim(),
+      description: description.trim() || undefined,
+    });
+  };
 
   return (
     <div className="form">
       <label className="form-label">Nazwa *</label>
-      <input className="form-input" value={name} onChange={e => handleNameChange(e.target.value)} placeholder="np. Do utylizacji" />
+      <input
+        className="form-input"
+        value={name}
+        onChange={(e) => handleNameChange(e.target.value)}
+        placeholder="np. Do utylizacji"
+      />
 
       <label className="form-label">Identyfikator (slug) *</label>
-      <input className="form-input" value={slug} onChange={e => setSlug(e.target.value)} placeholder="np. to_dispose" />
-      <p className="form-hint">Używany przez API. Tylko małe litery, cyfry i podkreślniki.</p>
+      <input
+        className="form-input"
+        value={slug}
+        onChange={(e) => setSlug(e.target.value)}
+        placeholder="np. to_dispose"
+      />
+      <p className="form-hint">
+        Używany przez API. Tylko małe litery, cyfry i podkreślniki.
+      </p>
 
       <label className="form-label">Opis</label>
-      <input className="form-input" value={description} onChange={e => setDescription(e.target.value)} placeholder="Opcjonalny opis" />
+      <input
+        className="form-input"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Opcjonalny opis"
+      />
 
       <div className="form-actions">
-        <button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim() || !slug.trim()}>
+        <button
+          className="btn btn-primary"
+          onClick={submit}
+          disabled={loading || !name.trim() || !slug.trim()}
+        >
           {loading ? 'Zapisywanie…' : 'Utwórz'}
         </button>
       </div>
     </div>
-  )
+  );
 }
 
 // ---------- Formularz edycji ----------
 
-function EditForm({ status, onSubmit, loading }: {
-  status: Status
-  onSubmit: (p: UpdateStatusPayload) => void
-  loading: boolean
+function EditForm({
+  status,
+  onSubmit,
+  loading,
+}: {
+  status: Status;
+  onSubmit: (p: UpdateStatusPayload) => void;
+  loading: boolean;
 }) {
-  const [name, setName] = useState(status.name)
-  const [description, setDescription] = useState(status.description ?? '')
+  const [name, setName] = useState(status.name);
+  const [description, setDescription] = useState(status.description ?? '');
 
   const submit = () => {
-    onSubmit({ name: name.trim(), description: description.trim() || undefined })
-  }
+    onSubmit({
+      name: name.trim(),
+      description: description.trim() || undefined,
+    });
+  };
 
   return (
     <div className="form">
       <label className="form-label">Nazwa *</label>
-      <input className="form-input" value={name} onChange={e => setName(e.target.value)} />
+      <input
+        className="form-input"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
 
       <label className="form-label">Opis</label>
-      <input className="form-input" value={description} onChange={e => setDescription(e.target.value)} placeholder="Opcjonalny opis" />
+      <input
+        className="form-input"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Opcjonalny opis"
+      />
 
       <div className="form-actions">
-        <button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim()}>
+        <button
+          className="btn btn-primary"
+          onClick={submit}
+          disabled={loading || !name.trim()}
+        >
           {loading ? 'Zapisywanie…' : 'Zapisz'}
         </button>
       </div>
     </div>
-  )
+  );
 }
