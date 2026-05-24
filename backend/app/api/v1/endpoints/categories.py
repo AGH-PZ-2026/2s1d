@@ -34,7 +34,9 @@ def create_category(data: CategoryCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{category_id}", response_model=CategoryResponse)
-def update_category(category_id: int, data: CategoryUpdate, db: Session = Depends(get_db)):
+def update_category(
+    category_id: int, data: CategoryUpdate, db: Session = Depends(get_db)
+):
     return service.update(db, category_id, data)
 
 
