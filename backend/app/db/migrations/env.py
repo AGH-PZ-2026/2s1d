@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.db.session import Base
+from app.models.item_status import ItemStatus  # noqa: F401
 
 config = context.config
 
