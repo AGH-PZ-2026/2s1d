@@ -16,6 +16,7 @@ async def lifespan(app: FastAPI):
         db.close()
     yield
 
+
 app = FastAPI(title="Inventory System API", lifespan=lifespan)
 
 app.include_router(api_router)
@@ -29,4 +30,3 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
-
