@@ -1,6 +1,16 @@
 import os
 
-os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+os.environ.update(
+    {
+        "DATABASE_URL": "sqlite:///./test.db",
+        "POSTGRES_USER": "test",
+        "POSTGRES_PASSWORD": "test",
+        "POSTGRES_DB": "test",
+        "POSTGRES_HOST": "localhost",
+        "POSTGRES_PORT": "5432",
+        "SECRET_KEY": "test",
+    }
+)
 
 import pytest
 from fastapi.testclient import TestClient
