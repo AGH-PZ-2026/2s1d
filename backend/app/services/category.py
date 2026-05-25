@@ -68,7 +68,9 @@ def create(db: Session, data: CategoryCreate) -> Category:
 def update(db: Session, category_id: int, data: CategoryUpdate) -> Category:
     category = get_by_id(db, category_id)
     
-    _check_name_unique_under_parent(db, data.name, data.parent_id, exclude_id=category_id)
+    _check_name_unique_under_parent(
+        db, data.name, data.parent_id, exclude_id=category_id
+    )
 
     if data.parent_id is not None:
         get_by_id(db, data.parent_id)
