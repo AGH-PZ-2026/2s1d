@@ -138,9 +138,7 @@ def test_update_category_name(client):
 
 def test_update_category_empty_name(client):
     category = client.post("/api/v1/categories/", json={"name": "test"}).json()
-    response = client.patch(
-        f"/api/v1/categories/{category['id']}", json={"name": "  "}
-    )
+    response = client.patch(f"/api/v1/categories/{category['id']}", json={"name": "  "})
     assert response.status_code == 422
 
 

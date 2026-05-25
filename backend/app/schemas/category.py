@@ -9,12 +9,13 @@ class CategoryCreate(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def name_not_empty(cls, v: str)->str:
+    def name_not_empty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("Nazwa kategorii nie może być pusta!")
         if len(v) > 100:
             raise ValueError("Nazwa kategorii nie może być dłuższa niż 100 znaków.")
         return v.strip()
+
 
 class CategoryUpdate(BaseModel):
     name: str
@@ -22,12 +23,13 @@ class CategoryUpdate(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def name_not_empty(cls, v: str)->str:
+    def name_not_empty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("Nazwa kategorii nie może być pusta!")
         if len(v) > 100:
             raise ValueError("Nazwa kategorii nie może być dłuższa niż 100 znaków.")
         return v.strip()
+
 
 class CategoryResponse(BaseModel):
     id: int
