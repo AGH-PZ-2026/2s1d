@@ -40,6 +40,20 @@ Uruchom testy:
 uv run pytest -v
 ```
 
+## Kontrola jakości
+
+Uruchom linting:
+
+```bash
+uvx ruff check .
+```
+
+Sprawdź formatowanie:
+
+```bash
+uvx ruff format --check .
+```
+
 ## Struktura projektu
 
 - app/api/v1/endpoints/ - pliki z definicjami scieżek API
