@@ -29,6 +29,8 @@ export default function ItemsPage() {
 
   const [formError, setFormError] = useState<string | null>(null);
 
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   const [formLoading, setFormLoading] = useState(false);
 
   const fetchItems = useCallback(async () => {
@@ -77,6 +79,8 @@ export default function ItemsPage() {
 
       await fetchItems();
 
+      setSuccessMessage('Przedmiot został dodany pomyślnie.');
+
       setModal(null);
     } catch (e: unknown) {
       setFormError(e instanceof Error ? e.message : 'Wystąpił błąd.');
@@ -119,6 +123,10 @@ export default function ItemsPage() {
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
+
+      {successMessage && (
+        <div className="alert alert-success">{successMessage}</div>
+      )}
 
       {loading ? (
         <div className="loading-state">
