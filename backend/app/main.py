@@ -6,6 +6,7 @@ app = FastAPI(title="Inventory System API")
 
 app.include_router(api_router)
 
+
 @app.get("/")
 async def root():
     return {"message": "Inventory System API is running"}
