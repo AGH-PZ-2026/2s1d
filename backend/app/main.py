@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 
-from app.api.v1.endpoints.categories import router as categories_router
+from app.api.v1.router import api_router
 
 app = FastAPI(title="Inventory System API")
 
-app.include_router(categories_router, prefix="/api/v1")
-
+app.include_router(api_router)
 
 @app.get("/")
 async def root():
