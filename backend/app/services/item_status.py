@@ -21,11 +21,25 @@ def init_system_statuses(db: Session):
     db.commit()
 
 
+def _check_name_unique(db: Session, name: str, exclude_id: int | None = None):
+    q = db.query(ItemStatus).filter(ItemStatus.name == name)
+    
+    if exclude_id:
+        q = q.filter(ItemStatus.id != exclude_id)
+        
+    exists = q.first()
+    
+    if exists:
+        raise HTTPException(status_code=400, detail="Status with this name already exists")
+
+
 def get_all_statuses(db: Session):
     return db.query(ItemStatus).all()
 
 
 def create_status(data: ItemStatusCreate, db: Session):
+    _check_name_unique(db, data.name)
+    
     status = ItemStatus(name=data.name, is_system=False)
     db.add(status)
     db.commit()
@@ -39,6 +53,8 @@ def update_status(status_id: int, data: ItemStatusUpdate, db: Session):
         raise HTTPException(status_code=404, detail="Status not found")
     if status.is_system:
         raise HTTPException(status_code=403, detail="Cannot modify system status")
+    
+    _check_name_unique(db, data.name, exclude_id=status_id)
     status.name = data.name
     db.commit()
     db.refresh(status)

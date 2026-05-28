@@ -1,12 +1,19 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+class ItemStatusBase(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+        
+    @field_validator("name")
+    @classmethod
+    def normalize(cls, v: str):
+        return v.strip()
+
+class ItemStatusCreate(ItemStatusBase):
+    pass
 
 
-class ItemStatusCreate(BaseModel):
-    name: str
-
-
-class ItemStatusUpdate(BaseModel):
-    name: str
+class ItemStatusUpdate(ItemStatusBase):
+    pass
 
 
 class ItemStatusResponse(BaseModel):
