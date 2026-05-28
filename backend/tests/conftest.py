@@ -17,7 +17,6 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.services.item_status import init_system_statuses
 
-
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
 engine = create_engine(

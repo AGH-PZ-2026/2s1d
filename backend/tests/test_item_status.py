@@ -10,7 +10,7 @@ def test_get_all_statuses(client):
         "Uszkodzony",
         "Oczekuje zatwierdzenia",
     }
-    
+
     assert response.status_code == 200
     assert expected.issubset(names)
 
@@ -21,20 +21,20 @@ def test_create_status(client):
     assert response.json()["name"] == "Test"
     assert response.json()["is_system"] is False
 
+
 def test_create_duplicate_status(client):
     client.post("/api/v1/item-status/", json={"name": "Test"})
 
     response = client.post("/api/v1/item-status/", json={"name": "Test"})
 
     assert response.status_code == 400
-    
+
+
 def test_create_empty_name(client):
-    response = client.post(
-        "/api/v1/item-status/",
-        json={"name": ""}
-    )
+    response = client.post("/api/v1/item-status/", json={"name": ""})
 
     assert response.status_code == 422
+
 
 def test_delete_custom_status(client):
     custom_status = client.post("/api/v1/item-status/", json={"name": "Test"})
@@ -57,16 +57,15 @@ def test_update_custom_status(client):
     assert response.status_code == 200
     assert response.json()["name"] == "New name"
 
+
 def test_update_to_existing_name(client):
-    s1 = client.post("/api/v1/item-status/", json={"name": "A"})
+    client.post("/api/v1/item-status/", json={"name": "A"})
     s2 = client.post("/api/v1/item-status/", json={"name": "B"})
 
-    response = client.put(
-        f"/api/v1/item-status/{s2.json()['id']}",
-        json={"name": "A"}
-    )
+    response = client.put(f"/api/v1/item-status/{s2.json()['id']}", json={"name": "A"})
 
     assert response.status_code == 400
+
 
 def test_update_system_status_forbidden(client):
     all_statuses = client.get("/api/v1/item-status/").json()
@@ -76,14 +75,13 @@ def test_update_system_status_forbidden(client):
     )
     assert response.status_code == 403
 
+
 def test_create_status_trims_name(client):
-    response = client.post(
-        "/api/v1/item-status/",
-        json={"name": "   Test   "}
-    )
+    response = client.post("/api/v1/item-status/", json={"name": "   Test   "})
 
     assert response.status_code == 201
     assert response.json()["name"] == "Test"
+
 
 def test_delete_not_found(client):
     response = client.delete("/api/v1/item-status/99999999")
