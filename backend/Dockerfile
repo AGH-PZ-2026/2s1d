@@ -1,19 +1,25 @@
-FROM python:3.12-slim
+ARG PYTHON_VERSION=3.12-trixie-slim
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
+FROM astral/uv:python${PYTHON_VERSION} AS base
 WORKDIR /app
+RUN addgroup --gid 1000 --system app && \
+    adduser --system --uid 1000 --ingroup app app && \
+    chown -R app:app /app
+ENV UV_SYSTEM_PYTHON=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+FROM base AS deps
+COPY pyproject.toml uv.lock  .
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    uv pip install -r pyproject.toml
+RUN chown -R app:app /app
 
-COPY pyproject.toml ./
-RUN uv pip install --system --no-cache -e .
+FROM deps AS dev-deps
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    uv pip install --group dev -r pyproject.toml
+RUN chown -R app:app /app
 
-COPY . .
-
+FROM dev-deps AS development
+COPY --chown=app:app . .
 EXPOSE 8000
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+USER app
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
