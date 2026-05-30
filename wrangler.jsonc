@@ -1,0 +1,62 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pz-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-09",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "<YOUR_HYPERDRIVE_CONFIG_ID>",
+      "localConnectionString": "mysql://pz_user:pz_pass@localhost:3306/pz_db"
+    }
+  ],
+
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.1
+    }
+  },
+
+  "env": {
+    "production": {
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "<YOUR_HYPERDRIVE_CONFIG_ID>"
+        }
+      ],
+      "routes": [
+        {
+          "pattern": "<YOUR_DOMAIN>",
+          "custom_domain": true
+        }
+      ],
+      "observability": {
+        "enabled": true,
+        "logs": {
+          "head_sampling_rate": 1
+        },
+        "traces": {
+          "enabled": true,
+          "head_sampling_rate": 0.1
+        }
+      }
+    }
+  }
+}

@@ -1,36 +1,14 @@
-# python
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-env/
-build/
-develop-eggs/
-dist/
-uploads/
-backend/uploads/
-
-# node
 node_modules/
-npm-debug.log*
-yarn-error.log*
-.eslintcache
-
-# env
+dist/
 .env
 .env.local
-
-# db
-*.db
+.dev.vars
 *.sqlite3
-
-# docker
 docker-compose.override.yml
-
-# ide
 .idea/
 .vscode/
-
-# os
 .DS_Store
 Thumbs.db
+.wrangler/
+worker-configuration.d.ts
+coverage/

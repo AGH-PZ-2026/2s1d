@@ -1,71 +1,22 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-go/master/schema/compose-spec.json
 services:
   db:
-    image: postgres:16-alpine
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-pz_db}
+      MYSQL_USER: ${MYSQL_USER:-pz_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-pz_pass}
     ports:
-      - ${DB_PORT:-}:5432
+      - "${MYSQL_PORT:-3306}:3306"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
+      - ./infra/docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-    env_file: .env
-
-  backend:
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - ${BACKEND_PORT:-}:8000
-    build:
-      context: backend
-      dockerfile: Dockerfile
-      target: development
-    develop:
-      watch:
-        - path: ./backend
-          action: sync
-          target: /app
-          initial_sync: true
-        - path: ./backend/pyproject.toml
-          action: rebuild
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432
-    env_file: .env
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)\"",
-        ]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-    restart: unless-stopped
-
-  frontend:
-    depends_on:
-      backend:
-        condition: service_healthy
-    ports:
-      - ${FRONTEND_PORT:-}:5173
-    build:
-      context: frontend
-      dockerfile: Dockerfile
-      target: development
-    develop:
-      watch:
-        - path: ./frontend
-          action: sync
-          target: /app
-          initial_sync: true
-        - path: ./frontend/package.json
-          action: rebuild
-    env_file: .env
-    restart: unless-stopped
 
 volumes:
-  pgdata:
+  mysql_data:
