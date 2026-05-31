@@ -1,6 +1,8 @@
 import datetime
 from typing import Any
+
 from pydantic import BaseModel, ConfigDict
+
 
 class AuditLogBase(BaseModel):
     user_id: int
@@ -9,8 +11,10 @@ class AuditLogBase(BaseModel):
     old_value: dict[str, Any] | None = None
     new_value: dict[str, Any] | None = None
 
+
 class AuditLogCreate(AuditLogBase):
     pass
+
 
 class AuditLogResponse(AuditLogBase):
     id: int
