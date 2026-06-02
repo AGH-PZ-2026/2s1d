@@ -29,7 +29,7 @@ interface BackendStatusResponse {
 const mapBackendToFrontend = (b: BackendStatusResponse): Status => ({
   id: b.id,
   name: b.name,
-  // Ponieważ backend (ItemStatusResponse) nie ma pola slug, generujemy go automatycznie na froncie
+  // Ponieważ backend nie ma pola slug, generujemy go automatycznie na froncie
   slug: b.name
     .toLowerCase()
     .replace(/\s+/g, '_')
@@ -38,21 +38,23 @@ const mapBackendToFrontend = (b: BackendStatusResponse): Status => ({
   description: undefined, // Backend aktualnie nie przechowuje ani nie zwraca opisu statusu
 });
 
-// Pomocnik do wyciągania i ładnego formatowania błędów walidacyjnych (status 422) z FastAPI
 async function handleApiError(response: Response): Promise<never> {
   if (response.status === 422) {
     try {
       const errorData = await response.json();
       if (Array.isArray(errorData.detail)) {
         const messages = errorData.detail.map(
-          (err: any) => `${err.loc.join('.')}: ${err.msg}`
+          (err: { loc: (string | number)[]; msg: string }) =>
+            `${err.loc.join('.')}: ${err.msg}`
         );
         throw new Error(`Błąd walidacji: ${messages.join(', ')}`);
       }
       throw new Error(errorData.detail || 'Niepoprawne dane wejściowe.');
     } catch (e) {
       if (e instanceof Error) throw e;
-      throw new Error('Błąd walidacji danych po stronie backendu.');
+      throw new Error('Błąd walidacji danych po stronie backendu.', {
+        cause: e,
+      });
     }
   }
   throw new Error(`Błąd serwera (kod: ${response.status}).`);
