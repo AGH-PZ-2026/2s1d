@@ -1,7 +1,14 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import categories, item_status
+from app.api.v1.endpoints import (
+    categories,
+    item_status,
+    items,
+    statuses,
+)
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(item_status.router)
 api_router.include_router(categories.router)
+api_router.include_router(items.router)
+api_router.include_router(statuses.router)
