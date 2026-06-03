@@ -6,7 +6,7 @@ router = APIRouter()
 
 MOCK_ITEMS = {
     1: {"id": 1, "name": "Laptop Dell", "description": "Służbowy laptop"},
-    2: {"id": 2, "name": "Projektor Epson", "description": "Rzutnik"}
+    2: {"id": 2, "name": "Projektor Epson", "description": "Rzutnik"},
 }
 
 PREFIX = "ITEM-QR-"
