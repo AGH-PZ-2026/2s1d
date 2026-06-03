@@ -21,7 +21,7 @@ def test_upload_excel_success_and_errors(client):
     excel_file = create_fake_excel(
         headers=["name", "description"],
         rows=[
-            ["Klawiatura", "Biała, mechaniczna"], 
+            ["Klawiatura", "Biała, mechaniczna"],
             [None, "Brak nazwy!"],
         ],
     )
