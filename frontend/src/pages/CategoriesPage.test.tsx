@@ -5,22 +5,39 @@ import { CategoriesPage } from './CategoriesPage';
 
 vi.mock('../services/categoryService');
 
-const mockCategoryService = vi.mocked(await import('../services/categoryService')).default;
+const mockCategoryService = vi.mocked(
+  await import('../services/categoryService')
+).default;
 
 const mockTreeNode = {
   category: { id: 0, name: 'Root', parentId: null },
   children: [
     {
-      category: { id: 1, name: 'Aparatura pomiarowa', parentId: null, description: 'Urządzenia do pomiarów laboratoryjnych' },
+      category: {
+        id: 1,
+        name: 'Aparatura pomiarowa',
+        parentId: null,
+        description: 'Urządzenia do pomiarów laboratoryjnych',
+      },
       children: [
         {
-          category: { id: 5, name: 'Spektrometry', parentId: 1, description: 'Przyrządy do analizy widmowej' },
+          category: {
+            id: 5,
+            name: 'Spektrometry',
+            parentId: 1,
+            description: 'Przyrządy do analizy widmowej',
+          },
           children: [],
         },
       ],
     },
     {
-      category: { id: 2, name: 'Przyrządy analityczne', parentId: null, description: 'Sprzęt do analiz chemicznych' },
+      category: {
+        id: 2,
+        name: 'Przyrządy analityczne',
+        parentId: null,
+        description: 'Sprzęt do analiz chemicznych',
+      },
       children: [],
     },
   ],
@@ -94,7 +111,9 @@ describe('CategoriesPage', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText('Brak kategorii. Utwórz nową kategorię główną, aby zacząć.')
+          screen.getByText(
+            'Brak kategorii. Utwórz nową kategorię główną, aby zacząć.'
+          )
         ).toBeInTheDocument();
       });
     });
@@ -135,7 +154,9 @@ describe('CategoriesPage', () => {
     it('should disable create button when form is open', async () => {
       render(<CategoriesPage />);
 
-      const button = (await screen.findByText('+ Nowa kategoria główna')) as HTMLButtonElement;
+      const button = (await screen.findByText(
+        '+ Nowa kategoria główna'
+      )) as HTMLButtonElement;
       fireEvent.click(button);
 
       await waitFor(() => {
@@ -157,7 +178,9 @@ describe('CategoriesPage', () => {
       fireEvent.click(button);
 
       const nameInput = screen.getByPlaceholderText('Enter category name');
-      const descriptionInput = screen.getByPlaceholderText('Enter category description (optional)');
+      const descriptionInput = screen.getByPlaceholderText(
+        'Enter category description (optional)'
+      );
       const submitButton = screen.getByText('Add Category');
 
       await userEvent.type(nameInput, 'Nowa aparatura');
@@ -224,7 +247,9 @@ describe('CategoriesPage', () => {
       });
 
       const nameInput = screen.getByPlaceholderText('Enter category name');
-      const descriptionInput = screen.getByPlaceholderText('Enter category description (optional)');
+      const descriptionInput = screen.getByPlaceholderText(
+        'Enter category description (optional)'
+      );
       const submitButton = screen.getByText('Add Category');
 
       await userEvent.type(nameInput, 'Mikroskopy');
@@ -268,7 +293,9 @@ describe('CategoriesPage', () => {
     it('should disable create button when subcategory form is open', async () => {
       render(<CategoriesPage />);
 
-      const button = (await screen.findByText('+ Nowa kategoria główna')) as HTMLButtonElement;
+      const button = (await screen.findByText(
+        '+ Nowa kategoria główna'
+      )) as HTMLButtonElement;
 
       await waitFor(() => {
         const addButtons = screen.getAllByText('Add');
@@ -308,7 +335,9 @@ describe('CategoriesPage', () => {
         fireEvent.click(editButtons[0]);
       });
 
-      const nameInput = screen.getByDisplayValue('Aparatura pomiarowa') as HTMLInputElement;
+      const nameInput = screen.getByDisplayValue(
+        'Aparatura pomiarowa'
+      ) as HTMLInputElement;
       await userEvent.clear(nameInput);
       await userEvent.type(nameInput, 'Aparatura pomiarowa Współczesna');
 
@@ -368,7 +397,9 @@ describe('CategoriesPage', () => {
         fireEvent.click(deleteButtons[0]);
       });
 
-      const confirmButton = screen.getByRole('button', { name: /Usuń kategorię i jej podkategorie/i });
+      const confirmButton = screen.getByRole('button', {
+        name: /Usuń kategorię i jej podkategorie/i,
+      });
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
@@ -386,7 +417,9 @@ describe('CategoriesPage', () => {
         fireEvent.click(deleteButtons[0]);
       });
 
-      const confirmButton = screen.getByRole('button', { name: /Usuń kategorię i jej podkategorie/i });
+      const confirmButton = screen.getByRole('button', {
+        name: /Usuń kategorię i jej podkategorie/i,
+      });
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
@@ -397,7 +430,9 @@ describe('CategoriesPage', () => {
 
   describe('Error handling', () => {
     it('should show error message during CRUD operation (create)', async () => {
-      mockCategoryService.create.mockRejectedValue(new Error('Błąd przy tworzeniu kategorii.'));
+      mockCategoryService.create.mockRejectedValue(
+        new Error('Błąd przy tworzeniu kategorii.')
+      );
 
       render(<CategoriesPage />);
 
@@ -411,13 +446,17 @@ describe('CategoriesPage', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        const errorAlerts = screen.getAllByText('Błąd przy tworzeniu kategorii.');
+        const errorAlerts = screen.getAllByText(
+          'Błąd przy tworzeniu kategorii.'
+        );
         expect(errorAlerts.length).toBeGreaterThan(0);
       });
     });
 
     it('should show error message during CRUD operation (update)', async () => {
-      mockCategoryService.update.mockRejectedValue(new Error('Błąd przy aktualizacji kategorii.'));
+      mockCategoryService.update.mockRejectedValue(
+        new Error('Błąd przy aktualizacji kategorii.')
+      );
 
       render(<CategoriesPage />);
 
@@ -430,13 +469,17 @@ describe('CategoriesPage', () => {
       fireEvent.click(saveButton);
 
       await waitFor(() => {
-        const errorAlerts = screen.getAllByText('Błąd przy aktualizacji kategorii.');
+        const errorAlerts = screen.getAllByText(
+          'Błąd przy aktualizacji kategorii.'
+        );
         expect(errorAlerts.length).toBeGreaterThan(0);
       });
     });
 
     it('should show error message during CRUD operation (delete)', async () => {
-      mockCategoryService.remove.mockRejectedValue(new Error('Błąd przy usuwaniu kategorii.'));
+      mockCategoryService.remove.mockRejectedValue(
+        new Error('Błąd przy usuwaniu kategorii.')
+      );
 
       render(<CategoriesPage />);
 
@@ -445,18 +488,24 @@ describe('CategoriesPage', () => {
         fireEvent.click(deleteButtons[0]);
       });
 
-      const confirmButton = screen.getByRole('button', { name: /Usuń kategorię i jej podkategorie/i });
+      const confirmButton = screen.getByRole('button', {
+        name: /Usuń kategorię i jej podkategorie/i,
+      });
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Błąd przy usuwaniu kategorii.')).toBeInTheDocument();
+        expect(
+          screen.getByText('Błąd przy usuwaniu kategorii.')
+        ).toBeInTheDocument();
       });
     });
   });
 
   describe('Retry functionality', () => {
     it('should show retry button when initial load fails', async () => {
-      mockCategoryService.getTree.mockRejectedValue(new Error('Nie udało się załadować kategorii.'));
+      mockCategoryService.getTree.mockRejectedValue(
+        new Error('Nie udało się załadować kategorii.')
+      );
 
       render(<CategoriesPage />);
 
@@ -473,7 +522,7 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       const retryButton = await screen.findByText('Spróbuj ponownie');
-      
+
       mockCategoryService.getTree.mockResolvedValue(mockTreeNode);
       fireEvent.click(retryButton);
 
@@ -513,7 +562,9 @@ describe('CategoriesPage', () => {
     it('should re-enable create button after closing form', async () => {
       render(<CategoriesPage />);
 
-      const button = (await screen.findByText('+ Nowa kategoria główna')) as HTMLButtonElement;
+      const button = (await screen.findByText(
+        '+ Nowa kategoria główna'
+      )) as HTMLButtonElement;
       fireEvent.click(button);
 
       const cancelButton = screen.getByText('Cancel');
@@ -535,12 +586,17 @@ describe('CategoriesPage', () => {
 
       render(<CategoriesPage />);
 
-      await waitFor(() => {
-        const editButtons = screen.getAllByText('Edit');
-        fireEvent.click(editButtons[0]);
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          const editButtons = screen.getAllByText('Edit');
+          fireEvent.click(editButtons[0]);
+        },
+        { timeout: 3000 }
+      );
 
-      let nameInput = screen.getByDisplayValue('Aparatura pomiarowa') as HTMLInputElement;
+      let nameInput = screen.getByDisplayValue(
+        'Aparatura pomiarowa'
+      ) as HTMLInputElement;
       await userEvent.clear(nameInput);
       await userEvent.type(nameInput, 'Updated 1');
 
@@ -563,7 +619,9 @@ describe('CategoriesPage', () => {
         fireEvent.click(editButtons[0]);
       });
 
-      nameInput = screen.getByDisplayValue('Aparatura pomiarowa') as HTMLInputElement;
+      nameInput = screen.getByDisplayValue(
+        'Aparatura pomiarowa'
+      ) as HTMLInputElement;
       await userEvent.clear(nameInput);
       await userEvent.type(nameInput, 'Updated 2');
 

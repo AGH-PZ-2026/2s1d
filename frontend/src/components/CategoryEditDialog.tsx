@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Category, UpdateCategoryPayload } from '../types/category';
 import './CategoryEditDialog.css';
 
@@ -17,17 +17,11 @@ export const CategoryEditDialog: React.FC<CategoryEditDialogProps> = ({
   loading = false,
   error,
 }) => {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState(() => category?.name ?? '');
+  const [description, setDescription] = useState(
+    () => category?.description ?? ''
+  );
   const [nameError, setNameError] = useState('');
-
-  useEffect(() => {
-    if (category) {
-      setName(category.name || '');
-      setDescription(category.description || '');
-      setNameError('');
-    }
-  }, [category]);
 
   const validateForm = (): boolean => {
     if (!name.trim()) {
@@ -71,7 +65,10 @@ export const CategoryEditDialog: React.FC<CategoryEditDialogProps> = ({
   }
 
   return (
-    <div className="category-edit-dialog-backdrop" onClick={handleBackdropClick}>
+    <div
+      className="category-edit-dialog-backdrop"
+      onClick={handleBackdropClick}
+    >
       <div className="category-edit-dialog">
         <div className="dialog-header">
           <h2>Edit Category</h2>

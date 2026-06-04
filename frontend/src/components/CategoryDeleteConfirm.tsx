@@ -30,7 +30,10 @@ export const CategoryDeleteConfirm: React.FC<CategoryDeleteConfirmProps> = ({
   const hasChildren = childCount > 0;
 
   return (
-    <div className="category-delete-dialog-backdrop" onClick={handleBackdropClick}>
+    <div
+      className="category-delete-dialog-backdrop"
+      onClick={handleBackdropClick}
+    >
       <div className="category-delete-dialog">
         <div className="dialog-header">
           <h2>Usuń kategorię</h2>
@@ -38,14 +41,16 @@ export const CategoryDeleteConfirm: React.FC<CategoryDeleteConfirmProps> = ({
 
         <div className="dialog-body">
           <p className="delete-message">
-            Czy na pewno chcesz usunąć kategorię <strong>{category.name}</strong>?
+            Czy na pewno chcesz usunąć kategorię{' '}
+            <strong>{category.name}</strong>?
           </p>
 
           {hasChildren && (
             <div className="warning-box">
               <p className="warning-title">⚠️ Ostrzeżenie</p>
               <p>
-                Ta kategoria zawiera <strong>{childCount}</strong> {childCount === 1 ? 'podkategorię' : 'podkategorii'}.
+                Ta kategoria zawiera <strong>{childCount}</strong>{' '}
+                {childCount === 1 ? 'podkategorię' : 'podkategorii'}.
               </p>
             </div>
           )}
@@ -65,7 +70,11 @@ export const CategoryDeleteConfirm: React.FC<CategoryDeleteConfirmProps> = ({
             onClick={onConfirm}
             disabled={loading}
           >
-            {loading ? 'Usuwanie...' : hasChildren ? 'Usuń kategorię i jej podkategorie' : 'Usuń'}
+            {loading
+              ? 'Usuwanie...'
+              : hasChildren
+                ? 'Usuń kategorię i jej podkategorie'
+                : 'Usuń'}
           </button>
         </div>
       </div>

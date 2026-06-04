@@ -1,6 +1,6 @@
 /**
  * Category API Contract
- * 
+ *
  * Defines TypeScript interfaces for category management operations.
  * These types correspond to the backend category API responses and request payloads.
  */

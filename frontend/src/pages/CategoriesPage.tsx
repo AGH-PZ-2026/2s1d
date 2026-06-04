@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Category, CategoryTreeNode, CreateCategoryPayload, UpdateCategoryPayload } from '../types/category';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Category,
+  CategoryTreeNode,
+  CreateCategoryPayload,
+  UpdateCategoryPayload,
+} from '../types/category';
 import categoryService from '../services/categoryService';
 import { CategoryTree } from '../components/CategoryTree';
 import { CategoryForm } from '../components/CategoryForm';
@@ -8,7 +13,9 @@ import { CategoryDeleteConfirm } from '../components/CategoryDeleteConfirm';
 
 export const CategoriesPage: React.FC = () => {
   // Main state
-  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode | null>(null);
+  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,12 +27,34 @@ export const CategoriesPage: React.FC = () => {
   const [showCreateRootForm, setShowCreateRootForm] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(
+    null
+  );
 
-  // Load tree on mount
-  useEffect(() => {
-    handleLoadTree();
+  const handleLoadTree = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const tree = await categoryService.getTree();
+      setCategoryTree(tree);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Nie udało się załadować kategorii.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void handleLoadTree();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [handleLoadTree]);
 
   // Reset operation error after 5 seconds
   useEffect(() => {
@@ -35,20 +64,6 @@ export const CategoriesPage: React.FC = () => {
     }
   }, [operationError]);
 
-  const handleLoadTree = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const tree = await categoryService.getTree();
-      setCategoryTree(tree);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Nie udało się załadować kategorii.';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleCreateRoot = async (payload: CreateCategoryPayload) => {
     try {
       setOperationError(null);
@@ -56,42 +71,55 @@ export const CategoriesPage: React.FC = () => {
       setShowCreateRootForm(false);
       await handleLoadTree();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Błąd przy tworzeniu kategorii.';
+      const message =
+        err instanceof Error ? err.message : 'Błąd przy tworzeniu kategorii.';
       setOperationError(message);
     }
   };
 
-  const handleCreateSubcategory = async (parentId: number, payload: CreateCategoryPayload) => {
+  const handleCreateSubcategory = async (
+    parentId: number,
+    payload: CreateCategoryPayload
+  ) => {
     try {
       setOperationError(null);
       setLoadingIds((prev) => [...prev, parentId]);
-      
+
       const createPayload: CreateCategoryPayload = {
         ...payload,
         parentId,
       };
-      
+
       await categoryService.create(createPayload);
       setSelectedParentId(null);
       await handleLoadTree();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Błąd przy tworzeniu podkategorii.';
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Błąd przy tworzeniu podkategorii.';
       setOperationError(message);
     } finally {
       setLoadingIds((prev) => prev.filter((id) => id !== parentId));
     }
   };
 
-  const handleUpdateCategory = async (id: number, payload: UpdateCategoryPayload) => {
+  const handleUpdateCategory = async (
+    id: number,
+    payload: UpdateCategoryPayload
+  ) => {
     try {
       setOperationError(null);
       setLoadingIds((prev) => [...prev, id]);
-      
+
       await categoryService.update(id, payload);
       setEditingCategory(null);
       await handleLoadTree();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Błąd przy aktualizacji kategorii.';
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Błąd przy aktualizacji kategorii.';
       setOperationError(message);
     } finally {
       setLoadingIds((prev) => prev.filter((categoryId) => categoryId !== id));
@@ -102,12 +130,13 @@ export const CategoriesPage: React.FC = () => {
     try {
       setOperationError(null);
       setLoadingIds((prev) => [...prev, id]);
-      
+
       await categoryService.remove(id);
       setDeletingCategory(null);
       await handleLoadTree();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Błąd przy usuwaniu kategorii.';
+      const message =
+        err instanceof Error ? err.message : 'Błąd przy usuwaniu kategorii.';
       setOperationError(message);
     } finally {
       setLoadingIds((prev) => prev.filter((categoryId) => categoryId !== id));
@@ -116,7 +145,7 @@ export const CategoriesPage: React.FC = () => {
 
   const getChildCount = (parentId: number): number => {
     if (!categoryTree) return 0;
-    
+
     const countChildren = (node: CategoryTreeNode): number => {
       let count = 0;
       if (node.category.id === parentId && node.children) {
@@ -129,7 +158,7 @@ export const CategoriesPage: React.FC = () => {
       }
       return count;
     };
-    
+
     return countChildren(categoryTree);
   };
 
@@ -180,9 +209,7 @@ export const CategoriesPage: React.FC = () => {
       </div>
 
       {operationError && (
-        <div className="alert alert-error">
-          {operationError}
-        </div>
+        <div className="alert alert-error">{operationError}</div>
       )}
 
       <div style={styles.contentContainer}>
@@ -204,7 +231,10 @@ export const CategoriesPage: React.FC = () => {
                 onAddSubcategory={(parentId) => setSelectedParentId(parentId)}
                 onEdit={(category) => setEditingCategory(category)}
                 onDelete={(categoryId) => {
-                  const categoryToDelete = findCategoryById(categoryTree, categoryId);
+                  const categoryToDelete = findCategoryById(
+                    categoryTree,
+                    categoryId
+                  );
                   if (categoryToDelete) {
                     setDeletingCategory(categoryToDelete);
                   }
@@ -236,7 +266,10 @@ export const CategoriesPage: React.FC = () => {
                 setShowCreateRootForm(false);
                 setSelectedParentId(null);
               }}
-              loading={selectedParentId !== null && loadingIds.includes(selectedParentId)}
+              loading={
+                selectedParentId !== null &&
+                loadingIds.includes(selectedParentId)
+              }
               error={operationError}
             />
           </div>
@@ -246,6 +279,7 @@ export const CategoriesPage: React.FC = () => {
       {/* Edit Dialog */}
       {editingCategory && (
         <CategoryEditDialog
+          key={editingCategory.id}
           category={editingCategory}
           onSave={handleUpdateCategory}
           onCancel={() => setEditingCategory(null)}
@@ -269,7 +303,10 @@ export const CategoriesPage: React.FC = () => {
 };
 
 // Helper function to find a category in the tree by ID
-const findCategoryById = (tree: CategoryTreeNode, id: number): Category | null => {
+const findCategoryById = (
+  tree: CategoryTreeNode,
+  id: number
+): Category | null => {
   if (tree.category.id === id) {
     return tree.category;
   }

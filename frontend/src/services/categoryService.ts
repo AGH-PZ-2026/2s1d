@@ -86,10 +86,10 @@ const INITIAL_CATEGORIES: Category[] = [
     description: 'Szafy do suszenia i przechowywania próbek',
   },
 ];
- 
+
 let mockCategories: Category[] = INITIAL_CATEGORIES.map((cat) => ({ ...cat }));
 let nextId = 12;
- 
+
 export const _resetForTesting = (): void => {
   mockCategories = INITIAL_CATEGORIES.map((cat) => ({ ...cat }));
   nextId = 12;
@@ -105,7 +105,11 @@ const _validateCategoryName = (name: string): void => {
   }
 };
 
-const _checkDuplicateName = (name: string, parentId: number | null, excludeId?: number): void => {
+const _checkDuplicateName = (
+  name: string,
+  parentId: number | null,
+  excludeId?: number
+): void => {
   const isDuplicate = mockCategories.some(
     (cat) =>
       cat.name === name &&
@@ -159,7 +163,9 @@ export const categoryService = {
 
     // If parentId is provided, verify it exists
     if (payload.parentId !== null && payload.parentId !== undefined) {
-      const parentExists = mockCategories.some((cat) => cat.id === payload.parentId);
+      const parentExists = mockCategories.some(
+        (cat) => cat.id === payload.parentId
+      );
       if (!parentExists) {
         throw new Error('Kategoria nadrzędna nie istnieje');
       }
@@ -186,7 +192,9 @@ export const categoryService = {
     }
 
     const updated = { ...category, ...payload };
-    mockCategories = mockCategories.map((cat) => (cat.id === id ? updated : cat));
+    mockCategories = mockCategories.map((cat) =>
+      cat.id === id ? updated : cat
+    );
     return updated;
   },
 

@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { categoryService, _resetForTesting } from './categoryService';
-import type { Category, CreateCategoryPayload, UpdateCategoryPayload } from '../types/category';
+import type {
+  CreateCategoryPayload,
+  UpdateCategoryPayload,
+} from '../types/category';
 
 describe('categoryService', () => {
   // Helper to create fresh service state for each test
@@ -38,8 +41,12 @@ describe('categoryService', () => {
       const rootCategories = categories.filter((cat) => cat.parentId === null);
 
       expect(rootCategories.length).toBeGreaterThan(0);
-      expect(rootCategories.some((cat) => cat.name === 'Aparatura pomiarowa')).toBe(true);
-      expect(rootCategories.some((cat) => cat.name === 'Przyrządy analityczne')).toBe(true);
+      expect(
+        rootCategories.some((cat) => cat.name === 'Aparatura pomiarowa')
+      ).toBe(true);
+      expect(
+        rootCategories.some((cat) => cat.name === 'Przyrządy analityczne')
+      ).toBe(true);
     });
 
     it('should include child categories with parentId set', async () => {
@@ -48,7 +55,9 @@ describe('categoryService', () => {
 
       expect(childCategories.length).toBeGreaterThan(0);
       expect(
-        childCategories.some((cat) => cat.name === 'Spektrometry' && cat.parentId === 1)
+        childCategories.some(
+          (cat) => cat.name === 'Spektrometry' && cat.parentId === 1
+        )
       ).toBe(true);
     });
 
@@ -96,11 +105,15 @@ describe('categoryService', () => {
     it('should nest child categories under their parents', async () => {
       const tree = await categoryService.getTree();
 
-      const measurementNode = tree.children.find((node) => node.category.name === 'Aparatura pomiarowa');
+      const measurementNode = tree.children.find(
+        (node) => node.category.name === 'Aparatura pomiarowa'
+      );
       expect(measurementNode).toBeDefined();
       expect(measurementNode!.children.length).toBeGreaterThan(0);
 
-      const childNames = measurementNode!.children.map((child) => child.category.name);
+      const childNames = measurementNode!.children.map(
+        (child) => child.category.name
+      );
       expect(childNames).toContain('Spektrometry');
       expect(childNames).toContain('Mikroskopy');
       expect(childNames).toContain('Czujniki temperatury');
@@ -109,7 +122,9 @@ describe('categoryService', () => {
     it('should have correct parentId relationships in tree', async () => {
       const tree = await categoryService.getTree();
 
-      const measurementNode = tree.children.find((node) => node.category.name === 'Aparatura pomiarowa');
+      const measurementNode = tree.children.find(
+        (node) => node.category.name === 'Aparatura pomiarowa'
+      );
       measurementNode!.children.forEach((child) => {
         expect(child.category.parentId).toBe(measurementNode!.category.id);
       });
@@ -208,10 +223,10 @@ describe('categoryService', () => {
     });
 
     it('should throw error when name is undefined', async () => {
-      const payload: CreateCategoryPayload = {
-        name: undefined as any,
+      const payload = {
+        name: undefined,
         parentId: null,
-      };
+      } as unknown as CreateCategoryPayload;
 
       await expect(categoryService.create(payload)).rejects.toThrow();
     });
@@ -343,7 +358,9 @@ describe('categoryService', () => {
     });
 
     it('should make changes visible in getAll()', async () => {
-      await categoryService.update(1, { name: 'Aparatura pomiarowa Zabytkowa' });
+      await categoryService.update(1, {
+        name: 'Aparatura pomiarowa Zabytkowa',
+      });
 
       const allCategories = await categoryService.getAll();
       const updated = allCategories.find((cat) => cat.id === 1);
@@ -392,9 +409,9 @@ describe('categoryService', () => {
     });
 
     it('should allow updating to same name (exclude self from duplicate check)', async () => {
-      const category = await categoryService.getAll().then((cats) =>
-        cats.find((cat) => cat.id === 1)
-      );
+      const category = await categoryService
+        .getAll()
+        .then((cats) => cats.find((cat) => cat.id === 1));
 
       const payload: UpdateCategoryPayload = {
         name: category!.name,
@@ -424,9 +441,9 @@ describe('categoryService', () => {
     });
 
     it('should maintain other properties when updating', async () => {
-      const before = await categoryService.getAll().then((cats) =>
-        cats.find((cat) => cat.id === 5)
-      );
+      const before = await categoryService
+        .getAll()
+        .then((cats) => cats.find((cat) => cat.id === 5));
 
       const payload: UpdateCategoryPayload = {
         description: 'Updated description only',
@@ -527,7 +544,9 @@ describe('categoryService', () => {
       const created = await categoryService.create(payload);
       const tree = await categoryService.getTree();
 
-      const apparatusNode = tree.children.find((node) => node.category.name === 'Aparatura pomiarowa');
+      const apparatusNode = tree.children.find(
+        (node) => node.category.name === 'Aparatura pomiarowa'
+      );
       if (!apparatusNode) {
         throw new Error('Aparatura pomiarowa node not found');
       }
@@ -543,7 +562,9 @@ describe('categoryService', () => {
       await categoryService.update(5, { name: 'Obraz i Spektrometry' });
       const tree = await categoryService.getTree();
 
-      const apparatusNode = tree.children.find((node) => node.category.name === 'Aparatura pomiarowa');
+      const apparatusNode = tree.children.find(
+        (node) => node.category.name === 'Aparatura pomiarowa'
+      );
       if (!apparatusNode) {
         throw new Error('Aparatura pomiarowa node not found');
       }
@@ -576,6 +597,6 @@ describe('categoryService', () => {
       const childCountAfter = apparatusNodeAfter.children.length;
 
       expect(childCountAfter).toBe(childCountBefore - 1);
-    })
+    });
   });
 });

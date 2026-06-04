@@ -185,9 +185,7 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
 
         {/* Render Children */}
         {hasChildren && isExpanded && (
-          <div>
-            {children.map((child) => renderNode(child, depth + 1))}
-          </div>
+          <div>{children.map((child) => renderNode(child, depth + 1))}</div>
         )}
       </div>
     );

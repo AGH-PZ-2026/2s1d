@@ -41,7 +41,11 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
       description: description.trim() || undefined,
     };
 
-    if (mode === 'subcategory' && parentCategoryId !== undefined && parentCategoryId !== null) {
+    if (
+      mode === 'subcategory' &&
+      parentCategoryId !== undefined &&
+      parentCategoryId !== null
+    ) {
       payload.parentId = parentCategoryId;
     }
 
@@ -96,11 +100,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
         </div>
 
         <div style={styles.buttonGroup}>
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary"
-          >
+          <button type="submit" disabled={loading} className="btn btn-primary">
             {loading ? 'Saving...' : 'Add Category'}
           </button>
           <button
