@@ -18,7 +18,7 @@ class AuditLogAction(str, Enum):
 
 class AuditLogBase(BaseModel):
     user_id: int
-    action: str
+    action: AuditLogAction
     item_id: int
     old_value: dict[str, Any] | None = None
     new_value: dict[str, Any] | None = None
