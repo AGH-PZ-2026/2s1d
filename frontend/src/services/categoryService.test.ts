@@ -5,11 +5,190 @@ import type {
   UpdateCategoryPayload,
 } from '../types/category';
 
+const INITIAL_CATEGORIES = [
+  {
+    id: 1,
+    name: 'Aparatura pomiarowa',
+    parentId: null,
+    description: 'Urządzenia do precyzyjnych pomiarów laboratoryjnych',
+  },
+  {
+    id: 2,
+    name: 'Przyrządy analityczne',
+    parentId: null,
+    description: 'Sprzęt do analizy chemicznej i biologicznej',
+  },
+  {
+    id: 3,
+    name: 'Meble laboratoryjne',
+    parentId: null,
+    description: 'Stoły, szafy oraz regały do pracy i przechowywania',
+  },
+  {
+    id: 4,
+    name: 'Ochrona osobista',
+    parentId: null,
+    description: 'Elementy ochronne używane w laboratoriach',
+  },
+  {
+    id: 5,
+    name: 'Spektrometry',
+    parentId: 1,
+    description: 'Przyrządy do pomiaru widma i identyfikacji próbek',
+  },
+  {
+    id: 6,
+    name: 'Mikroskopy',
+    parentId: 1,
+    description: 'Instrumenty do obserwacji próbek w powiększeniu',
+  },
+  {
+    id: 7,
+    name: 'Czujniki temperatury',
+    parentId: 1,
+    description: 'Termometry i rejestratory temperatury',
+  },
+  {
+    id: 8,
+    name: 'Chromatografia',
+    parentId: 2,
+    description: 'Systemy do separacji i analizy substancji',
+  },
+  {
+    id: 9,
+    name: 'Spektrofotometry',
+    parentId: 2,
+    description: 'Urządzenia do pomiaru absorpcji światła',
+  },
+  {
+    id: 10,
+    name: 'Stoły robocze',
+    parentId: 3,
+    description: 'Stabilne stanowiska do pracy laboratoryjnej',
+  },
+  {
+    id: 11,
+    name: 'Szafy suszarnicze',
+    parentId: 3,
+    description: 'Szafy do suszenia i przechowywania próbek',
+  },
+];
+
+let testDb = INITIAL_CATEGORIES.map((c) => ({ ...c }));
+let nextId = 12;
+
+vi.stubGlobal(
+  'fetch',
+  vi.fn(async (url: string, options?: RequestInit) => {
+    const isRootUrl = url === '/api/v1/categories';
+    const idMatch = url.match(/\/api\/v1\/categories\/(\d+)/);
+    const method = options?.method || 'GET';
+
+    const response = (status: number, data: unknown) => ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => data,
+    });
+
+    // GET /api/v1/categories
+    if (isRootUrl && method === 'GET') {
+      return response(200, [...testDb]);
+    }
+
+    // POST /api/v1/categories
+    if (isRootUrl && method === 'POST') {
+      const payload = JSON.parse(options?.body as string);
+      if (!payload.name || payload.name.trim().length === 0) {
+        return response(422, { detail: 'Nazwa kategorii nie może być pusta' });
+      }
+      if (
+        testDb.some(
+          (c) =>
+            c.name === payload.name && c.parentId === (payload.parentId ?? null)
+        )
+      ) {
+        return response(422, {
+          detail:
+            'Kategoria o tej nazwie już istnieje na tym poziomie hierarchii',
+        });
+      }
+      if (
+        payload.parentId !== null &&
+        payload.parentId !== undefined &&
+        !testDb.some((c) => c.id === payload.parentId)
+      ) {
+        return response(422, { detail: 'Kategoria nadrzędna nie istnieje' });
+      }
+
+      const newCat = {
+        id: nextId++,
+        name: payload.name,
+        parentId: payload.parentId ?? null,
+        description: payload.description,
+      };
+      testDb.push(newCat);
+      return response(201, newCat);
+    }
+
+    // PUT /api/v1/categories/:id
+    if (idMatch && method === 'PUT') {
+      const id = parseInt(idMatch[1]);
+      const payload = JSON.parse(options?.body as string);
+      const index = testDb.findIndex((c) => c.id === id);
+      if (index === -1)
+        return response(404, { detail: 'Kategoria nie istnieje' });
+
+      if (payload.name !== undefined) {
+        if (!payload.name || payload.name.trim().length === 0) {
+          return response(422, {
+            detail: 'Nazwa kategorii nie może być pusta',
+          });
+        }
+        if (
+          testDb.some(
+            (c) =>
+              c.name === payload.name &&
+              c.parentId === testDb[index].parentId &&
+              c.id !== id
+          )
+        ) {
+          return response(422, {
+            detail:
+              'Kategoria o tej nazwie już istnieje na tym poziomie hierarchii',
+          });
+        }
+      }
+
+      testDb[index] = { ...testDb[index], ...payload };
+      return response(200, testDb[index]);
+    }
+
+    // DELETE /api/v1/categories/:id
+    if (idMatch && method === 'DELETE') {
+      const id = parseInt(idMatch[1]);
+      const index = testDb.findIndex((c) => c.id === id);
+      if (index === -1)
+        return response(404, { detail: 'Kategoria nie istnieje' });
+      if (testDb.some((c) => c.parentId === id)) {
+        return response(422, {
+          detail: 'Nie można usunąć kategorii, która ma podkategorie',
+        });
+      }
+
+      testDb = testDb.filter((c) => c.id !== id);
+      return { ok: true, status: 204, json: async () => ({}) };
+    }
+
+    return response(404, { detail: 'Not Found' });
+  })
+);
+
 describe('categoryService', () => {
-  // Helper to create fresh service state for each test
   beforeEach(() => {
     vi.clearAllMocks();
     _resetForTesting();
+    testDb = INITIAL_CATEGORIES.map((c) => ({ ...c }));
+    nextId = 12;
   });
 
   describe('getAll()', () => {
