@@ -1,12 +1,12 @@
 /**
- * KONTRAKT API – po podłączeniu backendu zamień mock na fetch:
+ * API CONTRACT – replace mock with fetch after connecting the backend:
  *
  * GET    /api/v1/categories          → Category[]
  * POST   /api/v1/categories          → Category        body: CreateCategoryPayload
  * PUT    /api/v1/categories/:id      → Category        body: UpdateCategoryPayload
  * DELETE /api/v1/categories/:id      → 204 No Content
  *
- * Błędy walidacyjne: { detail: string } z kodem 422
+ * Validation errors: { detail: string } with code 422
  */
 
 import type {
@@ -15,6 +15,48 @@ import type {
   UpdateCategoryPayload,
   CategoryTreeNode,
 } from '../types/category';
+
+// Data source and API address configuration
+const USE_MOCKS = false;
+const BASE_URL = 'http://localhost:8000/api/v1/categories';
+
+// Type reflecting the structure of FastAPI/ models (snake_case)
+interface BackendCategoryResponse {
+  id: number;
+  name: string;
+  parent_id: number | null;
+  description?: string;
+}
+
+// Adapter mapping data from backend (snake_case) to frontend structure (camelCase)
+const mapBackendToFrontend = (cat: BackendCategoryResponse): Category => ({
+  id: cat.id,
+  name: cat.name,
+  parentId: cat.parent_id !== undefined ? cat.parent_id : null,
+  description: cat.description,
+});
+
+// Helper handler to extract errors from FastAPI
+const handleResponse = async (response: Response): Promise<void> => {
+  if (response.ok) return;
+  try {
+    const errorData = await response.json();
+    if (errorData && errorData.detail) {
+      if (typeof errorData.detail === 'string')
+        throw new Error(errorData.detail);
+      if (Array.isArray(errorData.detail)) {
+        throw new Error(
+          errorData.detail
+            .map((err: { msg?: string }) => err.msg || JSON.stringify(err))
+            .join(', ')
+        );
+      }
+    }
+  } catch (e) {
+    if (e instanceof Error) throw e;
+  }
+  throw new Error(`Błąd serwera (Status ${response.status})`);
+};
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -125,11 +167,34 @@ const _checkDuplicateName = (
 
 export const categoryService = {
   async getAll(): Promise<Category[]> {
+    if (!USE_MOCKS) {
+      const response = await fetch(BASE_URL);
+      await handleResponse(response);
+      const data: BackendCategoryResponse[] = await response.json();
+      return data.map(mapBackendToFrontend);
+    }
+
     await delay(100);
     return _fetchCategories();
   },
 
   async getTree(): Promise<CategoryTreeNode> {
+    if (!USE_MOCKS) {
+      const categories = await this.getAll();
+      const buildTree = (parentId: number | null): CategoryTreeNode[] => {
+        return categories
+          .filter((cat) => cat.parentId === parentId)
+          .map((cat) => ({
+            category: cat,
+            children: buildTree(cat.id),
+          }));
+      };
+      return {
+        category: { id: 0, name: 'Root', parentId: null },
+        children: buildTree(null),
+      };
+    }
+
     await delay(150);
     const categories = _fetchCategories();
 
@@ -156,12 +221,27 @@ export const categoryService = {
   },
 
   async create(payload: CreateCategoryPayload): Promise<Category> {
-    await delay(300);
+    if (!USE_MOCKS) {
+      const backendPayload = {
+        name: payload.name,
+        parent_id: payload.parentId ?? null,
+        description: payload.description,
+      };
 
+      const response = await fetch(BASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(backendPayload),
+      });
+      await handleResponse(response);
+      const data: BackendCategoryResponse = await response.json();
+      return mapBackendToFrontend(data);
+    }
+
+    await delay(300);
     _validateCategoryName(payload.name);
     _checkDuplicateName(payload.name, payload.parentId ?? null);
 
-    // If parentId is provided, verify it exists
     if (payload.parentId !== null && payload.parentId !== undefined) {
       const parentExists = mockCategories.some(
         (cat) => cat.id === payload.parentId
@@ -182,6 +262,22 @@ export const categoryService = {
   },
 
   async update(id: number, payload: UpdateCategoryPayload): Promise<Category> {
+    if (!USE_MOCKS) {
+      const backendPayload: Partial<BackendCategoryResponse> = {};
+      if (payload.name !== undefined) backendPayload.name = payload.name;
+      if (payload.description !== undefined)
+        backendPayload.description = payload.description;
+
+      const response = await fetch(`${BASE_URL}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(backendPayload),
+      });
+      await handleResponse(response);
+      const data: BackendCategoryResponse = await response.json();
+      return mapBackendToFrontend(data);
+    }
+
     await delay(300);
     const category = mockCategories.find((cat) => cat.id === id);
     if (!category) throw new Error('Kategoria nie istnieje');
@@ -199,6 +295,14 @@ export const categoryService = {
   },
 
   async remove(id: number): Promise<void> {
+    if (!USE_MOCKS) {
+      const response = await fetch(`${BASE_URL}/${id}`, {
+        method: 'DELETE',
+      });
+      await handleResponse(response);
+      return;
+    }
+
     await delay(300);
     const category = mockCategories.find((cat) => cat.id === id);
     if (!category) throw new Error('Kategoria nie istnieje');
