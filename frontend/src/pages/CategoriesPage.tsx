@@ -358,7 +358,7 @@ const styles = {
   } as React.CSSProperties,
   errorContainer: {
     padding: '20px',
-    backgroundColor: '#f8d7da',
+    backgroundColor: '#2c1a1c',
     border: '1px solid #f5c6cb',
     borderRadius: '8px',
     color: '#721c24',
@@ -414,19 +414,19 @@ const styles = {
     gap: '20px',
   } as React.CSSProperties,
   treeContainer: {
-    border: '1px solid #ddd',
+    border: '1px solid #333',
     borderRadius: '8px',
     padding: '20px',
-    backgroundColor: '#fff',
+    backgroundColor: '#18181c',
   } as React.CSSProperties,
   treeContent: {
     minHeight: '200px',
   } as React.CSSProperties,
   formContainer: {
-    border: '1px solid #ddd',
+    border: '1px solid #333',
     borderRadius: '8px',
     padding: '20px',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#1e1e24',
     height: 'fit-content',
     position: 'sticky',
     top: '20px',
@@ -434,9 +434,9 @@ const styles = {
   emptyMessage: {
     padding: '40px 20px',
     textAlign: 'center',
-    color: '#999',
+    color: '#666',
     fontSize: '14px',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#121214',
     borderRadius: '4px',
   } as React.CSSProperties,
 };
