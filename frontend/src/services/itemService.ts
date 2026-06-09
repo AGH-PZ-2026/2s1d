@@ -3,6 +3,7 @@ import type { CreateItemPayload, Item } from '../types/item';
 import type { Location } from '../types/location';
 import type { Owner } from '../types/owner';
 import type { Status } from '../types/status';
+import { authHeaders, jsonAuthHeaders } from './authHeaders';
 
 const USE_MOCKS = import.meta.env.MODE === 'test';
 
@@ -120,7 +121,7 @@ export const itemService = {
       await delay(100);
       return [...mockItems];
     }
-    const response = await fetch('/api/v1/items/');
+    const response = await fetch('/api/v1/items/', { headers: authHeaders() });
     await ensureOk(response);
     const data: BackendItem[] = await response.json();
     return data.map(mapItem);
@@ -138,7 +139,7 @@ export const itemService = {
 
     const response = await fetch('/api/v1/items/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonAuthHeaders(),
       body: JSON.stringify(payload),
     });
     await ensureOk(response);
@@ -150,7 +151,9 @@ export const itemService = {
       await delay(100);
       return [...mockCategories];
     }
-    const response = await fetch('/api/v1/categories/');
+    const response = await fetch('/api/v1/categories/', {
+      headers: authHeaders(),
+    });
     await ensureOk(response);
     const data: BackendCategory[] = await response.json();
     return data.map((category) => ({
@@ -166,7 +169,9 @@ export const itemService = {
       await delay(100);
       return [...mockLocations];
     }
-    const response = await fetch('/api/v1/locations/');
+    const response = await fetch('/api/v1/locations/', {
+      headers: authHeaders(),
+    });
     await ensureOk(response);
     const data: BackendLocation[] = await response.json();
     return data.map((location) => ({
@@ -187,7 +192,9 @@ export const itemService = {
       await delay(100);
       return [...mockOwners];
     }
-    const response = await fetch('/api/v1/auth/users');
+    const response = await fetch('/api/v1/auth/users', {
+      headers: authHeaders(),
+    });
     await ensureOk(response);
     const data: BackendUser[] = await response.json();
     return data.map((user) => ({ id: user.id, fullName: user.email }));
@@ -198,7 +205,9 @@ export const itemService = {
       await delay(100);
       return [...mockStatuses];
     }
-    const response = await fetch('/api/v1/item-status/');
+    const response = await fetch('/api/v1/item-status/', {
+      headers: authHeaders(),
+    });
     await ensureOk(response);
     const data: BackendStatus[] = await response.json();
     return data.map((status) => ({

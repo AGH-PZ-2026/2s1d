@@ -15,6 +15,7 @@ import type {
   UpdateCategoryPayload,
   CategoryTreeNode,
 } from '../types/category';
+import { authHeaders, jsonAuthHeaders } from './authHeaders';
 
 // Data source and API address configuration
 const USE_MOCKS = import.meta.env.MODE === 'test';
@@ -169,7 +170,7 @@ const _checkDuplicateName = (
 export const categoryService = {
   async getAll(): Promise<Category[]> {
     if (!USE_MOCKS) {
-      const response = await fetch(COLLECTION_URL);
+      const response = await fetch(COLLECTION_URL, { headers: authHeaders() });
       await handleResponse(response);
       const data: BackendCategoryResponse[] = await response.json();
       return data.map(mapBackendToFrontend);
@@ -231,7 +232,7 @@ export const categoryService = {
 
       const response = await fetch(COLLECTION_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonAuthHeaders(),
         body: JSON.stringify(backendPayload),
       });
       await handleResponse(response);
@@ -271,7 +272,7 @@ export const categoryService = {
 
       const response = await fetch(`${BASE_URL}/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonAuthHeaders(),
         body: JSON.stringify(backendPayload),
       });
       await handleResponse(response);
@@ -299,6 +300,7 @@ export const categoryService = {
     if (!USE_MOCKS) {
       const response = await fetch(`${BASE_URL}/${id}`, {
         method: 'DELETE',
+        headers: authHeaders(),
       });
       await handleResponse(response);
       return;

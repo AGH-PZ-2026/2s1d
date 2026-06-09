@@ -14,6 +14,7 @@ import type {
   CreateStatusPayload,
   UpdateStatusPayload,
 } from '../types/status';
+import { authHeaders, jsonAuthHeaders } from './authHeaders';
 
 // Konfiguracja Mocków i adresu API
 const API_BASE = '/api/v1/item-status';
@@ -134,7 +135,7 @@ export const statusService = {
       return _fetchStatuses();
     }
     // Pobieranie danych przez REST API
-    const response = await fetch(API_COLLECTION);
+    const response = await fetch(API_COLLECTION, { headers: authHeaders() });
     if (!response.ok) await handleApiError(response);
 
     const data: BackendStatusResponse[] = await response.json();
@@ -161,7 +162,7 @@ export const statusService = {
 
     const response = await fetch(API_COLLECTION, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonAuthHeaders(),
       body: JSON.stringify(backendPayload),
     });
 
@@ -189,7 +190,7 @@ export const statusService = {
 
     const response = await fetch(`${API_BASE}/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonAuthHeaders(),
       body: JSON.stringify(backendPayload),
     });
 
@@ -209,6 +210,7 @@ export const statusService = {
     }
     const response = await fetch(`${API_BASE}/${id}`, {
       method: 'DELETE',
+      headers: authHeaders(),
     });
 
     if (!response.ok) await handleApiError(response);

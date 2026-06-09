@@ -1,4 +1,5 @@
 import type { CreateDelegationPayload, Delegation } from '../types/delegation';
+import { authHeaders, jsonAuthHeaders } from './authHeaders';
 
 const USE_MOCKS = import.meta.env.MODE === 'test';
 
@@ -48,7 +49,7 @@ export const delegationService = {
 
     const response = await fetch(`/api/v1/items/${itemId}/delegations/`, {
       method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      headers: jsonAuthHeaders(),
       body: JSON.stringify(payload),
     });
     await ensureOk(response);
@@ -76,11 +77,6 @@ export const delegationService = {
     await ensureOk(response);
   },
 };
-
-function authHeaders(): Record<string, string> {
-  const token = window.localStorage.getItem('access_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
