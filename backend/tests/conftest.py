@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 from app.core.security import get_password_hash  # noqa: E402
 from app.db.session import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models.borrowing import Borrowing  # noqa: E402,F401
 from app.models.delegation import Delegation  # noqa: E402,F401
 from app.models.group import Group  # noqa: E402,F401
 from app.models.item import Item  # noqa: E402,F401

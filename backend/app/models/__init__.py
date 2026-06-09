@@ -1,4 +1,7 @@
 from app.models.audit_log import AuditLog as AuditLog
+from app.models.borrowing import Borrowing as Borrowing
+from app.models.borrowing import BorrowingMode as BorrowingMode
+from app.models.borrowing import BorrowingStatus as BorrowingStatus
 from app.models.category import Category as Category
 from app.models.delegation import Delegation as Delegation
 from app.models.group import Group as Group

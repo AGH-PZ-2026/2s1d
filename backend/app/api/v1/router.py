@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     audit_logs,
     auth,
     batch_qr,
+    borrowings,
     categories,
     delegations,
     excel_import,
@@ -22,6 +23,7 @@ api_router.include_router(categories.router)
 api_router.include_router(items.router)
 api_router.include_router(item.router)
 api_router.include_router(locations.router)
+api_router.include_router(borrowings.router)
 api_router.include_router(statuses.router)
 api_router.include_router(qr_codes.router, prefix="/qr-codes", tags=["qr-codes"])
 api_router.include_router(excel_import.router, prefix="/excel", tags=["excel-import"])

@@ -26,3 +26,4 @@ class Item(Base):
     target_location = relationship("Location", back_populates="items")
     owner = relationship("User")
     owner_group = relationship("Group")
+    borrowings = relationship("Borrowing", back_populates="item")
