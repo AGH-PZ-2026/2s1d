@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     categories,
     delegations,
     excel_import,
+    groups,
     item,
     item_photos,
     item_status,
@@ -63,4 +64,5 @@ api_router.include_router(
     dependencies=authenticated,
 )
 api_router.include_router(delegations.router, dependencies=authenticated)
+api_router.include_router(groups.router, dependencies=authenticated)
 api_router.include_router(auth.router)
