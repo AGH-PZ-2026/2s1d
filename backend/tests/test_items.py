@@ -311,6 +311,7 @@ def test_update_status_unauthenticated(client, item_with_owner):
     response = client.patch(
         f"/api/v1/items/{item_with_owner.id}/status",
         params={"status_id": 1},
+        headers={"Authorization": ""},
     )
 
     assert response.status_code == 401

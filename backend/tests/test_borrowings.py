@@ -141,7 +141,7 @@ def test_owner_overdue_report_and_csv_pdf_exports(client, db, auth_headers, user
     assert report.json()[0]["daysOverdue"] >= 1
     assert csv_response.status_code == 200
     assert "text/csv" in csv_response.headers["content-type"]
-    assert f"Test Item {item.id}" in csv_response.text
+    assert item.name in csv_response.text
     assert pdf_response.status_code == 200
     assert pdf_response.headers["content-type"] == "application/pdf"
 

@@ -1,16 +1,17 @@
 import os
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ.setdefault("DATABASE_URL", "sqlite://")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
 
-from app.core.security import get_password_hash  # noqa: E402
+import app.main as app_main  # noqa: E402
+from app.core.security import create_access_token, get_password_hash  # noqa: E402
 from app.db.session import Base, get_db  # noqa: E402
-from app.main import app  # noqa: E402
 from app.models.borrowing import Borrowing  # noqa: E402,F401
 from app.models.delegation import Delegation  # noqa: E402,F401
 from app.models.group import Group  # noqa: E402,F401
@@ -24,12 +25,16 @@ from app.models.notification import (  # noqa: E402,F401
 from app.models.user import User  # noqa: E402,F401
 from app.services.item_status import init_system_statuses  # noqa: E402
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+SQLALCHEMY_DATABASE_URL = "sqlite://"
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+app = app_main.app
+app_main.SessionLocal = TestingSessionLocal
 
 
 @pytest.fixture(autouse=True)
@@ -61,7 +66,17 @@ def client(db):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
+    default_user = User(
+        email="default-client@test.com",
+        hashed_password=get_password_hash("password123"),
+    )
+    db.add(default_user)
+    db.commit()
+    db.refresh(default_user)
+    token = create_access_token({"sub": str(default_user.id)})
+    with TestClient(app) as test_client:
+        test_client.headers.update({"Authorization": f"Bearer {token}"})
+        yield test_client
     app.dependency_overrides.clear()
 
 

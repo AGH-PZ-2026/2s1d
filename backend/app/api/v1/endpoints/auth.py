@@ -29,7 +29,10 @@ def mock_sso_login(data: MockSsoLogin, db: Session = Depends(get_db)):
 
 
 @router.get("/users", response_model=list[UserResponse])
-def list_users(db: Session = Depends(get_db)):
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return service.list_approved_users(db)
 
 
