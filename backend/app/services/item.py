@@ -7,8 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.models.category import Category
 from app.models.delegation import PermissionLevel
+from app.models.group import Group
 from app.models.item import Item
 from app.models.item_status import ItemStatus
+from app.models.location import Location
 from app.models.user import User
 from app.schemas.item import ItemCreate
 from app.services.delegation import get_user_permission
@@ -24,8 +26,54 @@ def get_by_id(db: Session, item_id: int) -> Item:
     return item
 
 
-def get_all(db: Session) -> list[Item]:
-    return db.query(Item).all()
+ITEM_SORT_FIELDS = {
+    "id": Item.id,
+    "name": Item.name,
+    "manufacturer": Item.manufacturer,
+    "added_at": Item.added_at,
+    "purchase_date": Item.purchase_date,
+}
+
+
+def get_all(
+    db: Session,
+    *,
+    category_id: int | None = None,
+    status_id: int | None = None,
+    owner_id: int | None = None,
+    manufacturer: str | None = None,
+    search: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    sort_by: str = "id",
+    sort_dir: str = "asc",
+) -> list[Item]:
+    query = db.query(Item)
+    if category_id is not None:
+        query = query.filter(Item.category_id == category_id)
+    if status_id is not None:
+        query = query.filter(Item.status_id == status_id)
+    if owner_id is not None:
+        query = query.filter(Item.owner_id == owner_id)
+    if manufacturer:
+        query = query.filter(Item.manufacturer.ilike(f"%{manufacturer.strip()}%"))
+    if search:
+        term = f"%{search.strip()}%"
+        query = query.filter(Item.name.ilike(term) | Item.description.ilike(term))
+
+    sort_column = ITEM_SORT_FIELDS.get(sort_by)
+    if sort_column is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Nieobsługiwane pole sortowania",
+        )
+    if sort_dir not in {"asc", "desc"}:
+        raise HTTPException(
+            status_code=422, detail="Nieobsługiwany kierunek sortowania"
+        )
+
+    sort_expression = sort_column.desc() if sort_dir == "desc" else sort_column.asc()
+    return query.order_by(sort_expression).offset(offset).limit(limit).all()
 
 
 def create(db: Session, data: ItemCreate) -> Item:
@@ -40,6 +88,9 @@ def create(db: Session, data: ItemCreate) -> Item:
         added_at=datetime.now(UTC),
         category_id=data.category_id,
         status_id=data.status_id,
+        location_id=data.location_id,
+        owner_id=data.owner_id,
+        owner_group_id=data.owner_group_id,
     )
     db.add(item)
     try:
@@ -99,11 +150,24 @@ def _get_item_with_permission(
 def _validate_references(db: Session, data: ItemCreate) -> None:
     _ensure_exists(db, Category, data.category_id, "Kategoria nie istnieje")
     _ensure_exists(db, ItemStatus, data.status_id, "Status nie istnieje")
+    if data.location_id is not None:
+        _ensure_exists(db, Location, data.location_id, "Lokalizacja nie istnieje")
+    if data.owner_id is not None:
+        _ensure_exists(db, User, data.owner_id, "Właściciel nie istnieje")
+    if data.owner_group_id is not None:
+        _ensure_exists(
+            db,
+            Group,
+            data.owner_group_id,
+            "Grupa właścicielska nie istnieje",
+        )
 
 
 def _ensure_exists(
     db: Session,
-    model: type[Category] | type[ItemStatus],
+    model: (
+        type[Category] | type[ItemStatus] | type[Location] | type[User] | type[Group]
+    ),
     entity_id: int,
     detail: str,
 ) -> None:

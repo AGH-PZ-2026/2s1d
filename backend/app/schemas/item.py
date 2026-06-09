@@ -14,6 +14,9 @@ class ItemCreate(ItemApiModel):
     purchase_date: date | None = Field(default=None, alias="purchaseDate")
     category_id: int = Field(alias="categoryId")
     status_id: int = Field(alias="statusId")
+    location_id: int | None = Field(default=None, alias="locationId")
+    owner_id: int | None = Field(default=None, alias="ownerId")
+    owner_group_id: int | None = Field(default=None, alias="ownerGroupId")
 
     @field_validator("name")
     @classmethod
@@ -45,6 +48,7 @@ class ItemResponse(ItemApiModel):
     category_id: int | None = Field(default=None, serialization_alias="categoryId")
     status_id: int | None = Field(default=None, serialization_alias="statusId")
     location: str | None = None
+    location_id: int | None = Field(default=None, serialization_alias="locationId")
     owner_id: int | None = None
     owner_group_id: int | None = None
 

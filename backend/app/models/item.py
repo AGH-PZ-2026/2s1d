@@ -17,10 +17,12 @@ class Item(Base):
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     status_id = Column(Integer, ForeignKey("item_status.id"), nullable=True)
     location = Column(String, nullable=True)
+    location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     owner_group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)
 
     category = relationship("Category", back_populates="items")
     status = relationship("ItemStatus", back_populates="items")
+    target_location = relationship("Location", back_populates="items")
     owner = relationship("User")
     owner_group = relationship("Group")

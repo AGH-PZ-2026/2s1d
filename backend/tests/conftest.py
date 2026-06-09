@@ -3,19 +3,20 @@ import os
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from app.core.security import get_password_hash
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.delegation import Delegation  # noqa: F401
-from app.models.group import Group  # noqa: F401
-from app.models.item import Item  # noqa: F401
-from app.models.user import User  # noqa: F401
-from app.services.item_status import init_system_statuses
+from app.core.security import get_password_hash  # noqa: E402
+from app.db.session import Base, get_db  # noqa: E402
+from app.main import app  # noqa: E402
+from app.models.delegation import Delegation  # noqa: E402,F401
+from app.models.group import Group  # noqa: E402,F401
+from app.models.item import Item  # noqa: E402,F401
+from app.models.location import Location  # noqa: E402,F401
+from app.models.user import User  # noqa: E402,F401
+from app.services.item_status import init_system_statuses  # noqa: E402
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 

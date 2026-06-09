@@ -3,8 +3,11 @@ from datetime import UTC, datetime
 from sqlalchemy.exc import IntegrityError
 
 from app.models.category import Category
+from app.models.group import Group
 from app.models.item import Item
 from app.models.item_status import ItemStatus
+from app.models.location import Location
+from app.models.user import User
 
 
 def test_create_item_with_all_references(client, db):
@@ -202,6 +205,80 @@ def test_frontend_lookup_endpoints(client, db):
         "type": "custom",
         "description": None,
     } in statuses
+
+
+def test_create_item_with_location_and_owner(client, db):
+    refs = _create_references(db)
+    location = Location(name="D-17 / 2.14", building="D-17", room="2.14")
+    owner = User(email="owner@example.com", hashed_password="hash")
+    group = Group(name="Laboratorium")
+    db.add_all([location, owner, group])
+    db.commit()
+    db.refresh(location)
+    db.refresh(owner)
+    db.refresh(group)
+
+    response = client.post(
+        "/api/v1/items/",
+        json=_item_payload(
+            refs,
+            locationId=location.id,
+            ownerId=owner.id,
+            ownerGroupId=group.id,
+        ),
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["locationId"] == location.id
+    assert data["owner_id"] == owner.id
+    assert data["owner_group_id"] == group.id
+
+
+def test_list_items_filters_sorts_and_paginates(client, db):
+    refs = _create_references(db)
+    other_category = Category(name="Komputery")
+    other_status = ItemStatus(name="W kalibracji", is_system=False)
+    db.add_all([other_category, other_status])
+    db.commit()
+    db.refresh(other_category)
+    db.refresh(other_status)
+
+    client.post(
+        "/api/v1/items/",
+        json=_item_payload(refs, name="Oscyloskop A", manufacturer="Rigol"),
+    )
+    client.post(
+        "/api/v1/items/",
+        json=_item_payload(refs, name="Oscyloskop B", manufacturer="Keysight"),
+    )
+    client.post(
+        "/api/v1/items/",
+        json=_item_payload(
+            {
+                "categoryId": other_category.id,
+                "statusId": other_status.id,
+            },
+            name="Laptop",
+            manufacturer="Dell",
+        ),
+    )
+
+    response = client.get(
+        "/api/v1/items/",
+        params={
+            "categoryId": refs["categoryId"],
+            "manufacturer": "rig",
+            "sortBy": "name",
+            "sortDir": "desc",
+            "limit": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["name"] == "Oscyloskop A"
 
 
 def test_update_status_as_owner(client, auth_headers, item_with_owner):
