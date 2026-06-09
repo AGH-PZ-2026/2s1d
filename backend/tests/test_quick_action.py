@@ -1,3 +1,4 @@
+from app.core.security import get_password_hash
 from app.models.delegation import Delegation, PermissionLevel
 from app.models.item import Item
 from app.models.item_status import ItemStatus
@@ -19,10 +20,11 @@ def test_get_item_details_success(client, db):
 
 def test_mark_damaged_as_owner(client, db):
     item = _create_quick_action_item(db)
+    headers = _auth_headers_for(client, item.owner.email)
 
     response = client.patch(
         f"/api/v1/quick-actions/{item.id}/mark-damaged",
-        json={"user_id": item.owner_id},
+        headers=headers,
     )
 
     assert response.status_code == 200
@@ -31,7 +33,9 @@ def test_mark_damaged_as_owner(client, db):
 
 def test_mark_damaged_as_delegate(client, db):
     item = _create_quick_action_item(db)
-    delegate = User(email="delegate@example.com", hashed_password="hash")
+    delegate = User(
+        email="delegate@example.com", hashed_password=get_password_hash("password123")
+    )
     db.add(delegate)
     db.commit()
     db.refresh(delegate)
@@ -46,7 +50,7 @@ def test_mark_damaged_as_delegate(client, db):
 
     response = client.patch(
         f"/api/v1/quick-actions/{item.id}/mark-damaged",
-        json={"user_id": delegate.id},
+        headers=_auth_headers_for(client, delegate.email),
     )
 
     assert response.status_code == 200
@@ -55,10 +59,16 @@ def test_mark_damaged_as_delegate(client, db):
 
 def test_mark_damaged_forbidden(client, db):
     item = _create_quick_action_item(db)
+    stranger = User(
+        email="stranger@example.com", hashed_password=get_password_hash("password123")
+    )
+    db.add(stranger)
+    db.commit()
+    db.refresh(stranger)
 
     response = client.patch(
         f"/api/v1/quick-actions/{item.id}/mark-damaged",
-        json={"user_id": 9999},
+        headers=_auth_headers_for(client, stranger.email),
     )
 
     assert response.status_code == 403
@@ -68,7 +78,9 @@ def test_mark_damaged_forbidden(client, db):
 def _create_quick_action_item(db):
     available = db.query(ItemStatus).filter(ItemStatus.name == "Dostępny").first()
     damaged = db.query(ItemStatus).filter(ItemStatus.name == "Uszkodzony").first()
-    owner = User(email="owner@example.com", hashed_password="hash")
+    owner = User(
+        email="owner@example.com", hashed_password=get_password_hash("password123")
+    )
     location = Location(name="Biuro 101", room="101")
     db.add_all([owner, location])
     db.commit()
@@ -87,3 +99,11 @@ def _create_quick_action_item(db):
     db.commit()
     db.refresh(item)
     return item
+
+
+def _auth_headers_for(client, email: str) -> dict[str, str]:
+    token = client.post(
+        "/api/v1/auth/token",
+        data={"username": email, "password": "password123"},
+    ).json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

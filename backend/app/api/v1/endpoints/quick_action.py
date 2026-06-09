@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.delegation import Delegation, PermissionLevel
 from app.models.item import Item
 from app.models.item_status import ItemStatus
+from app.models.user import User
 from app.schemas.audit_log import AuditLogAction
-from app.schemas.quick_action import ItemDetailsResponse, QuickActionRequest
+from app.schemas.quick_action import ItemDetailsResponse
 from app.services.audit_log import record_audit_log
 
 router = APIRouter()
@@ -21,11 +23,11 @@ def get_item_details(item_id: int, db: Session = Depends(get_db)):
 @router.patch("/{item_id}/mark-damaged", response_model=ItemDetailsResponse)
 def mark_item_damaged(
     item_id: int,
-    request: QuickActionRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     item = _get_item(db, item_id)
-    if not _can_mark_damaged(db, item, request.user_id):
+    if not _can_mark_damaged(db, item, current_user.id):
         raise HTTPException(
             status_code=403,
             detail="Brak uprawnień do edycji tego przedmiotu.",
@@ -43,7 +45,7 @@ def mark_item_damaged(
     db.refresh(item)
     record_audit_log(
         db,
-        user_id=request.user_id,
+        user_id=current_user.id,
         action=AuditLogAction.STATUS_CHANGED,
         item_id=item.id,
         old_value={"status_id": old_status_id},
