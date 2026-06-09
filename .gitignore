@@ -7,6 +7,8 @@ env/
 build/
 develop-eggs/
 dist/
+uploads/
+backend/uploads/
 
 # node
 node_modules/

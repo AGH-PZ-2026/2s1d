@@ -27,3 +27,4 @@ class Item(Base):
     owner = relationship("User")
     owner_group = relationship("Group")
     borrowings = relationship("Borrowing", back_populates="item")
+    photos = relationship("ItemPhoto", back_populates="item")

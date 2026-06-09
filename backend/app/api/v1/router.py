@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     delegations,
     excel_import,
     item,
+    item_photos,
     item_status,
     items,
     locations,
@@ -22,6 +23,7 @@ api_router.include_router(item_status.router)
 api_router.include_router(categories.router)
 api_router.include_router(items.router)
 api_router.include_router(item.router)
+api_router.include_router(item_photos.router)
 api_router.include_router(locations.router)
 api_router.include_router(borrowings.router)
 api_router.include_router(statuses.router)
