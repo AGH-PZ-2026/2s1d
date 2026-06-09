@@ -6,6 +6,7 @@ import { ErrorPage } from './pages/ErrorPage';
 import StatusesPage from './pages/StatusesPage';
 import CategoriesPage from './pages/CategoriesPage';
 import DelegationsPage from './pages/DelegationsPage';
+import ItemsPage from './pages/ItemsPage';
 
 export const router = createBrowserRouter([
   {
@@ -32,6 +33,10 @@ export const router = createBrowserRouter([
       {
         path: '/delegations',
         element: <DelegationsPage />,
+      },
+      {
+        path: '/items',
+        element: <ItemsPage />,
       },
     ],
   },
