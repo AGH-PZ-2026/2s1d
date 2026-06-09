@@ -45,3 +45,12 @@ def approve_user(user_id: int, current_user: User, db: Session) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+def list_approved_users(db: Session) -> list[User]:
+    return (
+        db.query(User)
+        .filter(User.is_active == True, User.is_approved == True)  # noqa: E712
+        .order_by(User.email.asc())
+        .all()
+    )

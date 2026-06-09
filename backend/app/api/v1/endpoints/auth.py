@@ -23,6 +23,11 @@ def login(
     return service.login_user(form_data.username, form_data.password, db)
 
 
+@router.get("/users", response_model=list[UserResponse])
+def list_users(db: Session = Depends(get_db)):
+    return service.list_approved_users(db)
+
+
 @router.patch("/users/{user_id}/approve", response_model=UserResponse)
 def approve_user(
     user_id: int,
