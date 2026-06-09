@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.core.dependencies import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.item import ItemCreate, ItemResponse
 from app.services import item as service
 
@@ -36,8 +38,12 @@ def list_items(
 
 
 @router.post("/", response_model=ItemResponse, status_code=201)
-def create_item(data: ItemCreate, db: Session = Depends(get_db)):
-    return service.create(db, data)
+def create_item(
+    data: ItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.create(db, data, current_user)
 
 
 @router.get("/{item_id}", response_model=ItemResponse)

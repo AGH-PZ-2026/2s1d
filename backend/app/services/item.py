@@ -78,7 +78,7 @@ def get_all(
     return query.order_by(sort_expression).offset(offset).limit(limit).all()
 
 
-def create(db: Session, data: ItemCreate) -> Item:
+def create(db: Session, data: ItemCreate, user: User) -> Item:
     _validate_references(db, data)
 
     item = Item(
@@ -106,7 +106,7 @@ def create(db: Session, data: ItemCreate) -> Item:
     db.refresh(item)
     record_audit_log(
         db,
-        user_id=0,
+        user_id=user.id,
         action=AuditLogAction.ITEM_CREATED,
         item_id=item.id,
         new_value={

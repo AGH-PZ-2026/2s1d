@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
 
+from app.models.audit_log import AuditLog
 from app.models.category import Category
 from app.models.group import Group
 from app.models.item import Item
@@ -33,6 +34,10 @@ def test_create_item_with_all_references(client, db):
     assert len(data["systemId"]) == 17
     assert data["categoryId"] == refs["categoryId"]
     assert data["statusId"] == refs["statusId"]
+    log = db.query(AuditLog).filter(AuditLog.item_id == data["id"]).first()
+    assert log is not None
+    assert log.user_id is not None
+    assert log.user_id > 0
 
 
 def test_list_items_returns_frontend_shape(client, db):
