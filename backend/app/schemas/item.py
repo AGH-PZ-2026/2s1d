@@ -25,7 +25,7 @@ class ItemCreate(ItemApiModel):
 
     @field_validator("manufacturer")
     @classmethod
-    def normalize_optional_text(cls, value: str | None) -> str | None:
+    def normalize_manufacturer(cls, value: str | None) -> str | None:
         if value is None:
             return None
         stripped = value.strip()
@@ -36,13 +36,16 @@ class ItemCreate(ItemApiModel):
 
 class ItemResponse(ItemApiModel):
     id: int
-    system_id: str = Field(serialization_alias="systemId")
+    system_id: str | None = Field(default=None, serialization_alias="systemId")
     name: str
-    manufacturer: str
-    description: str | None
-    purchase_date: date | None = Field(serialization_alias="purchaseDate")
-    added_at: datetime = Field(serialization_alias="addedAt")
-    category_id: int = Field(serialization_alias="categoryId")
-    status_id: int = Field(serialization_alias="statusId")
+    manufacturer: str | None = None
+    description: str | None = None
+    purchase_date: date | None = Field(default=None, serialization_alias="purchaseDate")
+    added_at: datetime | None = Field(default=None, serialization_alias="addedAt")
+    category_id: int | None = Field(default=None, serialization_alias="categoryId")
+    status_id: int | None = Field(default=None, serialization_alias="statusId")
+    location: str | None = None
+    owner_id: int | None = None
+    owner_group_id: int | None = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)

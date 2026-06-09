@@ -16,6 +16,9 @@ export const Layout = () => {
         <Link to="/categories" style={{ marginRight: '15px' }}>
           Categories
         </Link>
+        <Link to="/delegations" style={{ marginRight: '15px' }}>
+          Delegations
+        </Link>
         <Link to="/contact">Non-existent page</Link>
       </nav>
 
