@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -32,8 +32,8 @@ def update_description(
 @router.patch("/{item_id}/location")
 def update_location(
     item_id: int,
-    location: str,
+    location_id: int = Query(alias="locationId"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.update_item_location(item_id, location, current_user, db)
+    return service.update_item_location(item_id, location_id, current_user, db)

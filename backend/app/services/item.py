@@ -157,18 +157,19 @@ def update_item_description(item_id: int, description: str, user: User, db: Sess
     return {"message": "Description updated"}
 
 
-def update_item_location(item_id: int, location: str, user: User, db: Session):
+def update_item_location(item_id: int, location_id: int, user: User, db: Session):
     item = _get_item_with_permission(item_id, user, db, [PermissionLevel.manage])
-    old_location = item.location
-    item.location = location
+    old_location_id = item.location_id
+    _ensure_exists(db, Location, location_id, "Lokalizacja nie istnieje")
+    item.location_id = location_id
     db.commit()
     record_audit_log(
         db,
         user_id=user.id,
         action=AuditLogAction.LOCATION_CHANGED,
         item_id=item.id,
-        old_value={"location": old_location},
-        new_value={"location": location},
+        old_value={"location_id": old_location_id},
+        new_value={"location_id": location_id},
     )
     return {"message": "Location updated"}
 

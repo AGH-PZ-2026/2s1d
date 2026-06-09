@@ -1,3 +1,6 @@
+from app.models.location import Location
+
+
 def test_add_delegation_as_owner(client, auth_headers, item_with_owner, other_user):
     response = client.post(
         f"/api/v1/items/{item_with_owner.id}/delegations/",
@@ -58,8 +61,12 @@ def test_delegate_edit_can_update_status(
 
 
 def test_delegate_edit_cannot_update_location(
-    client, auth_headers, item_with_owner, other_user, other_auth_headers
+    client, db, auth_headers, item_with_owner, other_user, other_auth_headers
 ):
+    location = Location(name="Room 101", room="101")
+    db.add(location)
+    db.commit()
+    db.refresh(location)
     client.post(
         f"/api/v1/items/{item_with_owner.id}/delegations/",
         json={"user_id": other_user.id, "permission": "edit"},
@@ -67,10 +74,34 @@ def test_delegate_edit_cannot_update_location(
     )
     response = client.patch(
         f"/api/v1/items/{item_with_owner.id}/location",
-        params={"location": "Room 101"},
+        params={"locationId": location.id},
         headers=other_auth_headers,
     )
     assert response.status_code == 403
+
+
+def test_delegate_manage_can_update_location(
+    client, db, auth_headers, item_with_owner, other_user, other_auth_headers
+):
+    location = Location(name="Room 102", room="102")
+    db.add(location)
+    db.commit()
+    db.refresh(location)
+    client.post(
+        f"/api/v1/items/{item_with_owner.id}/delegations/",
+        json={"user_id": other_user.id, "permission": "manage"},
+        headers=auth_headers,
+    )
+
+    response = client.patch(
+        f"/api/v1/items/{item_with_owner.id}/location",
+        params={"locationId": location.id},
+        headers=other_auth_headers,
+    )
+    db.refresh(item_with_owner)
+
+    assert response.status_code == 200
+    assert item_with_owner.location_id == location.id
 
 
 def test_delegate_edit_can_update_description(
