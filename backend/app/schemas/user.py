@@ -18,6 +18,11 @@ class UserResponse(BaseModel):
     id: int
     email: str
     is_active: bool
+    is_approved: bool
     role: UserRole
 
     model_config = {"from_attributes": True}
+
+
+class UserApprovalResponse(UserResponse):
+    pass
