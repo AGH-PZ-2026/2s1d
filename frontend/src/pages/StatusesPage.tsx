@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { X, Lock } from 'lucide-react';
 import { statusService } from '../services/statusService';
 import type {
   Status,
@@ -150,7 +151,13 @@ export default function StatusesPage() {
                         </button>
                       </>
                     ) : (
-                      <span className="locked">🔒 Chroniony</span>
+                      <span className="locked">
+                        <Lock
+                          size={14}
+                          style={{ verticalAlign: 'middle', marginRight: 4 }}
+                        />
+                        Chroniony
+                      </span>
                     )}
                   </div>
                 </td>
@@ -166,7 +173,7 @@ export default function StatusesPage() {
             <div className="modal-header">
               <h2>{modal.mode === 'create' ? 'Nowa flaga' : 'Edytuj flagę'}</h2>
               <button className="modal-close" onClick={() => setModal(null)}>
-                ✕
+                <X size={18} />
               </button>
             </div>
 

@@ -15,10 +15,15 @@ export default defineConfig({
         target: 'http://backend:8000',
         changeOrigin: true,
       },
+      '/health': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+      },
     },
   },
   test: {
     environment: 'jsdom',
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
     globals: true,
     setupFiles: './src/setupTests.ts',
   },

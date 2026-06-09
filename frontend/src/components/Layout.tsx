@@ -1,35 +1,95 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { useState } from 'react';
+import { useState, type ElementType } from 'react';
+import {
+  LayoutDashboard,
+  Package,
+  FolderTree,
+  CircleDot,
+  Send,
+  ArrowLeftRight,
+  QrCode,
+  Printer,
+  FileSpreadsheet,
+  FileWarning,
+  Bell,
+  History,
+  Menu,
+  LogIn,
+  LogOut,
+} from 'lucide-react';
+import { authService } from '../services/authService';
+import { useAuth } from '../hooks/useAuth';
 
 interface NavItem {
   to: string;
   label: string;
-  icon: string;
+  icon: ElementType;
   section?: string;
+  requiresAuth?: boolean;
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: '◉', section: 'Główne' },
-  { to: '/items', label: 'Przedmioty', icon: '⊞' },
-  { to: '/categories', label: 'Kategorie', icon: '⊟' },
-  { to: '/statuses', label: 'Statusy', icon: '◈' },
-  { to: '/delegations', label: 'Delegacje', icon: '⊜' },
-  { to: '/qr', label: 'Skaner QR', icon: '⊡', section: 'Narzędzia' },
-  { to: '/batch-qr', label: 'Druk QR', icon: '⊞' },
-  { to: '/import', label: 'Import Excel', icon: '⇪' },
-  { to: '/reports/overdue', label: 'Raporty', icon: '⎙' },
+  {
+    to: '/',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    section: 'Główne',
+    requiresAuth: true,
+  },
+  { to: '/items', label: 'Przedmioty', icon: Package, requiresAuth: true },
+  {
+    to: '/categories',
+    label: 'Kategorie',
+    icon: FolderTree,
+    requiresAuth: true,
+  },
+  { to: '/statuses', label: 'Statusy', icon: CircleDot, requiresAuth: true },
+  { to: '/delegations', label: 'Delegacje', icon: Send, requiresAuth: true },
+  {
+    to: '/borrowings',
+    label: 'Wypożyczenia',
+    icon: ArrowLeftRight,
+    requiresAuth: true,
+  },
+  {
+    to: '/qr',
+    label: 'Skaner QR',
+    icon: QrCode,
+    section: 'Narzędzia',
+    requiresAuth: true,
+  },
+  { to: '/batch-qr', label: 'Druk QR', icon: Printer, requiresAuth: true },
+  {
+    to: '/import',
+    label: 'Import Excel',
+    icon: FileSpreadsheet,
+    requiresAuth: true,
+  },
+  {
+    to: '/reports/overdue',
+    label: 'Raporty',
+    icon: FileWarning,
+    requiresAuth: true,
+  },
   {
     to: '/notifications',
     label: 'Powiadomienia',
-    icon: '◎',
+    icon: Bell,
     section: 'System',
+    requiresAuth: true,
   },
-  { to: '/about', label: 'O systemie', icon: '◌' },
+  {
+    to: '/audit-logs',
+    label: 'Logi audytu',
+    icon: History,
+    requiresAuth: true,
+  },
 ];
 
 export const Layout = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user } = useAuth();
 
   return (
     <div className="app-shell">
@@ -46,7 +106,7 @@ export const Layout = () => {
         }}
         aria-label="Menu"
       >
-        ☰
+        <Menu size={20} />
       </button>
 
       {/* Overlay for mobile */}
@@ -76,51 +136,90 @@ export const Layout = () => {
         </Link>
 
         <nav style={{ flex: 1, padding: '8px 0' }}>
-          {navItems.map((item) => {
-            const isActive =
-              item.to === '/'
-                ? location.pathname === '/'
-                : location.pathname.startsWith(item.to);
+          {navItems
+            .filter((item) => !item.requiresAuth || user)
+            .map((item) => {
+              const isActive =
+                item.to === '/'
+                  ? location.pathname === '/'
+                  : location.pathname.startsWith(item.to);
 
-            return (
-              <div key={item.to}>
-                {item.section && (
-                  <div className="sidebar-section">
-                    <div className="sidebar-section-label">{item.section}</div>
+              return (
+                <div key={item.to}>
+                  {item.section && (
+                    <div className="sidebar-section">
+                      <div className="sidebar-section-label">
+                        {item.section}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ padding: '0 10px' }}>
+                    <Link
+                      to={item.to}
+                      className={`nav-link ${isActive ? 'active' : ''}`}
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <span className="nav-link-icon">
+                        <item.icon size={18} />
+                      </span>
+                      {item.label}
+                    </Link>
                   </div>
-                )}
-                <div style={{ padding: '0 10px' }}>
-                  <Link
-                    to={item.to}
-                    className={`nav-link ${isActive ? 'active' : ''}`}
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <span className="nav-link-icon">{item.icon}</span>
-                    {item.label}
-                  </Link>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </nav>
 
         <div className="sidebar-footer">
-          <Link
-            to="/login"
-            className="nav-link"
-            style={{ marginBottom: 8 }}
-            onClick={() => setSidebarOpen(false)}
-          >
-            <span className="nav-link-icon">⊡</span>
-            Logowanie
-          </Link>
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar">?</div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">Niezalogowany</div>
-              <div className="sidebar-user-role">Zaloguj się</div>
-            </div>
-          </div>
+          {user ? (
+            <>
+              <button
+                className="nav-link"
+                style={{ marginBottom: 8, width: '100%', textAlign: 'left' }}
+                onClick={() => {
+                  authService.logout();
+                  setSidebarOpen(false);
+                }}
+              >
+                <span className="nav-link-icon">
+                  <LogOut size={18} />
+                </span>
+                Wyloguj
+              </button>
+              <div className="sidebar-user">
+                <div className="sidebar-user-avatar">
+                  {user.email.charAt(0).toUpperCase()}
+                </div>
+                <div className="sidebar-user-info">
+                  <div className="sidebar-user-name">{user.email}</div>
+                  <div className="sidebar-user-role">
+                    {user.role === 'admin' ? 'Administrator' : 'Użytkownik'}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="nav-link"
+                style={{ marginBottom: 8 }}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <span className="nav-link-icon">
+                  <LogIn size={18} />
+                </span>
+                Logowanie
+              </Link>
+              <div className="sidebar-user">
+                <div className="sidebar-user-avatar">?</div>
+                <div className="sidebar-user-info">
+                  <div className="sidebar-user-name">Niezalogowany</div>
+                  <div className="sidebar-user-role">Zaloguj się</div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </aside>
 

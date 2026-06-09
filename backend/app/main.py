@@ -2,6 +2,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.router import api_router
 from app.db.session import SessionLocal
@@ -43,5 +45,13 @@ async def root():
 
 
 @app.get("/health")
-async def health_check():
-    return {"status": "ok"}
+def health_check():
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        return {"status": "degraded", "database": "error"}
+    finally:
+        db.close()
+
+    return {"status": "ok", "database": "ok"}

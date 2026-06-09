@@ -12,9 +12,15 @@ export interface ImportReport {
 }
 
 export const excelImportService = {
-  async upload(file: File): Promise<ImportReport> {
+  async upload(
+    file: File,
+    columnMapping?: Record<string, string>
+  ): Promise<ImportReport> {
     const formData = new FormData();
     formData.append('file', file);
+    if (columnMapping) {
+      formData.append('column_mapping', JSON.stringify(columnMapping));
+    }
     const response = await fetch('/api/v1/excel/upload', {
       method: 'POST',
       headers: authHeaders(),

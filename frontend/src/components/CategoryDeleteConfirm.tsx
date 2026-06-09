@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { Category } from '../types/category';
 import './CategoryDeleteConfirm.css';
 
@@ -47,7 +48,13 @@ export const CategoryDeleteConfirm: React.FC<CategoryDeleteConfirmProps> = ({
 
           {hasChildren && (
             <div className="warning-box">
-              <p className="warning-title">⚠️ Ostrzeżenie</p>
+              <p className="warning-title">
+                <AlertTriangle
+                  size={16}
+                  style={{ verticalAlign: 'middle', marginRight: 6 }}
+                />
+                Ostrzeżenie
+              </p>
               <p>
                 Ta kategoria zawiera <strong>{childCount}</strong>{' '}
                 {childCount === 1 ? 'podkategorię' : 'podkategorii'}.

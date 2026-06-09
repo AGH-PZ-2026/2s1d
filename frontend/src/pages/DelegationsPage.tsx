@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { X } from 'lucide-react';
 import { delegationService } from '../services/delegationService';
 import type {
   Delegation,
@@ -136,7 +137,7 @@ export default function DelegationsPage() {
                 className="modal-close"
                 onClick={() => setShowModal(false)}
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
             {formError && <div className="alert alert-error">{formError}</div>}

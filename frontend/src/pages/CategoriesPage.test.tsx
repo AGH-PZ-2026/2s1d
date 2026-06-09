@@ -148,7 +148,7 @@ describe('CategoriesPage', () => {
       const button = await screen.findByText('+ Nowa kategoria główna');
       fireEvent.click(button);
 
-      expect(screen.getByText('Add Root Category')).toBeInTheDocument();
+      expect(screen.getByText('Nowa kategoria główna')).toBeInTheDocument();
     });
 
     it('should disable create button when form is open', async () => {
@@ -177,11 +177,11 @@ describe('CategoriesPage', () => {
       const button = await screen.findByText('+ Nowa kategoria główna');
       fireEvent.click(button);
 
-      const nameInput = screen.getByPlaceholderText('Enter category name');
+      const nameInput = screen.getByPlaceholderText('Wprowadź nazwę kategorii');
       const descriptionInput = screen.getByPlaceholderText(
-        'Enter category description (optional)'
+        'Opcjonalny opis kategorii'
       );
-      const submitButton = screen.getByText('Add Category');
+      const submitButton = screen.getByText('Utwórz');
 
       await userEvent.type(nameInput, 'Nowa aparatura');
       await userEvent.type(descriptionInput, 'Nowa kolekcja');
@@ -207,8 +207,8 @@ describe('CategoriesPage', () => {
       const button = await screen.findByText('+ Nowa kategoria główna');
       fireEvent.click(button);
 
-      const nameInput = screen.getByPlaceholderText('Enter category name');
-      const submitButton = screen.getByText('Add Category');
+      const nameInput = screen.getByPlaceholderText('Wprowadź nazwę kategorii');
+      const submitButton = screen.getByText('Utwórz');
 
       await userEvent.type(nameInput, 'Nowa aparatura');
       fireEvent.click(submitButton);
@@ -224,11 +224,11 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const addButtons = screen.getAllByText('Add');
+        const addButtons = screen.getAllByTitle('Dodaj podkategorię');
         fireEvent.click(addButtons[0]);
       });
 
-      expect(screen.getByText('Add Subcategory')).toBeInTheDocument();
+      expect(screen.getByText('Nowa podkategoria')).toBeInTheDocument();
     });
 
     it('should call service.create() with parentId when subcategory form submitted', async () => {
@@ -242,15 +242,15 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const addButtons = screen.getAllByText('Add');
+        const addButtons = screen.getAllByTitle('Dodaj podkategorię');
         fireEvent.click(addButtons[0]);
       });
 
-      const nameInput = screen.getByPlaceholderText('Enter category name');
+      const nameInput = screen.getByPlaceholderText('Wprowadź nazwę kategorii');
       const descriptionInput = screen.getByPlaceholderText(
-        'Enter category description (optional)'
+        'Opcjonalny opis kategorii'
       );
-      const submitButton = screen.getByText('Add Category');
+      const submitButton = screen.getByText('Utwórz');
 
       await userEvent.type(nameInput, 'Mikroskopy');
       await userEvent.type(descriptionInput, 'Mikroskopy laboratoryjne');
@@ -275,12 +275,12 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const addButtons = screen.getAllByText('Add');
+        const addButtons = screen.getAllByTitle('Dodaj podkategorię');
         fireEvent.click(addButtons[0]);
       });
 
-      const nameInput = screen.getByPlaceholderText('Enter category name');
-      const submitButton = screen.getByText('Add Category');
+      const nameInput = screen.getByPlaceholderText('Wprowadź nazwę kategorii');
+      const submitButton = screen.getByText('Utwórz');
 
       await userEvent.type(nameInput, 'Mikroskopy');
       fireEvent.click(submitButton);
@@ -298,7 +298,7 @@ describe('CategoriesPage', () => {
       )) as HTMLButtonElement;
 
       await waitFor(() => {
-        const addButtons = screen.getAllByText('Add');
+        const addButtons = screen.getAllByTitle('Dodaj podkategorię');
         fireEvent.click(addButtons[0]);
       });
 
@@ -313,7 +313,7 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const editButtons = screen.getAllByText('Edit');
+        const editButtons = screen.getAllByTitle('Edytuj');
         fireEvent.click(editButtons[0]);
       });
 
@@ -331,7 +331,7 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const editButtons = screen.getAllByText('Edit');
+        const editButtons = screen.getAllByTitle('Edytuj');
         fireEvent.click(editButtons[0]);
       });
 
@@ -362,7 +362,7 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const editButtons = screen.getAllByText('Edit');
+        const editButtons = screen.getAllByTitle('Edytuj');
         fireEvent.click(editButtons[0]);
       });
 
@@ -380,7 +380,7 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const deleteButtons = screen.getAllByText('Delete');
+        const deleteButtons = screen.getAllByTitle('Usuń');
         fireEvent.click(deleteButtons[0]);
       });
 
@@ -393,7 +393,7 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const deleteButtons = screen.getAllByText('Delete');
+        const deleteButtons = screen.getAllByTitle('Usuń');
         fireEvent.click(deleteButtons[0]);
       });
 
@@ -413,7 +413,7 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const deleteButtons = screen.getAllByText('Delete');
+        const deleteButtons = screen.getAllByTitle('Usuń');
         fireEvent.click(deleteButtons[0]);
       });
 
@@ -439,8 +439,8 @@ describe('CategoriesPage', () => {
       const button = await screen.findByText('+ Nowa kategoria główna');
       fireEvent.click(button);
 
-      const nameInput = screen.getByPlaceholderText('Enter category name');
-      const submitButton = screen.getByText('Add Category');
+      const nameInput = screen.getByPlaceholderText('Wprowadź nazwę kategorii');
+      const submitButton = screen.getByText('Utwórz');
 
       await userEvent.type(nameInput, 'Test');
       fireEvent.click(submitButton);
@@ -461,7 +461,7 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const editButtons = screen.getAllByText('Edit');
+        const editButtons = screen.getAllByTitle('Edytuj');
         fireEvent.click(editButtons[0]);
       });
 
@@ -484,7 +484,7 @@ describe('CategoriesPage', () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const deleteButtons = screen.getAllByText('Delete');
+        const deleteButtons = screen.getAllByTitle('Usuń');
         fireEvent.click(deleteButtons[0]);
       });
 
@@ -539,24 +539,26 @@ describe('CategoriesPage', () => {
       const button = await screen.findByText('+ Nowa kategoria główna');
       fireEvent.click(button);
 
-      const cancelButton = screen.getByText('Cancel');
+      const cancelButton = screen.getByText('Anuluj');
       fireEvent.click(cancelButton);
 
-      expect(screen.queryByText('Add Root Category')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Nowa kategoria główna')
+      ).not.toBeInTheDocument();
     });
 
     it('should close subcategory form when Cancel clicked', async () => {
       render(<CategoriesPage />);
 
       await waitFor(() => {
-        const addButtons = screen.getAllByText('Add');
+        const addButtons = screen.getAllByTitle('Dodaj podkategorię');
         fireEvent.click(addButtons[0]);
       });
 
-      const cancelButton = screen.getByText('Cancel');
+      const cancelButton = screen.getByText('Anuluj');
       fireEvent.click(cancelButton);
 
-      expect(screen.queryByText('Add Subcategory')).not.toBeInTheDocument();
+      expect(screen.queryByText('Nowa podkategoria')).not.toBeInTheDocument();
     });
 
     it('should re-enable create button after closing form', async () => {
@@ -567,7 +569,7 @@ describe('CategoriesPage', () => {
       )) as HTMLButtonElement;
       fireEvent.click(button);
 
-      const cancelButton = screen.getByText('Cancel');
+      const cancelButton = screen.getByText('Anuluj');
       fireEvent.click(cancelButton);
 
       await waitFor(() => {
@@ -588,7 +590,7 @@ describe('CategoriesPage', () => {
 
       await waitFor(
         () => {
-          const editButtons = screen.getAllByText('Edit');
+          const editButtons = screen.getAllByTitle('Edytuj');
           fireEvent.click(editButtons[0]);
         },
         { timeout: 3000 }
@@ -615,7 +617,7 @@ describe('CategoriesPage', () => {
       mockCategoryService.getTree.mockResolvedValue(mockTreeNode);
 
       await waitFor(() => {
-        const editButtons = screen.getAllByText('Edit');
+        const editButtons = screen.getAllByTitle('Edytuj');
         fireEvent.click(editButtons[0]);
       });
 

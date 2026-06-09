@@ -1,4 +1,5 @@
 import { useRouteError, Link, isRouteErrorResponse } from 'react-router';
+import { AlertTriangle, ArrowLeft } from 'lucide-react';
 
 export const ErrorPage = () => {
   const error = useRouteError();
@@ -33,7 +34,7 @@ export const ErrorPage = () => {
             marginBottom: 16,
           }}
         >
-          ⚠
+          <AlertTriangle size={64} />
         </div>
         <h1
           style={{
@@ -56,7 +57,11 @@ export const ErrorPage = () => {
           {errorMessage}
         </p>
         <Link to="/" className="btn btn-primary">
-          ← Wróć do strony głównej
+          <ArrowLeft
+            size={16}
+            style={{ verticalAlign: 'middle', marginRight: 6 }}
+          />
+          Wróć do strony głównej
         </Link>
       </div>
     </div>

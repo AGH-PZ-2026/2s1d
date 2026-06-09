@@ -4,8 +4,20 @@ import {
   type ImportReport,
 } from '../services/excelImportService';
 
+const defaultColumnMapping = {
+  name: 'name',
+  manufacturer: 'manufacturer',
+  description: 'description',
+  purchase_date: 'purchase_date',
+  category_id: 'category_id',
+  status_id: 'status_id',
+  location_id: 'location_id',
+  owner_id: 'owner_id',
+};
+
 export default function ExcelImportPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [columnMapping, setColumnMapping] = useState(defaultColumnMapping);
   const [report, setReport] = useState<ImportReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -17,7 +29,7 @@ export default function ExcelImportPage() {
     setReport(null);
     setIsUploading(true);
     try {
-      setReport(await excelImportService.upload(file));
+      setReport(await excelImportService.upload(file, columnMapping));
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Nie udało się zaimportować pliku.'
@@ -50,6 +62,25 @@ export default function ExcelImportPage() {
             accept=".xlsx"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
+
+          <fieldset className="import-mapping">
+            <legend>Mapowanie kolumn</legend>
+            {Object.entries(columnMapping).map(([field, column]) => (
+              <label className="form-label" key={field}>
+                {field}
+                <input
+                  className="form-input"
+                  onChange={(event) =>
+                    setColumnMapping((current) => ({
+                      ...current,
+                      [field]: event.target.value,
+                    }))
+                  }
+                  value={column}
+                />
+              </label>
+            ))}
+          </fieldset>
           {error ? <div className="alert alert-error">{error}</div> : null}
           <div className="form-actions">
             <button className="btn btn-primary" disabled={!file || isUploading}>

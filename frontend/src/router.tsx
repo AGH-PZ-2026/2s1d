@@ -1,12 +1,14 @@
 import { createBrowserRouter } from 'react-router';
 import { Layout } from './components/Layout';
+import { AuthGate } from './components/AuthGate';
 import { HomePage } from './pages/HomePage';
-import { AboutPage } from './pages/AboutPage';
+import AuditLogsPage from './pages/AuditLogsPage';
 import BatchQrPage from './pages/BatchQrPage';
 import { ErrorPage } from './pages/ErrorPage';
 import StatusesPage from './pages/StatusesPage';
 import CategoriesPage from './pages/CategoriesPage';
 import DelegationsPage from './pages/DelegationsPage';
+import BorrowingsPage from './pages/BorrowingsPage';
 import ExcelImportPage from './pages/ExcelImportPage';
 import ItemsPage from './pages/ItemsPage';
 import LoginPage from './pages/LoginPage';
@@ -22,47 +24,99 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/',
-        element: <HomePage />,
-      },
-      {
-        path: '/about',
-        element: <AboutPage />,
+        element: (
+          <AuthGate>
+            <HomePage />
+          </AuthGate>
+        ),
       },
       {
         path: '/statuses',
-        element: <StatusesPage />,
+        element: (
+          <AuthGate>
+            <StatusesPage />
+          </AuthGate>
+        ),
       },
       {
         path: '/categories',
-        element: <CategoriesPage />,
+        element: (
+          <AuthGate>
+            <CategoriesPage />
+          </AuthGate>
+        ),
       },
       {
         path: '/delegations',
-        element: <DelegationsPage />,
+        element: (
+          <AuthGate>
+            <DelegationsPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/borrowings',
+        element: (
+          <AuthGate>
+            <BorrowingsPage />
+          </AuthGate>
+        ),
       },
       {
         path: '/items',
-        element: <ItemsPage />,
+        element: (
+          <AuthGate>
+            <ItemsPage />
+          </AuthGate>
+        ),
       },
       {
         path: '/qr',
-        element: <QrScannerPage />,
+        element: (
+          <AuthGate>
+            <QrScannerPage />
+          </AuthGate>
+        ),
       },
       {
         path: '/import',
-        element: <ExcelImportPage />,
+        element: (
+          <AuthGate>
+            <ExcelImportPage />
+          </AuthGate>
+        ),
       },
       {
         path: '/reports/overdue',
-        element: <OverdueReportsPage />,
+        element: (
+          <AuthGate>
+            <OverdueReportsPage />
+          </AuthGate>
+        ),
       },
       {
         path: '/batch-qr',
-        element: <BatchQrPage />,
+        element: (
+          <AuthGate>
+            <BatchQrPage />
+          </AuthGate>
+        ),
       },
       {
         path: '/notifications',
-        element: <NotificationsPage />,
+        element: (
+          <AuthGate>
+            <NotificationsPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/audit-logs',
+        element: (
+          <AuthGate>
+            <AuditLogsPage />
+          </AuthGate>
+        ),
       },
       {
         path: '/login',

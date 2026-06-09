@@ -14,6 +14,11 @@ export interface AuthSession {
   user: AuthUser;
 }
 
+export interface RegisterPayload {
+  email: string;
+  password: string;
+}
+
 interface MockSsoResponse {
   access_token: string;
   token_type: string;
@@ -24,6 +29,16 @@ const TOKEN_KEY = 'access_token';
 const USER_KEY = 'auth_user';
 
 export const authService = {
+  async register(payload: RegisterPayload): Promise<AuthUser> {
+    const response = await fetch('/api/v1/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    await ensureOk(response);
+    return response.json();
+  },
+
   async mockSsoLogin(email: string, role: UserRole): Promise<AuthSession> {
     const response = await fetch('/api/v1/auth/mock-sso', {
       method: 'POST',

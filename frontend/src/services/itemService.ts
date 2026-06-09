@@ -1,5 +1,6 @@
 import type { Category } from '../types/category';
 import type { CreateItemPayload, Item } from '../types/item';
+import type { Group } from '../types/group';
 import type { Location } from '../types/location';
 import type { Owner } from '../types/owner';
 import type { Status } from '../types/status';
@@ -19,6 +20,8 @@ interface BackendItem {
   locationId?: number | null;
   owner_id?: number | null;
   ownerId?: number | null;
+  owner_group_id?: number | null;
+  ownerGroupId?: number | null;
 }
 
 interface BackendCategory {
@@ -40,6 +43,17 @@ interface BackendLocation {
   mapY?: number | null;
 }
 
+export interface CreateLocationPayload {
+  name: string;
+  kind: 'internal' | 'external';
+  building?: string;
+  room?: string;
+  cabinet?: string;
+  shelf?: string;
+  mapX?: number;
+  mapY?: number;
+}
+
 interface BackendStatus {
   id: number;
   name: string;
@@ -49,6 +63,11 @@ interface BackendStatus {
 interface BackendUser {
   id: number;
   email: string;
+}
+
+interface BackendGroup {
+  id: number;
+  name: string;
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -108,6 +127,11 @@ const mockLocations: Location[] = [
 const mockOwners: Owner[] = [
   { id: 1, fullName: 'jan.kowalski@agh.edu.pl' },
   { id: 2, fullName: 'anna.nowak@agh.edu.pl' },
+];
+
+const mockGroups: Group[] = [
+  { id: 1, name: 'Laboratorium elektroniki' },
+  { id: 2, name: 'Zespół aparatury pomiarowej' },
 ];
 
 const mockStatuses: Status[] = [
@@ -174,17 +198,28 @@ export const itemService = {
     });
     await ensureOk(response);
     const data: BackendLocation[] = await response.json();
-    return data.map((location) => ({
-      id: location.id,
-      name: location.name,
-      kind: location.kind,
-      building: location.building ?? undefined,
-      room: location.room ?? undefined,
-      cabinet: location.cabinet ?? undefined,
-      shelf: location.shelf ?? undefined,
-      mapX: location.mapX ?? undefined,
-      mapY: location.mapY ?? undefined,
-    }));
+    return data.map(mapLocation);
+  },
+
+  async createLocation(payload: CreateLocationPayload): Promise<Location> {
+    const response = await fetch('/api/v1/locations/', {
+      method: 'POST',
+      headers: jsonAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    await ensureOk(response);
+    return mapLocation(await response.json());
+  },
+
+  async updateLocation(itemId: number, locationId: number): Promise<void> {
+    const response = await fetch(
+      `/api/v1/items/${itemId}/location?locationId=${locationId}`,
+      {
+        method: 'PATCH',
+        headers: authHeaders(),
+      }
+    );
+    await ensureOk(response);
   },
 
   async getOwners(): Promise<Owner[]> {
@@ -198,6 +233,19 @@ export const itemService = {
     await ensureOk(response);
     const data: BackendUser[] = await response.json();
     return data.map((user) => ({ id: user.id, fullName: user.email }));
+  },
+
+  async getGroups(): Promise<Group[]> {
+    if (USE_MOCKS) {
+      await delay(100);
+      return [...mockGroups];
+    }
+    const response = await fetch('/api/v1/groups/', {
+      headers: authHeaders(),
+    });
+    await ensureOk(response);
+    const data: BackendGroup[] = await response.json();
+    return data.map((group) => ({ id: group.id, name: group.name }));
   },
 
   async getStatuses(): Promise<Status[]> {
@@ -219,6 +267,20 @@ export const itemService = {
   },
 };
 
+function mapLocation(location: BackendLocation): Location {
+  return {
+    id: location.id,
+    name: location.name,
+    kind: location.kind,
+    building: location.building ?? undefined,
+    room: location.room ?? undefined,
+    cabinet: location.cabinet ?? undefined,
+    shelf: location.shelf ?? undefined,
+    mapX: location.mapX ?? undefined,
+    mapY: location.mapY ?? undefined,
+  };
+}
+
 function validateItem(payload: CreateItemPayload): void {
   if (!payload.name.trim()) throw new Error('Nazwa przedmiotu jest wymagana.');
   if (!payload.manufacturer.trim()) throw new Error('Producent jest wymagany.');
@@ -235,6 +297,7 @@ function mapItem(item: BackendItem): Item {
     statusId: item.statusId ?? 0,
     locationId: item.locationId ?? 0,
     ownerId: item.ownerId ?? item.owner_id ?? 0,
+    ownerGroupId: item.ownerGroupId ?? item.owner_group_id ?? undefined,
   };
 }
 
