@@ -25,6 +25,11 @@ def test_any_authenticated_user_can_add_item_photo(
     assert data["addedAt"] is not None
     assert Path(data["storagePath"]).exists()
 
+    logs = client.get("/api/v1/audit-logs/").json()
+    assert any(
+        log["action"] == "PHOTO_ADDED" and log["item_id"] == item.id for log in logs
+    )
+
 
 def test_list_item_photo_history(client, db, auth_headers, user):
     item = _create_item(db, user.id)

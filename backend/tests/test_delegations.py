@@ -6,6 +6,11 @@ def test_add_delegation_as_owner(client, auth_headers, item_with_owner, other_us
     )
     assert response.status_code == 201
     assert response.json()["permission"] == "edit"
+    logs = client.get("/api/v1/audit-logs/").json()
+    assert any(
+        log["action"] == "DELEGATES_CHANGED" and log["item_id"] == item_with_owner.id
+        for log in logs
+    )
 
 
 def test_add_delegation_not_owner(

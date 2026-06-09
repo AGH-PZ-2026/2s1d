@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.models.item import Item
 from app.models.item_photo import ItemPhoto
 from app.models.user import User
+from app.schemas.audit_log import AuditLogAction
+from app.services.audit_log import record_audit_log
 
 UPLOAD_ROOT = Path("uploads/item_photos")
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
@@ -45,6 +47,17 @@ def add_photo(db: Session, item_id: int, file: UploadFile, user: User) -> ItemPh
     db.add(photo)
     db.commit()
     db.refresh(photo)
+    record_audit_log(
+        db,
+        user_id=user.id,
+        action=AuditLogAction.PHOTO_ADDED,
+        item_id=item_id,
+        new_value={
+            "photo_id": photo.id,
+            "filename": photo.original_filename,
+            "content_type": photo.content_type,
+        },
+    )
     return photo
 
 

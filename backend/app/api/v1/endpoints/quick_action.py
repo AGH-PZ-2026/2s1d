@@ -5,7 +5,9 @@ from app.db.session import get_db
 from app.models.delegation import Delegation, PermissionLevel
 from app.models.item import Item
 from app.models.item_status import ItemStatus
+from app.schemas.audit_log import AuditLogAction
 from app.schemas.quick_action import ItemDetailsResponse, QuickActionRequest
+from app.services.audit_log import record_audit_log
 
 router = APIRouter()
 
@@ -35,9 +37,18 @@ def mark_item_damaged(
     if damaged_status is None:
         raise HTTPException(status_code=409, detail="Brak statusu Uszkodzony")
 
+    old_status_id = item.status_id
     item.status_id = damaged_status.id
     db.commit()
     db.refresh(item)
+    record_audit_log(
+        db,
+        user_id=request.user_id,
+        action=AuditLogAction.STATUS_CHANGED,
+        item_id=item.id,
+        old_value={"status_id": old_status_id},
+        new_value={"status_id": damaged_status.id, "quick_action": "mark-damaged"},
+    )
     return _to_details(item)
 
 

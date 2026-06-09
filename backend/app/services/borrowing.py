@@ -7,12 +7,14 @@ from app.models.borrowing import Borrowing, BorrowingMode, BorrowingStatus
 from app.models.item import Item
 from app.models.item_status import ItemStatus
 from app.models.user import User, UserRole
+from app.schemas.audit_log import AuditLogAction
 from app.schemas.borrowing import (
     BorrowingRequestCreate,
     BorrowingReturn,
     ExternalBorrowingCreate,
     OverdueReportRow,
 )
+from app.services.audit_log import record_audit_log
 
 STATUS_PENDING = "Oczekuje zatwierdzenia"
 STATUS_RESERVED = "Zarezerwowany"
@@ -51,6 +53,18 @@ def request_borrowing(
     _set_item_status(db, item, STATUS_PENDING)
     db.commit()
     db.refresh(borrowing)
+    record_audit_log(
+        db,
+        user_id=current_user.id,
+        action=AuditLogAction.BORROWING_REQUESTED,
+        item_id=item.id,
+        new_value={
+            "borrowing_id": borrowing.id,
+            "mode": borrowing.mode,
+            "status": borrowing.status,
+            "planned_return_at": _iso(borrowing.planned_return_at),
+        },
+    )
     return borrowing
 
 
@@ -64,6 +78,14 @@ def approve_borrowing(db: Session, borrowing_id: int, current_user: User) -> Bor
     _set_item_status(db, borrowing.item, STATUS_RESERVED)
     db.commit()
     db.refresh(borrowing)
+    record_audit_log(
+        db,
+        user_id=current_user.id,
+        action=AuditLogAction.BORROWING_APPROVED,
+        item_id=borrowing.item_id,
+        old_value={"status": BorrowingStatus.pending},
+        new_value={"status": borrowing.status, "borrowing_id": borrowing.id},
+    )
     return borrowing
 
 
@@ -76,6 +98,17 @@ def reject_borrowing(db: Session, borrowing_id: int, current_user: User) -> Borr
     _set_item_status(db, borrowing.item, STATUS_AVAILABLE)
     db.commit()
     db.refresh(borrowing)
+    record_audit_log(
+        db,
+        user_id=current_user.id,
+        action=AuditLogAction.ITEM_UPDATED,
+        item_id=borrowing.item_id,
+        old_value={"borrowing_status": BorrowingStatus.pending},
+        new_value={
+            "borrowing_status": borrowing.status,
+            "borrowing_id": borrowing.id,
+        },
+    )
     return borrowing
 
 
@@ -94,6 +127,14 @@ def hand_over_borrowing(
     _set_item_status(db, borrowing.item, STATUS_BORROWED)
     db.commit()
     db.refresh(borrowing)
+    record_audit_log(
+        db,
+        user_id=current_user.id,
+        action=AuditLogAction.ITEM_BORROWED,
+        item_id=borrowing.item_id,
+        old_value={"status": BorrowingStatus.reserved},
+        new_value={"status": borrowing.status, "borrowing_id": borrowing.id},
+    )
     return borrowing
 
 
@@ -116,6 +157,18 @@ def return_borrowing(
     _set_item_status(db, borrowing.item, STATUS_AVAILABLE)
     db.commit()
     db.refresh(borrowing)
+    record_audit_log(
+        db,
+        user_id=current_user.id,
+        action=AuditLogAction.BORROWING_RETURNED,
+        item_id=borrowing.item_id,
+        old_value={"status": BorrowingStatus.borrowed},
+        new_value={
+            "status": borrowing.status,
+            "borrowing_id": borrowing.id,
+            "comment": borrowing.return_comment,
+        },
+    )
     return borrowing
 
 
@@ -141,6 +194,18 @@ def create_external_borrowing(
     _set_item_status(db, item, STATUS_BORROWED)
     db.commit()
     db.refresh(borrowing)
+    record_audit_log(
+        db,
+        user_id=current_user.id,
+        action=AuditLogAction.ITEM_BORROWED,
+        item_id=item.id,
+        new_value={
+            "borrowing_id": borrowing.id,
+            "mode": borrowing.mode,
+            "status": borrowing.status,
+            "external_borrower": borrowing.external_borrower,
+        },
+    )
     return borrowing
 
 
@@ -250,3 +315,7 @@ def _set_item_status(db: Session, item: Item, name: str) -> None:
     if status is None:
         raise HTTPException(status_code=409, detail=f"Brak statusu {name}")
     item.status_id = status.id
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None

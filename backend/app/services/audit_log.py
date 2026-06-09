@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditLog
-from app.schemas.audit_log import AuditLogCreate
+from app.schemas.audit_log import AuditLogAction, AuditLogCreate
 
 
 def create_audit_log(db: Session, log_in: AuditLogCreate) -> AuditLog:
@@ -26,3 +26,25 @@ def get_audit_logs(db: Session, skip: int = 0, limit: int = 100) -> list[AuditLo
         .limit(limit)
         .all()
     )
+
+
+def record_audit_log(
+    db: Session,
+    *,
+    user_id: int,
+    action: AuditLogAction,
+    item_id: int,
+    old_value: dict | None = None,
+    new_value: dict | None = None,
+) -> AuditLog:
+    db_log = AuditLog(
+        user_id=user_id,
+        action=action,
+        item_id=item_id,
+        old_value=old_value,
+        new_value=new_value,
+    )
+    db.add(db_log)
+    db.commit()
+    db.refresh(db_log)
+    return db_log

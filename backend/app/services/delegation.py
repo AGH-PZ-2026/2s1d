@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from app.models.delegation import Delegation, PermissionLevel
 from app.models.item import Item
 from app.models.user import User
+from app.schemas.audit_log import AuditLogAction
 from app.schemas.delegation import DelegationCreate
+from app.services.audit_log import record_audit_log
 
 
 def get_delegations(item_id: int, db: Session):
@@ -30,6 +32,18 @@ def add_delegation(
     db.add(delegation)
     db.commit()
     db.refresh(delegation)
+    record_audit_log(
+        db,
+        user_id=current_user.id,
+        action=AuditLogAction.DELEGATES_CHANGED,
+        item_id=item_id,
+        new_value={
+            "delegation_id": delegation.id,
+            "user_id": delegation.user_id,
+            "group_id": delegation.group_id,
+            "permission": delegation.permission,
+        },
+    )
     return delegation
 
 
@@ -48,8 +62,22 @@ def remove_delegation(
     )
     if not delegation:
         raise HTTPException(status_code=404, detail="Delegation not found")
+    old_value = {
+        "delegation_id": delegation.id,
+        "user_id": delegation.user_id,
+        "group_id": delegation.group_id,
+        "permission": delegation.permission,
+    }
     db.delete(delegation)
     db.commit()
+    record_audit_log(
+        db,
+        user_id=current_user.id,
+        action=AuditLogAction.DELEGATES_CHANGED,
+        item_id=item_id,
+        old_value=old_value,
+        new_value=None,
+    )
 
 
 def get_user_permission(

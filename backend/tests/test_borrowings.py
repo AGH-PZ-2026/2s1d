@@ -50,6 +50,12 @@ def test_classic_borrowing_flow_requires_owner_return(
     assert owner_return.json()["status"] == "returned"
     assert owner_return.json()["returnComment"] == "Bez uszkodzeń"
     assert _item_status(db, item.id) == "Dostępny"
+    logs = client.get("/api/v1/audit-logs/").json()
+    actions = [log["action"] for log in logs if log["item_id"] == item.id]
+    assert "BORROWING_REQUESTED" in actions
+    assert "BORROWING_APPROVED" in actions
+    assert "ITEM_BORROWED" in actions
+    assert "BORROWING_RETURNED" in actions
 
 
 def test_trusted_borrower_can_return_item(

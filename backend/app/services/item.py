@@ -12,7 +12,9 @@ from app.models.item import Item
 from app.models.item_status import ItemStatus
 from app.models.location import Location
 from app.models.user import User
+from app.schemas.audit_log import AuditLogAction
 from app.schemas.item import ItemCreate
+from app.services.audit_log import record_audit_log
 from app.services.delegation import get_user_permission
 
 SYSTEM_ID_PREFIX = "ITEM"
@@ -102,6 +104,19 @@ def create(db: Session, data: ItemCreate) -> Item:
             detail="Nie udało się wygenerować unikalnego identyfikatora przedmiotu",
         ) from exc
     db.refresh(item)
+    record_audit_log(
+        db,
+        user_id=0,
+        action=AuditLogAction.ITEM_CREATED,
+        item_id=item.id,
+        new_value={
+            "name": item.name,
+            "status_id": item.status_id,
+            "category_id": item.category_id,
+            "location_id": item.location_id,
+            "owner_id": item.owner_id,
+        },
+    )
     return item
 
 
@@ -109,9 +124,18 @@ def update_item_status(item_id: int, status_id: int, user: User, db: Session):
     item = _get_item_with_permission(
         item_id, user, db, [PermissionLevel.edit, PermissionLevel.manage]
     )
+    old_status_id = item.status_id
     _ensure_exists(db, ItemStatus, status_id, "Status nie istnieje")
     item.status_id = status_id
     db.commit()
+    record_audit_log(
+        db,
+        user_id=user.id,
+        action=AuditLogAction.STATUS_CHANGED,
+        item_id=item.id,
+        old_value={"status_id": old_status_id},
+        new_value={"status_id": status_id},
+    )
     return {"message": "Status updated"}
 
 
@@ -119,15 +143,33 @@ def update_item_description(item_id: int, description: str, user: User, db: Sess
     item = _get_item_with_permission(
         item_id, user, db, [PermissionLevel.edit, PermissionLevel.manage]
     )
+    old_description = item.description
     item.description = description
     db.commit()
+    record_audit_log(
+        db,
+        user_id=user.id,
+        action=AuditLogAction.ITEM_UPDATED,
+        item_id=item.id,
+        old_value={"description": old_description},
+        new_value={"description": description},
+    )
     return {"message": "Description updated"}
 
 
 def update_item_location(item_id: int, location: str, user: User, db: Session):
     item = _get_item_with_permission(item_id, user, db, [PermissionLevel.manage])
+    old_location = item.location
     item.location = location
     db.commit()
+    record_audit_log(
+        db,
+        user_id=user.id,
+        action=AuditLogAction.LOCATION_CHANGED,
+        item_id=item.id,
+        old_value={"location": old_location},
+        new_value={"location": location},
+    )
     return {"message": "Location updated"}
 
 
