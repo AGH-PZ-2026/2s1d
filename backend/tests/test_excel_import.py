@@ -2,6 +2,8 @@ import io
 
 import openpyxl
 
+from app.models.item import Item
+
 
 def create_fake_excel(headers: list, rows: list) -> io.BytesIO:
     """Pomocnicza funkcja generująca plik Excel w pamięci RAM na potrzeby testów."""
@@ -17,7 +19,7 @@ def create_fake_excel(headers: list, rows: list) -> io.BytesIO:
     return out
 
 
-def test_upload_excel_success_and_errors(client):
+def test_upload_excel_success_and_errors(client, db):
     excel_file = create_fake_excel(
         headers=["name", "description"],
         rows=[
@@ -38,6 +40,10 @@ def test_upload_excel_success_and_errors(client):
     assert data["successful_rows"] == 1
     assert len(data["errors"]) == 1
     assert data["errors"][0]["row_number"] == 3
+    imported = db.query(Item).filter(Item.name == "Klawiatura").first()
+    assert imported is not None
+    assert imported.description == "Biała, mechaniczna"
+    assert imported.system_id.startswith("ITEM-")
 
 
 def test_upload_invalid_file_extension(client):

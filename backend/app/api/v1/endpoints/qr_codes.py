@@ -1,52 +1,55 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-from app.schemas.qr_code import MockItemResponse, QRCodeDataResponse
+from app.db.session import get_db
+from app.models.item import Item
+from app.schemas.qr_code import QRCodeDataResponse, QRItemResponse
 
 router = APIRouter()
 
-MOCK_ITEMS = {
-    1: {"id": 1, "name": "Laptop Dell", "description": "Służbowy laptop"},
-    2: {"id": 2, "name": "Projektor Epson", "description": "Rzutnik"},
-}
-
-PREFIX = "ITEM-QR-"
+LEGACY_PREFIX = "ITEM-QR-"
 
 
 @router.get("/{item_id}/generate-data", response_model=QRCodeDataResponse)
-def get_qr_data_for_item(item_id: int):
-    """
-    Pobiera dane potrzebne do wygenerowania kodu QR dla przedmiotu.
-    Frontend użyje tekstu 'qr_data', by narysować obrazek kodu QR.
-    """
-    if item_id not in MOCK_ITEMS:
+def get_qr_data_for_item(item_id: int, db: Session = Depends(get_db)):
+    item = _get_item(db, item_id)
+    return QRCodeDataResponse(item_id=item.id, qr_data=_qr_data(item))
+
+
+@router.get("/scan/{qr_data}", response_model=QRItemResponse)
+def scan_qr_code(qr_data: str, db: Session = Depends(get_db)):
+    item = _find_by_qr_data(db, qr_data)
+    return QRItemResponse(
+        id=item.id,
+        system_id=item.system_id,
+        name=item.name,
+        description=item.description,
+        qr_data=_qr_data(item),
+    )
+
+
+def _get_item(db: Session, item_id: int) -> Item:
+    item = db.query(Item).filter(Item.id == item_id).first()
+    if item is None:
         raise HTTPException(status_code=404, detail="Przedmiot nie istnieje.")
+    return item
 
-    return QRCodeDataResponse(item_id=item_id, qr_data=f"{PREFIX}{item_id}")
 
+def _find_by_qr_data(db: Session, qr_data: str) -> Item:
+    if qr_data.startswith(LEGACY_PREFIX):
+        try:
+            return _get_item(db, int(qr_data.removeprefix(LEGACY_PREFIX)))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Błędny ID w kodzie QR.")
 
-@router.get("/scan/{qr_data}", response_model=MockItemResponse)
-def scan_qr_code(qr_data: str):
-    """
-    Wyszukuje przedmiot po zeskanowanym identyfikatorze z kodu QR.
-    Zwraca szczegóły przedmiotu lub czytelny błąd.
-    """
-    if not qr_data.startswith(PREFIX):
+    if not qr_data.startswith("ITEM-"):
         raise HTTPException(status_code=400, detail="Niepoprawny format kodu QR.")
 
-    try:
-        # Wyciągamy ID z tekstu np. "ITEM-QR-1" -> "1"
-        item_id_str = qr_data.replace(PREFIX, "")
-        item_id = int(item_id_str)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Błędny ID w kodzie QR.")
-
-    if item_id not in MOCK_ITEMS:
+    item = db.query(Item).filter(Item.system_id == qr_data).first()
+    if item is None:
         raise HTTPException(status_code=404, detail="Nieznany przedmiot z QR.")
+    return item
 
-    item_info = MOCK_ITEMS[item_id]
-    return MockItemResponse(
-        id=item_info["id"],
-        name=item_info["name"],
-        description=item_info["description"],
-        qr_data=qr_data,
-    )
+
+def _qr_data(item: Item) -> str:
+    return item.system_id or f"{LEGACY_PREFIX}{item.id}"

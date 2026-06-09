@@ -6,8 +6,9 @@ class QRCodeDataResponse(BaseModel):
     qr_data: str
 
 
-class MockItemResponse(BaseModel):
+class QRItemResponse(BaseModel):
     id: int
+    system_id: str | None
     name: str
-    description: str
+    description: str | None
     qr_data: str
