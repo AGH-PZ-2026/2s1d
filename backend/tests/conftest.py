@@ -17,6 +17,10 @@ from app.models.group import Group  # noqa: E402,F401
 from app.models.item import Item  # noqa: E402,F401
 from app.models.item_photo import ItemPhoto  # noqa: E402,F401
 from app.models.location import Location  # noqa: E402,F401
+from app.models.notification import (  # noqa: E402,F401
+    NotificationEvent,  # noqa: E402,F401
+    NotificationPreference,  # noqa: E402,F401
+)
 from app.models.user import User  # noqa: E402,F401
 from app.services.item_status import init_system_statuses  # noqa: E402
 

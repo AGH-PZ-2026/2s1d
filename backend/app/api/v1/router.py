@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     item_status,
     items,
     locations,
+    notifications,
     qr_codes,
     quick_action,
     statuses,
@@ -26,6 +27,7 @@ api_router.include_router(item.router)
 api_router.include_router(item_photos.router)
 api_router.include_router(locations.router)
 api_router.include_router(borrowings.router)
+api_router.include_router(notifications.router)
 api_router.include_router(statuses.router)
 api_router.include_router(qr_codes.router, prefix="/qr-codes", tags=["qr-codes"])
 api_router.include_router(excel_import.router, prefix="/excel", tags=["excel-import"])

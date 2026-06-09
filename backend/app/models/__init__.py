@@ -10,5 +10,9 @@ from app.models.item_photo import ItemPhoto as ItemPhoto
 from app.models.item_status import ItemStatus as ItemStatus
 from app.models.location import Location as Location
 from app.models.location import LocationKind as LocationKind
+from app.models.notification import NotificationChannel as NotificationChannel
+from app.models.notification import NotificationEvent as NotificationEvent
+from app.models.notification import NotificationEventType as NotificationEventType
+from app.models.notification import NotificationPreference as NotificationPreference
 from app.models.user import User as User
 from app.models.user import UserRole as UserRole

@@ -15,6 +15,7 @@ from app.schemas.borrowing import (
     OverdueReportRow,
 )
 from app.services.audit_log import record_audit_log
+from app.services.notification import queue_borrowing_approved
 
 STATUS_PENDING = "Oczekuje zatwierdzenia"
 STATUS_RESERVED = "Zarezerwowany"
@@ -86,6 +87,7 @@ def approve_borrowing(db: Session, borrowing_id: int, current_user: User) -> Bor
         old_value={"status": BorrowingStatus.pending},
         new_value={"status": borrowing.status, "borrowing_id": borrowing.id},
     )
+    queue_borrowing_approved(db, borrowing)
     return borrowing
 
 
