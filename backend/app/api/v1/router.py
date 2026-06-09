@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     audit_logs,
+    batch_qr,
     categories,
     excel_import,
     item_status,
@@ -17,4 +18,5 @@ api_router.include_router(items.router)
 api_router.include_router(statuses.router)
 api_router.include_router(qr_codes.router, prefix="/qr-codes", tags=["qr-codes"])
 api_router.include_router(excel_import.router, prefix="/excel", tags=["excel-import"])
+api_router.include_router(batch_qr.router, prefix="/batch-qr", tags=["batch-qr"])
 api_router.include_router(audit_logs.router, prefix="/audit-logs", tags=["audit-logs"])
