@@ -17,3 +17,7 @@ export function badRequest(detail: string): never {
 export function forbidden(detail: string): never {
   throw new AppError(403, detail);
 }
+
+export function unauthorized(detail: string = "Unauthorized"): never {
+  throw new AppError(401, detail);
+}

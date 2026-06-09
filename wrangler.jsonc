@@ -22,6 +22,22 @@
     }
   ],
 
+  "r2_buckets": [
+    {
+      "binding": "PHOTOS_BUCKET",
+      "bucket_name": "pz-item-photos"
+    }
+  ],
+
+  "queues": {
+    "producers": [
+      {
+        "binding": "NOTIFICATION_QUEUE",
+        "queue": "pz-notifications"
+      }
+    ]
+  },
+
   "observability": {
     "enabled": true,
     "logs": {
@@ -33,6 +49,10 @@
     }
   },
 
+  "vars": {
+    "JWT_SECRET": ""
+  },
+
   "env": {
     "production": {
       "hyperdrive": [
@@ -41,6 +61,20 @@
           "id": "<YOUR_HYPERDRIVE_CONFIG_ID>"
         }
       ],
+      "r2_buckets": [
+        {
+          "binding": "PHOTOS_BUCKET",
+          "bucket_name": "pz-item-photos"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "NOTIFICATION_QUEUE",
+            "queue": "pz-notifications"
+          }
+        ]
+      },
       "routes": [
         {
           "pattern": "<YOUR_DOMAIN>",

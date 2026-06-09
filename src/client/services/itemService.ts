@@ -1,0 +1,66 @@
+import type { Category } from '../types/category';
+import type { CreateItemPayload, Item } from '../types/item';
+import type { Location } from '../types/location';
+import type { Owner } from '../types/owner';
+import type { Status } from '../types/status';
+import { authHeaders, jsonAuthHeaders } from './authHeaders';
+
+const USE_MOCKS = import.meta.env.MODE === 'test';
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+interface BackendItem { id: number; systemId?: string | null; name: string; manufacturer?: string | null; description?: string | null; purchaseDate?: string | null; categoryId?: number | null; statusId?: number | null; locationId?: number | null; ownerId?: number | null; owner_id?: number | null; }
+interface BackendCat { id: number; name: string; parent_id?: number | null; }
+interface BackendLocation { id: number; name: string; kind?: 'internal' | 'external'; building?: string | null; room?: string | null; cabinet?: string | null; shelf?: string | null; mapX?: number | null; mapY?: number | null; }
+
+let mockItems: Item[] = [
+  { id: 1, name: 'Oscyloskop Tektronix TBS1102', manufacturer: 'Tektronix', description: 'Oscyloskop laboratoryjny 100MHz', purchaseDate: '2024-03-15', categoryId: 1, statusId: 1, locationId: 1, ownerId: 1 },
+  { id: 2, name: 'Multimetr UNI-T UT61E', manufacturer: 'UNI-T', description: 'Cyfrowy multimetr laboratoryjny', purchaseDate: '2023-11-08', categoryId: 2, statusId: 2, locationId: 2, ownerId: 2 },
+];
+let nextId = 3;
+
+const mockCategories: Category[] = [{ id: 1, name: 'Oscyloskop', parentId: null }, { id: 2, name: 'Multimetr', parentId: null }];
+const mockLocations: Location[] = [{ id: 1, name: 'Magazyn A', kind: 'internal', building: 'D-17', mapX: 28, mapY: 42 }, { id: 2, name: 'Sala 101', kind: 'internal', building: 'D-17', room: '101', mapX: 68, mapY: 30 }];
+const mockOwners: Owner[] = [{ id: 1, fullName: 'jan.kowalski@agh.edu.pl' }, { id: 2, fullName: 'anna.nowak@agh.edu.pl' }];
+const mockStatuses: Status[] = [{ id: 1, name: 'Dostępny', slug: 'dostpny', type: 'system' }, { id: 2, name: 'Wypożyczony', slug: 'wypoyczony', type: 'system' }];
+
+export const itemService = {
+  async getAll(): Promise<Item[]> {
+    if (USE_MOCKS) { await delay(100); return [...mockItems]; }
+    const r = await fetch('/api/v1/items/', { headers: authHeaders() }); await ensureOk(r);
+    return ((await r.json()) as BackendItem[]).map(mapItem);
+  },
+  async create(payload: CreateItemPayload): Promise<Item> {
+    if (USE_MOCKS) { await delay(500); const i: Item = { id: nextId++, ...payload }; mockItems = [...mockItems, i]; return i; }
+    const r = await fetch('/api/v1/items/', { method: 'POST', headers: jsonAuthHeaders(), body: JSON.stringify(payload) });
+    await ensureOk(r); return mapItem(await r.json());
+  },
+  async getCategories(): Promise<Category[]> {
+    if (USE_MOCKS) { await delay(100); return [...mockCategories]; }
+    const r = await fetch('/api/v1/categories/', { headers: authHeaders() }); await ensureOk(r);
+    return ((await r.json()) as BackendCat[]).map((c) => ({ id: c.id, name: c.name, parentId: c.parent_id ?? null }));
+  },
+  async getLocations(): Promise<Location[]> {
+    if (USE_MOCKS) { await delay(100); return [...mockLocations]; }
+    const r = await fetch('/api/v1/locations/', { headers: authHeaders() }); await ensureOk(r);
+    return ((await r.json()) as BackendLocation[]).map((l) => ({ id: l.id, name: l.name, kind: l.kind, building: l.building ?? undefined, room: l.room ?? undefined, cabinet: l.cabinet ?? undefined, shelf: l.shelf ?? undefined, mapX: l.mapX ?? undefined, mapY: l.mapY ?? undefined }));
+  },
+  async getOwners(): Promise<Owner[]> {
+    if (USE_MOCKS) { await delay(100); return [...mockOwners]; }
+    const r = await fetch('/api/v1/auth/users', { headers: authHeaders() }); await ensureOk(r);
+    return ((await r.json()) as { id: number; email: string }[]).map((u) => ({ id: u.id, fullName: u.email }));
+  },
+  async getStatuses(): Promise<Status[]> {
+    if (USE_MOCKS) { await delay(100); return [...mockStatuses]; }
+    const r = await fetch('/api/v1/item-status/', { headers: authHeaders() }); await ensureOk(r);
+    return ((await r.json()) as { id: number; name: string; is_system: boolean }[]).map((s) => ({ id: s.id, name: s.name, slug: s.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''), type: s.is_system ? 'system' : 'custom' }));
+  },
+};
+
+function mapItem(i: BackendItem): Item { return { id: i.id, name: i.name, manufacturer: i.manufacturer ?? '', description: i.description ?? undefined, purchaseDate: i.purchaseDate ?? undefined, categoryId: i.categoryId ?? 0, statusId: i.statusId ?? 0, locationId: i.locationId ?? 0, ownerId: i.ownerId ?? i.owner_id ?? 0 }; }
+
+async function ensureOk(response: Response): Promise<void> {
+  if (response.ok) return;
+  let detail = `Błąd serwera (${response.status})`;
+  try { const data = await response.json(); if (typeof data.detail === 'string') detail = data.detail; } catch {}
+  throw new Error(detail);
+}

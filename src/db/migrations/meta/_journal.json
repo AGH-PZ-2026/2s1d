@@ -4,23 +4,9 @@
   "entries": [
     {
       "idx": 0,
-      "version": "7",
-      "when": 1749446400000,
-      "tag": "0000_create_categories",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1749446400000,
-      "tag": "0001_create_item_status",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1749446400000,
-      "tag": "0002_seed_system_statuses",
+      "version": "5",
+      "when": 1781030791820,
+      "tag": "0000_boring_meltdown",
       "breakpoints": true
     }
   ]
