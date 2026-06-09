@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { itemService } from '../services/itemService';
+import { itemPhotoService, type ItemPhoto } from '../services/itemPhotoService';
 
 import type { Item, CreateItemPayload } from '../types/item';
 
@@ -33,6 +34,9 @@ export default function ItemsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [formLoading, setFormLoading] = useState(false);
+  const [photos, setPhotos] = useState<ItemPhoto[]>([]);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -114,6 +118,41 @@ export default function ItemsPage() {
     ? locations.find((location) => location.id === selectedItem.locationId)
     : undefined;
 
+  useEffect(() => {
+    async function loadPhotos(itemId: number) {
+      setPhotoError(null);
+      setPhotoLoading(true);
+      try {
+        setPhotos(await itemPhotoService.list(itemId));
+      } catch {
+        setPhotoError('Nie udało się pobrać historii zdjęć.');
+      } finally {
+        setPhotoLoading(false);
+      }
+    }
+
+    if (selectedItem) {
+      void loadPhotos(selectedItem.id);
+    }
+  }, [selectedItem]);
+
+  const handlePhotoUpload = async (file: File) => {
+    if (!selectedItem) return;
+    setPhotoError(null);
+    setPhotoLoading(true);
+    try {
+      await itemPhotoService.upload(selectedItem.id, file);
+      setPhotos(await itemPhotoService.list(selectedItem.id));
+      setSuccessMessage('Zdjęcie zostało dodane.');
+    } catch (err) {
+      setPhotoError(
+        err instanceof Error ? err.message : 'Nie udało się dodać zdjęcia.'
+      );
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
   return (
     <div className="page">
       <div className="page-header">
@@ -183,12 +222,21 @@ export default function ItemsPage() {
           </table>
 
           {selectedItem && (
-            <LocationMapPanel
-              item={selectedItem}
-              location={selectedLocation}
-              ownerName={getOwnerName(selectedItem.ownerId)}
-              statusName={getStatusName(selectedItem.statusId)}
-            />
+            <>
+              <LocationMapPanel
+                item={selectedItem}
+                location={selectedLocation}
+                ownerName={getOwnerName(selectedItem.ownerId)}
+                statusName={getStatusName(selectedItem.statusId)}
+              />
+              <ItemPhotosPanel
+                item={selectedItem}
+                photos={photos}
+                error={photoError}
+                loading={photoLoading}
+                onUpload={handlePhotoUpload}
+              />
+            </>
           )}
         </>
       )}
@@ -302,6 +350,69 @@ function formatLocationDetails(location: Location | undefined): string {
 
 function clamp(value: number): number {
   return Math.min(100, Math.max(0, value));
+}
+
+function ItemPhotosPanel({
+  item,
+  photos,
+  error,
+  loading,
+  onUpload,
+}: {
+  item: Item;
+  photos: ItemPhoto[];
+  error: string | null;
+  loading: boolean;
+  onUpload: (file: File) => void;
+}) {
+  return (
+    <section className="photos-panel">
+      <div>
+        <p className="location-panel__label">Dokumentacja zdjęciowa</p>
+        <h2>{item.name}</h2>
+      </div>
+      <label className="btn btn-secondary photos-upload">
+        Dodaj zdjęcie
+        <input
+          accept="image/*"
+          type="file"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) onUpload(file);
+            event.target.value = '';
+          }}
+        />
+      </label>
+      {error ? <div className="alert alert-error">{error}</div> : null}
+      {loading ? (
+        <div className="loading-state">
+          <div className="spinner" />
+          Ładowanie zdjęć...
+        </div>
+      ) : (
+        <table className="table photos-table">
+          <thead>
+            <tr>
+              <th>Plik</th>
+              <th>Typ</th>
+              <th>Dodano</th>
+              <th>Użytkownik</th>
+            </tr>
+          </thead>
+          <tbody>
+            {photos.map((photo) => (
+              <tr key={photo.id}>
+                <td>{photo.originalFilename}</td>
+                <td>{photo.contentType}</td>
+                <td>{new Date(photo.addedAt).toLocaleString('pl-PL')}</td>
+                <td>{photo.uploadedById}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
 }
 
 // ---------- Formularz tworzenia ----------
