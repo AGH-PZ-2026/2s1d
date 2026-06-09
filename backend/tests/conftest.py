@@ -22,7 +22,7 @@ from app.models.notification import (  # noqa: E402,F401
     NotificationEvent,  # noqa: E402,F401
     NotificationPreference,  # noqa: E402,F401
 )
-from app.models.user import User  # noqa: E402,F401
+from app.models.user import User, UserRole  # noqa: E402,F401
 from app.services.item_status import init_system_statuses  # noqa: E402
 
 SQLALCHEMY_DATABASE_URL = "sqlite://"
@@ -69,6 +69,7 @@ def client(db):
     default_user = User(
         email="default-client@test.com",
         hashed_password=get_password_hash("password123"),
+        role=UserRole.admin,
     )
     db.add(default_user)
     db.commit()

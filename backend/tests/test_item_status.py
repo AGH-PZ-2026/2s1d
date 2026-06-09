@@ -1,3 +1,13 @@
+def test_non_admin_cannot_create_status(client, auth_headers):
+    response = client.post(
+        "/api/v1/item-status/",
+        json={"name": "Tylko admin"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 403
+
+
 def test_get_all_statuses(client):
     response = client.get("/api/v1/item-status/")
     data = response.json()

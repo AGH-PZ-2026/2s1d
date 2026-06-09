@@ -1,3 +1,13 @@
+def test_non_admin_cannot_create_category(client, auth_headers):
+    response = client.post(
+        "/api/v1/categories/",
+        json={"name": "tylko admin"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 403
+
+
 def test_create_root_category(client):
     response = client.post("/api/v1/categories/", json={"name": "urządzenie"})
     assert response.status_code == 201

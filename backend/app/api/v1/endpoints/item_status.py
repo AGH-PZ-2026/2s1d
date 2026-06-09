@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.dependencies import require_admin
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.item_status import (
     ItemStatusCreate,
     ItemStatusResponse,
@@ -18,17 +20,28 @@ def get_statuses(db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=ItemStatusResponse, status_code=201)
-def create_status(data: ItemStatusCreate, db: Session = Depends(get_db)):
+def create_status(
+    data: ItemStatusCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     return service.create_status(data, db)
 
 
 @router.put("/{status_id}", response_model=ItemStatusResponse)
 def update_status(
-    status_id: int, data: ItemStatusUpdate, db: Session = Depends(get_db)
+    status_id: int,
+    data: ItemStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
 ):
     return service.update_status(status_id, data, db)
 
 
 @router.delete("/{status_id}", status_code=204)
-def delete_status(status_id: int, db: Session = Depends(get_db)):
+def delete_status(
+    status_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     service.delete_status(status_id, db)
