@@ -22,6 +22,9 @@ export const Layout = () => {
         <Link to="/items" style={{ marginRight: '15px' }}>
           Items page
         </Link>
+        <Link to="/qr" style={{ marginRight: '15px' }}>
+          QR
+        </Link>
         <Link to="/login" style={{ marginRight: '15px' }}>
           Login
         </Link>

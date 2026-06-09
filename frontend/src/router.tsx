@@ -8,6 +8,7 @@ import CategoriesPage from './pages/CategoriesPage';
 import DelegationsPage from './pages/DelegationsPage';
 import ItemsPage from './pages/ItemsPage';
 import LoginPage from './pages/LoginPage';
+import QrScannerPage from './pages/QrScannerPage';
 
 export const router = createBrowserRouter([
   {
@@ -38,6 +39,10 @@ export const router = createBrowserRouter([
       {
         path: '/items',
         element: <ItemsPage />,
+      },
+      {
+        path: '/qr',
+        element: <QrScannerPage />,
       },
       {
         path: '/login',
