@@ -455,6 +455,15 @@ body {
   margin-top: 20px;
 }
 
+.report-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .row-selected td {
   background: rgba(0, 105, 60, 0.18);
 }

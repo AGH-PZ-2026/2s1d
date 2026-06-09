@@ -9,6 +9,7 @@ import DelegationsPage from './pages/DelegationsPage';
 import ExcelImportPage from './pages/ExcelImportPage';
 import ItemsPage from './pages/ItemsPage';
 import LoginPage from './pages/LoginPage';
+import OverdueReportsPage from './pages/OverdueReportsPage';
 import QrScannerPage from './pages/QrScannerPage';
 
 export const router = createBrowserRouter([
@@ -48,6 +49,10 @@ export const router = createBrowserRouter([
       {
         path: '/import',
         element: <ExcelImportPage />,
+      },
+      {
+        path: '/reports/overdue',
+        element: <OverdueReportsPage />,
       },
       {
         path: '/login',

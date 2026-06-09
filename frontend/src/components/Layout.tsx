@@ -28,6 +28,9 @@ export const Layout = () => {
         <Link to="/import" style={{ marginRight: '15px' }}>
           Import
         </Link>
+        <Link to="/reports/overdue" style={{ marginRight: '15px' }}>
+          Reports
+        </Link>
         <Link to="/login" style={{ marginRight: '15px' }}>
           Login
         </Link>
