@@ -1,13 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
-import { itemService } from '../services/itemService';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { X } from 'lucide-react';
+import { itemService, type CreateLocationPayload } from '../services/itemService';
 import { itemPhotoService, type ItemPhoto } from '../services/itemPhotoService';
 import type { Item, CreateItemPayload } from '../types/item';
 import type { Category } from '../types/category';
+import type { Group } from '../types/group';
 import type { Location } from '../types/location';
 import type { Owner } from '../types/owner';
 import type { Status } from '../types/status';
 
 interface ModalState { mode: 'create'; }
+
+type SortKey = 'name' | 'manufacturer' | 'category' | 'status' | 'location';
+type SortDirection = 'asc' | 'desc';
+
+const PAGE_SIZE = 5;
 
 export default function ItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -15,6 +22,7 @@ export default function ItemsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,14 +33,17 @@ export default function ItemsPage() {
   const [photos, setPhotos] = useState<ItemPhoto[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoLoading, setPhotoLoading] = useState(false);
+  const [filters, setFilters] = useState({ query: '', categoryId: '', statusId: '', locationId: '', ownerId: '', manufacturer: '' });
+  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'name', direction: 'asc' });
+  const [page, setPage] = useState(1);
 
   const fetchItems = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [itemsData, categoriesData, locationsData, ownersData, statusesData] = await Promise.all([
-        itemService.getAll(), itemService.getCategories(), itemService.getLocations(), itemService.getOwners(), itemService.getStatuses(),
+      const [itemsData, categoriesData, locationsData, ownersData, groupsData, statusesData] = await Promise.all([
+        itemService.getAll(), itemService.getCategories(), itemService.getLocations(), itemService.getOwners(), itemService.getGroups(), itemService.getStatuses(),
       ]);
-      setItems(itemsData); setCategories(categoriesData); setLocations(locationsData); setOwners(ownersData); setStatuses(statusesData);
+      setItems(itemsData); setCategories(categoriesData); setLocations(locationsData); setOwners(ownersData); setGroups(groupsData); setStatuses(statusesData);
     } catch { setError('Nie udało się pobrać przedmiotów.'); } finally { setLoading(false); }
   }, []);
 
@@ -41,26 +52,66 @@ export default function ItemsPage() {
   const handleCreate = async (payload: CreateItemPayload) => {
     setFormLoading(true); setFormError(null);
     try { await itemService.create(payload); await fetchItems(); setSuccessMessage('Przedmiot został dodany pomyślnie.'); setModal(null); }
-    catch (e: unknown) { setFormError(e instanceof Error ? e.message : 'Wystąpił błąd.'); } finally { setFormLoading(false); }
+    catch (e: unknown) { setFormError(e instanceof Error ? e.message : 'Wystąpił błąd.'); }
+    finally { setFormLoading(false); }
   };
 
   const openCreate = () => { setFormError(null); setModal({ mode: 'create' }); };
-  const getCategoryName = (id: number) => categories.find((c) => c.id === id)?.name ?? '—';
-  const getStatusName = (id: number) => statuses.find((s) => s.id === id)?.name ?? '—';
-  const getLocationName = (id: number) => locations.find((l) => l.id === id)?.name ?? '—';
-  const getOwnerName = (id: number) => owners.find((o) => o.id === id)?.fullName ?? '—';
-  const selectedItem = items.find((item) => item.id === selectedItemId) ?? items[0];
-  const selectedLocation = selectedItem ? locations.find((loc) => loc.id === selectedItem.locationId) : undefined;
+
+  const getCategoryName = useCallback((id: number) => categories.find((c) => c.id === id)?.name ?? '—', [categories]);
+  const getStatusName = useCallback((id: number) => statuses.find((s) => s.id === id)?.name ?? '—', [statuses]);
+  const getLocationName = useCallback((id: number) => locations.find((l) => l.id === id)?.name ?? '—', [locations]);
+  const getOwnerName = useCallback((item: Item) => item.ownerGroupId ? `Grupa: ${groups.find((group) => group.id === item.ownerGroupId)?.name ?? item.ownerGroupId}` : owners.find((o) => o.id === item.ownerId)?.fullName ?? '—', [groups, owners]);
+
+  const filteredItems = useMemo(() => {
+    const query = filters.query.trim().toLowerCase();
+    const manufacturer = filters.manufacturer.trim().toLowerCase();
+    const visible = items.filter((item) => {
+      const matchesQuery = !query || item.name.toLowerCase().includes(query) || item.description?.toLowerCase().includes(query);
+      const matchesManufacturer = !manufacturer || item.manufacturer.toLowerCase().includes(manufacturer);
+      const matchesCategory = !filters.categoryId || item.categoryId === Number(filters.categoryId);
+      const matchesStatus = !filters.statusId || item.statusId === Number(filters.statusId);
+      const matchesLocation = !filters.locationId || item.locationId === Number(filters.locationId);
+      const matchesOwner = !filters.ownerId || item.ownerId === Number(filters.ownerId);
+      return matchesQuery && matchesManufacturer && matchesCategory && matchesStatus && matchesLocation && matchesOwner;
+    });
+    return [...visible].sort((a, b) => {
+      const aValue = sortValue(a, sort.key, { getCategoryName, getStatusName, getLocationName });
+      const bValue = sortValue(b, sort.key, { getCategoryName, getStatusName, getLocationName });
+      const result = aValue.localeCompare(bValue, 'pl');
+      return sort.direction === 'asc' ? result : -result;
+    });
+  }, [filters, getCategoryName, getLocationName, getStatusName, items, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedItems = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const selectedItem = filteredItems.find((item) => item.id === selectedItemId) ?? filteredItems[0] ?? items[0];
+  const selectedLocation = selectedItem ? locations.find((location) => location.id === selectedItem.locationId) : undefined;
 
   useEffect(() => {
     async function loadPhotos(itemId: number) { setPhotoError(null); setPhotoLoading(true); try { setPhotos(await itemPhotoService.list(itemId)); } catch { setPhotoError('Nie udało się pobrać historii zdjęć.'); } finally { setPhotoLoading(false); } }
-    if (selectedItem) { void loadPhotos(selectedItem.id); }
+    if (selectedItem) void loadPhotos(selectedItem.id);
   }, [selectedItem]);
 
   const handlePhotoUpload = async (file: File) => {
-    if (!selectedItem) return; setPhotoError(null); setPhotoLoading(true);
+    if (!selectedItem) return;
+    setPhotoError(null); setPhotoLoading(true);
     try { await itemPhotoService.upload(selectedItem.id, file); setPhotos(await itemPhotoService.list(selectedItem.id)); setSuccessMessage('Zdjęcie zostało dodane.'); }
-    catch (err) { setPhotoError(err instanceof Error ? err.message : 'Nie udało się dodać zdjęcia.'); } finally { setPhotoLoading(false); }
+    catch (err) { setPhotoError(err instanceof Error ? err.message : 'Nie udało się dodać zdjęcia.'); }
+    finally { setPhotoLoading(false); }
+  };
+
+  const handleLocationChange = async (locationId: number) => {
+    if (!selectedItem) return;
+    try { await itemService.updateLocation(selectedItem.id, locationId); await fetchItems(); setSuccessMessage('Lokalizacja przedmiotu została zaktualizowana.'); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Nie udało się zaktualizować lokalizacji.'); }
+  };
+
+  const handleCreateLocation = async (payload: CreateLocationPayload) => {
+    if (!selectedItem) return;
+    try { const location = await itemService.createLocation(payload); await itemService.updateLocation(selectedItem.id, location.id); await fetchItems(); setSuccessMessage('Nowy punkt lokalizacji został dodany i przypisany.'); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Nie udało się dodać punktu lokalizacji.'); }
   };
 
   return (
@@ -69,45 +120,85 @@ export default function ItemsPage() {
       {error && <div className="alert alert-error">{error}</div>}
       {successMessage && <div className="alert alert-success">{successMessage}</div>}
       {loading ? (<div className="loading-state"><div className="spinner" /><span>Ładowanie przedmiotów…</span></div>) : (<>
-        <table className="table"><thead><tr><th>Nazwa</th><th>Producent</th><th>Opis</th><th>Kategoria</th><th>Status</th><th>Lokalizacja</th><th>Właściciel / opiekun</th><th>Data zakupu</th></tr></thead><tbody>
-          {items.map((item) => (<tr key={item.id} className={item.id === selectedItem?.id ? 'row-selected' : ''} onClick={() => setSelectedItemId(item.id)}><td className="td-name">{item.name}</td><td>{item.manufacturer}</td><td>{item.description ?? '—'}</td><td>{getCategoryName(item.categoryId)}</td><td>{getStatusName(item.statusId)}</td><td>{getLocationName(item.locationId)}</td><td>{getOwnerName(item.ownerId)}</td><td>{item.purchaseDate ?? '—'}</td></tr>))}
-        </tbody></table>
-        {selectedItem && (<>
-          <LocationMapPanel item={selectedItem} location={selectedLocation} ownerName={getOwnerName(selectedItem.ownerId)} statusName={getStatusName(selectedItem.statusId)} />
-          <ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} />
-        </>)}
+        <ItemsFilters categories={categories} filters={filters} locations={locations} onChange={(patch) => { setFilters((current) => ({ ...current, ...patch })); setPage(1); }} owners={owners} statuses={statuses} />
+        <table className="table">
+          <thead><tr>
+            <th><SortButton active={sort.key === 'name'} direction={sort.direction} label="Nazwa" onClick={() => setSort(nextSort(sort, 'name'))} /></th>
+            <th><SortButton active={sort.key === 'manufacturer'} direction={sort.direction} label="Producent" onClick={() => setSort(nextSort(sort, 'manufacturer'))} /></th>
+            <th>Opis</th>
+            <th><SortButton active={sort.key === 'category'} direction={sort.direction} label="Kategoria" onClick={() => setSort(nextSort(sort, 'category'))} /></th>
+            <th><SortButton active={sort.key === 'status'} direction={sort.direction} label="Status" onClick={() => setSort(nextSort(sort, 'status'))} /></th>
+            <th><SortButton active={sort.key === 'location'} direction={sort.direction} label="Lokalizacja" onClick={() => setSort(nextSort(sort, 'location'))} /></th>
+            <th>Właściciel / opiekun</th>
+            <th>Data zakupu</th>
+          </tr></thead>
+          <tbody>
+            {paginatedItems.length === 0 ? (<tr><td colSpan={8}>Brak przedmiotów spełniających filtry.</td></tr>) : paginatedItems.map((item) => (<tr key={item.id} className={item.id === selectedItem?.id ? 'row-selected' : ''} onClick={() => setSelectedItemId(item.id)}><td className="td-name">{item.name}</td><td>{item.manufacturer}</td><td>{item.description ?? '—'}</td><td>{getCategoryName(item.categoryId)}</td><td>{getStatusName(item.statusId)}</td><td>{getLocationName(item.locationId)}</td><td>{getOwnerName(item)}</td><td>{item.purchaseDate ?? '—'}</td></tr>))}
+          </tbody>
+        </table>
+        <div className="table-pagination"><span>Strona {currentPage} z {totalPages} · Wyniki: {filteredItems.length}</span><div className="td-actions"><button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">Poprzednia</button><button className="btn btn-secondary" disabled={currentPage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">Następna</button></div></div>
+        {selectedItem && (<><LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} /><ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} /></>)}
       </>)}
-      {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>Nowy przedmiot</h2><button className="modal-close" onClick={() => setModal(null)}>✕</button></div>{formError && <div className="alert alert-error">{formError}</div>}<CreateForm categories={categories} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} /></div></div>)}
+      {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>Nowy przedmiot</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}<CreateForm categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} /></div></div>)}
     </div>
   );
 }
 
-function LocationMapPanel({ item, location, ownerName, statusName }: { item: Item; location: Location | undefined; ownerName: string; statusName: string }) {
-  const hasCoords = typeof location?.mapX === 'number' && typeof location?.mapY === 'number';
+function ItemsFilters({ categories, filters, locations, onChange, owners, statuses }: { categories: Category[]; filters: { query: string; categoryId: string; statusId: string; locationId: string; ownerId: string; manufacturer: string; }; locations: Location[]; onChange: (patch: Partial<typeof filters>) => void; owners: Owner[]; statuses: Status[] }) {
+  return (<section className="filters-panel" aria-label="Filtry przedmiotów">
+    <label className="form-label" htmlFor="item-filter-query">Nazwa lub opis</label><input className="form-input" id="item-filter-query" onChange={(event) => onChange({ query: event.target.value })} placeholder="np. oscyloskop" value={filters.query} />
+    <label className="form-label" htmlFor="item-filter-manufacturer">Producent</label><input className="form-input" id="item-filter-manufacturer" onChange={(event) => onChange({ manufacturer: event.target.value })} placeholder="np. Tektronix" value={filters.manufacturer} />
+    <label className="form-label" htmlFor="item-filter-category">Kategoria</label><select className="form-input" id="item-filter-category" onChange={(event) => onChange({ categoryId: event.target.value })} value={filters.categoryId}><option value="">Wszystkie</option>{categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}</select>
+    <label className="form-label" htmlFor="item-filter-status">Status</label><select className="form-input" id="item-filter-status" onChange={(event) => onChange({ statusId: event.target.value })} value={filters.statusId}><option value="">Wszystkie</option>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
+    <label className="form-label" htmlFor="item-filter-location">Lokalizacja</label><select className="form-input" id="item-filter-location" onChange={(event) => onChange({ locationId: event.target.value })} value={filters.locationId}><option value="">Wszystkie</option>{locations.map((location) => (<option key={location.id} value={location.id}>{location.name}</option>))}</select>
+    <label className="form-label" htmlFor="item-filter-owner">Właściciel / opiekun</label><select className="form-input" id="item-filter-owner" onChange={(event) => onChange({ ownerId: event.target.value })} value={filters.ownerId}><option value="">Wszyscy</option>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
+  </section>);
+}
+
+function SortButton({ active, direction, label, onClick }: { active: boolean; direction: SortDirection; label: string; onClick: () => void }) {
+  return (<button className="table-sort-button" onClick={onClick} type="button">{label}{active ? ` ${direction === 'asc' ? 'rosnąco' : 'malejąco'}` : ''}</button>);
+}
+
+function nextSort(current: { key: SortKey; direction: SortDirection }, key: SortKey): { key: SortKey; direction: SortDirection } { return { key, direction: (current.key === key && current.direction === 'asc' ? 'desc' : 'asc') as SortDirection }; }
+
+function sortValue(item: Item, key: SortKey, helpers: { getCategoryName: (id: number) => string; getStatusName: (id: number) => string; getLocationName: (id: number) => string }): string {
+  if (key === 'category') return helpers.getCategoryName(item.categoryId); if (key === 'status') return helpers.getStatusName(item.statusId); if (key === 'location') return helpers.getLocationName(item.locationId); return item[key] ?? '';
+}
+
+function LocationMapPanel({ item, location, locations, onCreateLocation, onLocationChange, ownerName, statusName }: { item: Item; location: Location | undefined; locations: Location[]; onCreateLocation: (p: CreateLocationPayload) => void; onLocationChange: (locationId: number) => void; ownerName: string; statusName: string }) {
+  const [newLocation, setNewLocation] = useState({ name: '', kind: 'internal' as 'internal' | 'external', building: '', room: '', cabinet: '', shelf: '', mapX: '50', mapY: '50' });
+  const hasCoordinates = typeof location?.mapX === 'number' && typeof location?.mapY === 'number';
   const x = clamp(location?.mapX ?? 50); const y = clamp(location?.mapY ?? 50);
-  return (<section className="location-panel" aria-label="Mapa lokalizacji przedmiotu"><div className="location-panel__summary"><p className="location-panel__label">Lokalizacja przedmiotu</p><h2>{item.name}</h2><dl><div><dt>Status</dt><dd>{statusName}</dd></div><div><dt>Opiekun</dt><dd>{ownerName}</dd></div><div><dt>Punkt</dt><dd>{location?.name ?? 'Brak przypisanej lokalizacji'}</dd></div><div><dt>Szczegóły</dt><dd>{formatLocationDetails(location)}</dd></div></dl></div><div className="location-map"><div className="location-map__axis location-map__axis--x">mapX</div><div className="location-map__axis location-map__axis--y">mapY</div>{hasCoords ? (<div className="location-map__pin" style={{ left: `${x}%`, top: `${y}%` }}><span>{location?.name}</span></div>) : (<div className="location-map__empty">Brak współrzędnych mapy dla tej lokalizacji</div>)}</div></section>);
+  return (<section className="location-panel" aria-label="Mapa lokalizacji przedmiotu">
+    <div className="location-panel__summary"><p className="location-panel__label">Lokalizacja przedmiotu</p><h2>{item.name}</h2><dl><div><dt>Status</dt><dd>{statusName}</dd></div><div><dt>Opiekun</dt><dd>{ownerName}</dd></div><div><dt>Punkt</dt><dd>{location?.name ?? 'Brak przypisanej lokalizacji'}</dd></div><div><dt>Szczegóły</dt><dd>{formatLocationDetails(location)}</dd></div></dl></div>
+    <div className="location-map"><div className="location-map__axis location-map__axis--x">mapX</div><div className="location-map__axis location-map__axis--y">mapY</div>{hasCoordinates ? (<div className="location-map__pin" style={{ left: `${x}%`, top: `${y}%` }}><span>{location?.name}</span></div>) : (<div className="location-map__empty">Brak współrzędnych mapy dla tej lokalizacji</div>)}</div>
+    <div className="location-controls">
+      <div className="form"><label className="form-label" htmlFor="item-location-select">Zmień lokalizację</label><select className="form-input" id="item-location-select" onChange={(event) => onLocationChange(Number(event.target.value))} value={item.locationId}>{locations.map((currentLocation) => (<option key={currentLocation.id} value={currentLocation.id}>{currentLocation.name}</option>))}</select></div>
+      <div className="form"><label className="form-label" htmlFor="new-location-name">Nowy punkt na mapie</label><input className="form-input" id="new-location-name" onChange={(event) => setNewLocation((current) => ({ ...current, name: event.target.value }))} placeholder="np. D-17 / 102 / Szafa B" value={newLocation.name} /><div className="location-controls__grid"><select aria-label="Typ lokalizacji" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, kind: event.target.value as 'internal' | 'external' }))} value={newLocation.kind}><option value="internal">Wewnętrzna</option><option value="external">Zewnętrzna</option></select><input aria-label="Budynek" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, building: event.target.value }))} placeholder="Budynek" value={newLocation.building} /><input aria-label="Pokój" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, room: event.target.value }))} placeholder="Pokój" value={newLocation.room} /><input aria-label="Szafa" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, cabinet: event.target.value }))} placeholder="Szafa" value={newLocation.cabinet} /><input aria-label="Półka" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, shelf: event.target.value }))} placeholder="Półka" value={newLocation.shelf} /><input aria-label="mapX" className="form-input" max={100} min={0} onChange={(event) => setNewLocation((current) => ({ ...current, mapX: event.target.value }))} type="number" value={newLocation.mapX} /><input aria-label="mapY" className="form-input" max={100} min={0} onChange={(event) => setNewLocation((current) => ({ ...current, mapY: event.target.value }))} type="number" value={newLocation.mapY} /></div><button className="btn btn-secondary" disabled={!newLocation.name.trim()} onClick={() => onCreateLocation({ name: newLocation.name.trim(), kind: newLocation.kind, building: newLocation.building.trim() || undefined, room: newLocation.room.trim() || undefined, cabinet: newLocation.cabinet.trim() || undefined, shelf: newLocation.shelf.trim() || undefined, mapX: Number(newLocation.mapX), mapY: Number(newLocation.mapY) })} type="button">Dodaj punkt i przypisz</button></div>
+    </div>
+  </section>);
 }
-function formatLocationDetails(loc: Location | undefined): string { if (!loc) return '—'; const d = [loc.building, loc.room, loc.cabinet, loc.shelf].filter(Boolean).join(' / '); return d || (loc.kind === 'external' ? 'Lokalizacja zewnętrzna' : '—'); }
-function clamp(v: number): number { return Math.min(100, Math.max(0, v)); }
 
-function ItemPhotosPanel({ item, photos, error, loading, onUpload }: { item: Item; photos: ItemPhoto[]; error: string | null; loading: boolean; onUpload: (file: File) => void }) {
-  return (<section className="photos-panel"><div><p className="location-panel__label">Dokumentacja zdjęciowa</p><h2>{item.name}</h2></div><label className="btn btn-secondary photos-upload">Dodaj zdjęcie<input accept="image/*" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) onUpload(file); event.target.value = ''; }} /></label>{error ? <div className="alert alert-error">{error}</div> : null}{loading ? (<div className="loading-state"><div className="spinner" />Ładowanie zdjęć...</div>) : (<table className="table photos-table"><thead><tr><th>Plik</th><th>Typ</th><th>Dodano</th><th>Użytkownik</th></tr></thead><tbody>{photos.map((photo) => (<tr key={photo.id}><td>{photo.originalFilename}</td><td>{photo.contentType}</td><td>{new Date(photo.addedAt).toLocaleString('pl-PL')}</td><td>{photo.uploadedById}</td></tr>))}</tbody></table>)}</section>);
+function formatLocationDetails(location: Location | undefined): string { if (!location) return '—'; const details = [location.building, location.room, location.cabinet, location.shelf].filter(Boolean).join(' / '); return details || (location.kind === 'external' ? 'Lokalizacja zewnętrzna' : '—'); }
+function clamp(value: number): number { return Math.min(100, Math.max(0, value)); }
+
+function ItemPhotosPanel({ item, photos: itemPhotos, error: photosError, loading: photosLoading, onUpload }: { item: Item; photos: ItemPhoto[]; error: string | null; loading: boolean; onUpload: (file: File) => void }) {
+  return (<section className="photos-panel"><div><p className="location-panel__label">Dokumentacja zdjęciowa</p><h2>{item.name}</h2></div><label className="btn btn-secondary photos-upload">Dodaj zdjęcie<input accept="image/*" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) onUpload(file); event.target.value = ''; }} /></label>{photosError ? <div className="alert alert-error">{photosError}</div> : null}{photosLoading ? (<div className="loading-state"><div className="spinner" />Ładowanie zdjęć...</div>) : (<table className="table photos-table"><thead><tr><th>Plik</th><th>Typ</th><th>Dodano</th><th>Użytkownik</th></tr></thead><tbody>{itemPhotos.map((photo) => (<tr key={photo.id}><td>{photo.originalFilename}</td><td>{photo.contentType}</td><td>{new Date(photo.addedAt).toLocaleString('pl-PL')}</td><td>{photo.uploadedById}</td></tr>))}</tbody></table>)}</section>);
 }
 
-function CreateForm({ categories, locations, owners, statuses, onSubmit, loading }: { categories: Category[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: CreateItemPayload) => void; loading: boolean }) {
-  const [name, setName] = useState(''); const [manufacturer, setManufacturer] = useState(''); const [description, setDescription] = useState(''); const [purchaseDate, setPurchaseDate] = useState('');
-  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(statuses[0]?.id ?? 1);
-  const [locationId, setLocationId] = useState(locations[0]?.id ?? 1); const [ownerId, setOwnerId] = useState(owners[0]?.id ?? 1);
-  const submit = () => { if (!name.trim() || !manufacturer.trim()) return; onSubmit({ name: name.trim(), manufacturer: manufacturer.trim(), description: description.trim() || undefined, purchaseDate: purchaseDate || undefined, categoryId, statusId, locationId, ownerId }); };
+function CreateForm({ categories, groups, locations, owners, statuses, onSubmit, loading }: { categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: CreateItemPayload) => void; loading: boolean }) {
+  const [name, setName] = useState(''); const [manufacturer, setManufacturer] = useState(''); const [description, setDescription] = useState(''); const [purchaseDate, setPurchaseDate] = useState(''); const [categoryId, setCategoryId] = useState(categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(statuses[0]?.id ?? 1); const [locationId, setLocationId] = useState(locations[0]?.id ?? 1); const [ownerId, setOwnerId] = useState(owners[0]?.id ?? 1); const [ownerGroupId, setOwnerGroupId] = useState('');
+  const submit = () => { if (!name.trim() || !manufacturer.trim()) return; onSubmit({ name: name.trim(), manufacturer: manufacturer.trim(), description: description.trim() || undefined, purchaseDate: purchaseDate || undefined, categoryId, statusId, locationId, ownerId, ownerGroupId: ownerGroupId ? Number(ownerGroupId) : undefined }); };
   return (<div className="form">
     <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="np. Laptop Dell" />
     <label className="form-label">Producent *</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="np. Dell" />
     <label className="form-label">Opis</label><textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcjonalny opis" />
     <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
-    <label className="form-label">Kategoria *</label><select className="form-input" value={categoryId} onChange={(e) => setCategoryId(Number(e.target.value))}>{categories.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}</select>
-    <label className="form-label">Status *</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>{statuses.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}</select>
-    <label className="form-label">Lokalizacja *</label><select className="form-input" value={locationId} onChange={(e) => setLocationId(Number(e.target.value))}>{locations.map((l) => (<option key={l.id} value={l.id}>{l.name}</option>))}</select>
-    <label className="form-label">Właściciel / opiekun *</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>{owners.map((o) => (<option key={o.id} value={o.id}>{o.fullName}</option>))}</select>
+    <label className="form-label">Kategoria *</label><select className="form-input" value={categoryId} onChange={(e) => setCategoryId(Number(e.target.value))}>{categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}</select>
+    <label className="form-label">Status *</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
+    <label className="form-label">Lokalizacja *</label><select className="form-input" value={locationId} onChange={(e) => setLocationId(Number(e.target.value))}>{locations.map((location) => (<option key={location.id} value={location.id}>{location.name}</option>))}</select>
+    <label className="form-label">Właściciel / opiekun *</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
+    <label className="form-label">Grupa opiekunów</label><select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}><option value="">Brak grupy</option>{groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}</select>
     <div className="form-actions"><button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim() || !manufacturer.trim()}>{loading ? 'Zapisywanie…' : 'Utwórz'}</button></div>
   </div>);
 }

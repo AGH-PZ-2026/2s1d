@@ -54,6 +54,34 @@ router.post("/mock-sso", zValidator("json", mockSsoSchema), async (c) => {
   });
 });
 
+// Register — frontend expects POST /api/v1/auth/register
+// Body: { email, password } → Response: { message }
+const registerSchema = z.object({
+  email: z.string().email().transform((v) => v.trim().toLowerCase()),
+  password: z.string().min(8),
+});
+
+router.post("/register", zValidator("json", registerSchema), async (c) => {
+  const db = c.get("db");
+  const body = c.req.valid("json");
+
+  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, body.email)).limit(1);
+  if (existing.length > 0) badRequest("User with this email already exists");
+
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(body.password));
+  const hashedPassword = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  await db.insert(users).values({
+    email: body.email,
+    hashedPassword,
+    isApproved: false,
+    role: "user",
+  });
+
+  return c.json({ message: "Konto wymaga zatwierdzenia przez administratora" }, 201);
+});
+
 // List users (for owners dropdown) — frontend expects GET /api/v1/auth/users
 // Response: [{ id, email }]
 router.get("/users", async (c) => {

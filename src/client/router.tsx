@@ -1,11 +1,13 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { AuthGate } from './components/AuthGate';
 import { HomePage } from './pages/HomePage';
-import { AboutPage } from './pages/AboutPage';
 import { ErrorPage } from './pages/ErrorPage';
 import StatusesPage from './pages/StatusesPage';
 import CategoriesPage from './pages/CategoriesPage';
 import DelegationsPage from './pages/DelegationsPage';
+import BorrowingsPage from './pages/BorrowingsPage';
+import AuditLogsPage from './pages/AuditLogsPage';
 import ExcelImportPage from './pages/ExcelImportPage';
 import ItemsPage from './pages/ItemsPage';
 import LoginPage from './pages/LoginPage';
@@ -20,17 +22,18 @@ export const router = createBrowserRouter([
     element: <Layout />,
     errorElement: <ErrorPage />,
     children: [
-      { path: '/', element: <HomePage /> },
-      { path: '/about', element: <AboutPage /> },
-      { path: '/statuses', element: <StatusesPage /> },
-      { path: '/categories', element: <CategoriesPage /> },
-      { path: '/delegations', element: <DelegationsPage /> },
-      { path: '/items', element: <ItemsPage /> },
-      { path: '/qr', element: <QrScannerPage /> },
-      { path: '/import', element: <ExcelImportPage /> },
-      { path: '/reports/overdue', element: <OverdueReportsPage /> },
-      { path: '/batch-qr', element: <BatchQrPage /> },
-      { path: '/notifications', element: <NotificationsPage /> },
+      { path: '/', element: <AuthGate><HomePage /></AuthGate> },
+      { path: '/statuses', element: <AuthGate><StatusesPage /></AuthGate> },
+      { path: '/categories', element: <AuthGate><CategoriesPage /></AuthGate> },
+      { path: '/delegations', element: <AuthGate><DelegationsPage /></AuthGate> },
+      { path: '/borrowings', element: <AuthGate><BorrowingsPage /></AuthGate> },
+      { path: '/audit-logs', element: <AuthGate requireAdmin><AuditLogsPage /></AuthGate> },
+      { path: '/items', element: <AuthGate><ItemsPage /></AuthGate> },
+      { path: '/qr', element: <AuthGate><QrScannerPage /></AuthGate> },
+      { path: '/import', element: <AuthGate><ExcelImportPage /></AuthGate> },
+      { path: '/reports/overdue', element: <AuthGate><OverdueReportsPage /></AuthGate> },
+      { path: '/batch-qr', element: <AuthGate><BatchQrPage /></AuthGate> },
+      { path: '/notifications', element: <AuthGate><NotificationsPage /></AuthGate> },
       { path: '/login', element: <LoginPage /> },
     ],
   },

@@ -34,6 +34,7 @@ async function signToken(
   payload: TokenPayload,
   secret: string,
 ): Promise<string> {
+  if (!secret) throw new Error("JWT_SECRET is not set");
   const encoder = new TextEncoder();
   const header = base64url(encoder.encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
   const body = base64url(encoder.encode(JSON.stringify(payload)));
@@ -60,6 +61,7 @@ async function verifyToken(
   secret: string,
 ): Promise<TokenPayload | null> {
   try {
+    if (!secret) return null;
     const parts = token.split(".");
     if (parts.length !== 3) return null;
 

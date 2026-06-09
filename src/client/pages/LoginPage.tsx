@@ -1,18 +1,16 @@
 import { useState, type FormEvent } from 'react';
-import {
-  authService,
-  type AuthUser,
-  type UserRole,
-} from '../services/authService';
+import { authService, type AuthUser, type UserRole } from '../services/authService';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('pracownik@agh.edu.pl');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
   const [role, setRole] = useState<UserRole>('user');
-  const [user, setUser] = useState<AuthUser | null>(() =>
-    authService.getSessionUser()
-  );
+  const [user, setUser] = useState<AuthUser | null>(() => authService.getSessionUser());
   const [error, setError] = useState<string | null>(null);
+  const [registrationMessage, setRegistrationMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -33,6 +31,23 @@ export default function LoginPage() {
     setUser(null);
   }
 
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setRegistrationMessage(null);
+    setIsRegistering(true);
+    try {
+      await authService.register({ email: registerEmail, password: registerPassword });
+      setRegistrationMessage('Konto wymaga zatwierdzenia przez administratora');
+      setRegisterEmail('');
+      setRegisterPassword('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nie udało się zarejestrować.');
+    } finally {
+      setIsRegistering(false);
+    }
+  }
+
   return (
     <section className="login-grid">
       <div className="login-panel login-panel--primary">
@@ -44,6 +59,7 @@ export default function LoginPage() {
           frontendowe.
         </p>
       </div>
+
       <div className="login-panel">
         <form className="form" onSubmit={handleSubmit}>
           <label className="form-label" htmlFor="mock-email">E-mail</label>
@@ -55,12 +71,25 @@ export default function LoginPage() {
           </select>
           {error ? <div className="alert alert-error">{error}</div> : null}
           <div className="form-actions">
-            <button className="btn btn-primary" disabled={isSubmitting} type="submit">
-              {isSubmitting ? 'Logowanie...' : 'Zaloguj'}
-            </button>
+            <button className="btn btn-primary" disabled={isSubmitting} type="submit">{isSubmitting ? 'Logowanie...' : 'Zaloguj'}</button>
           </div>
         </form>
       </div>
+
+      <div className="login-panel">
+        <form className="form" onSubmit={handleRegister}>
+          <h2>Rejestracja</h2>
+          <label className="form-label" htmlFor="register-email">E-mail</label>
+          <input className="form-input" id="register-email" type="email" value={registerEmail} onChange={(event) => setRegisterEmail(event.target.value)} required />
+          <label className="form-label" htmlFor="register-password">Hasło</label>
+          <input className="form-input" id="register-password" minLength={8} type="password" value={registerPassword} onChange={(event) => setRegisterPassword(event.target.value)} required />
+          {registrationMessage ? <div className="alert alert-success">{registrationMessage}</div> : null}
+          <div className="form-actions">
+            <button className="btn btn-secondary" disabled={isRegistering} type="submit">{isRegistering ? 'Rejestrowanie...' : 'Zarejestruj'}</button>
+          </div>
+        </form>
+      </div>
+
       <aside className="login-panel login-session">
         <p className="login-eyebrow">Aktualna sesja</p>
         {user ? (

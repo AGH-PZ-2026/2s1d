@@ -6,4 +6,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
   },
+  test: {
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
+  },
 });

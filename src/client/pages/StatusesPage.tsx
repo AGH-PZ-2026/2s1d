@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Lock, X } from 'lucide-react';
 import { statusService } from '../services/statusService';
 import type { Status, CreateStatusPayload, UpdateStatusPayload } from '../types/status';
 
@@ -44,7 +45,7 @@ export default function StatusesPage() {
                 <td className="td-desc">{status.description ?? '—'}</td>
                 <td><span className={`badge badge-${status.type}`}>{status.type === 'system' ? 'Systemowy' : 'Własny'}</span></td>
                 <td><div className="td-actions">
-                  {status.type === 'custom' ? (<><button className="btn btn-sm btn-secondary" onClick={() => openEdit(status)}>Edytuj</button><button className="btn btn-sm btn-danger" onClick={() => handleDelete(status)}>Usuń</button></>) : (<span className="locked">🔒 Chroniony</span>)}
+                  {status.type === 'custom' ? (<><button className="btn btn-sm btn-secondary" onClick={() => openEdit(status)}>Edytuj</button><button className="btn btn-sm btn-danger" onClick={() => handleDelete(status)}>Usuń</button></>) : (<span className="locked"><Lock size={14} style={{ marginRight: 4 }} />Chroniony</span>)}
                 </div></td>
               </tr>
             ))}
@@ -54,7 +55,7 @@ export default function StatusesPage() {
       {modal && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h2>{modal.mode === 'create' ? 'Nowa flaga' : 'Edytuj flagę'}</h2><button className="modal-close" onClick={() => setModal(null)}>✕</button></div>
+            <div className="modal-header"><h2>{modal.mode === 'create' ? 'Nowa flaga' : 'Edytuj flagę'}</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>
             {formError && <div className="alert alert-error">{formError}</div>}
             {modal.mode === 'create' ? <CreateForm onSubmit={handleCreate} loading={formLoading} /> : <EditForm status={modal.status!} onSubmit={(payload) => handleUpdate(modal.status!.id, payload)} loading={formLoading} />}
           </div>

@@ -8,6 +8,7 @@ export interface Item {
   statusId: number;
   locationId: number;
   ownerId: number;
+  ownerGroupId?: number;
 }
 
 export interface CreateItemPayload {
@@ -19,4 +20,5 @@ export interface CreateItemPayload {
   statusId: number;
   locationId: number;
   ownerId: number;
+  ownerGroupId?: number;
 }

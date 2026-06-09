@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
+import { sql } from "drizzle-orm";
 import { dbMiddleware } from "./middleware/db";
 import { authRouter } from "./routes/auth";
 import { statusesRouter } from "./routes/statuses";
@@ -42,7 +43,17 @@ app.route("/api/v1/items", delegationsRouter);
 app.route("/api/v1/items", itemPhotosRouter);
 app.route("/api/v1/items", itemsRouter);
 
-app.get("/api/health", (c) => c.json({ status: "ok" }));
+app.get("/api/health", async (c) => {
+  let dbStatus: "ok" | "error" = "error";
+  try {
+    const db = c.get("db");
+    await db.execute(sql`SELECT 1`);
+    dbStatus = "ok";
+  } catch {
+    dbStatus = "error";
+  }
+  return c.json({ status: dbStatus === "ok" ? "ok" : "degraded", database: dbStatus });
+});
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

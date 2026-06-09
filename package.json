@@ -23,6 +23,7 @@
     "@hono/zod-validator": "^0.4",
     "drizzle-orm": "^0.44",
     "hono": "^4",
+    "lucide-react": "^0.500",
     "react": "^19.2",
     "react-dom": "^19.2",
     "react-router-dom": "^7.17",

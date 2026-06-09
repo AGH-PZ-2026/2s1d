@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { X } from 'lucide-react';
 import { delegationService } from '../services/delegationService';
 import type { Delegation, CreateDelegationPayload, PermissionLevel } from '../types/delegation';
 
@@ -38,7 +39,7 @@ export default function DelegationsPage() {
       {loading ? (<div className="loading-state"><div className="spinner" /><span>Ładowanie delegacji…</span></div>) : (
         <table className="table"><thead><tr><th>Użytkownik</th><th>Grupa</th><th>Uprawnienie</th><th>Akcje</th></tr></thead><tbody>{delegations.length === 0 ? (<tr><td colSpan={4}>Brak delegacji.</td></tr>) : (delegations.map((d) => (<tr key={d.id}><td>{d.user_id ? `Użytkownik #${d.user_id}` : '—'}</td><td>{d.group_id ? `Grupa #${d.group_id}` : '—'}</td><td><span className={`badge badge-${d.permission}`}>{d.permission === 'manage' ? 'Zarządzanie' : 'Edycja'}</span></td><td><button className="btn btn-sm btn-danger" onClick={() => handleDelete(d)}>Usuń</button></td></tr>)))}</tbody></table>
       )}
-      {showModal && (<div className="modal-overlay" onClick={() => setShowModal(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>Nowa delegacja</h2><button className="modal-close" onClick={() => setShowModal(false)}>✕</button></div>{formError && <div className="alert alert-error">{formError}</div>}<CreateForm onSubmit={handleCreate} loading={formLoading} /></div></div>)}
+      {showModal && (<div className="modal-overlay" onClick={() => setShowModal(false)}><div className="modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>Nowa delegacja</h2><button className="modal-close" onClick={() => setShowModal(false)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}<CreateForm onSubmit={handleCreate} loading={formLoading} /></div></div>)}
     </div>
   );
 }

@@ -4,8 +4,9 @@ export interface ImportErrorDetail { row_number: number; error_message: string; 
 export interface ImportReport { total_rows_processed: number; successful_rows: number; errors: ImportErrorDetail[]; }
 
 export const excelImportService = {
-  async upload(file: File): Promise<ImportReport> {
+  async upload(file: File, columnMapping?: Record<string, string>): Promise<ImportReport> {
     const fd = new FormData(); fd.append('file', file);
+    if (columnMapping) fd.append('column_mapping', JSON.stringify(columnMapping));
     const response = await fetch('/api/v1/excel/upload', { method: 'POST', headers: authHeaders(), body: fd });
     await ensureOk(response); return response.json();
   },
