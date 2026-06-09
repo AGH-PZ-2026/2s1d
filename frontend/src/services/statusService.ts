@@ -1,10 +1,10 @@
 /**
  * KONTRAKT API – po podłączeniu backendu zamień mock na fetch:
  *
- * GET    /api/v1/statuses          → Status[]
- * POST   /api/v1/statuses          → Status        body: CreateStatusPayload
- * PUT    /api/v1/statuses/:id      → Status        body: UpdateStatusPayload
- * DELETE /api/v1/statuses/:id      → 204 No Content
+ * GET    /api/v1/item-status/      → Status[]
+ * POST   /api/v1/item-status/      → Status        body: CreateStatusPayload
+ * PUT    /api/v1/item-status/:id   → Status        body: UpdateStatusPayload
+ * DELETE /api/v1/item-status/:id   → 204 No Content
  *
  * Błędy walidacyjne: { detail: string } z kodem 422
  */
@@ -17,6 +17,7 @@ import type {
 
 // Konfiguracja Mocków i adresu API
 const API_BASE = '/api/v1/item-status';
+const API_COLLECTION = `${API_BASE}/`;
 const USE_MOCKS = import.meta.env.MODE === 'test';
 
 interface BackendStatusResponse {
@@ -133,7 +134,7 @@ export const statusService = {
       return _fetchStatuses();
     }
     // Pobieranie danych przez REST API
-    const response = await fetch(API_BASE);
+    const response = await fetch(API_COLLECTION);
     if (!response.ok) await handleApiError(response);
 
     const data: BackendStatusResponse[] = await response.json();
@@ -158,7 +159,7 @@ export const statusService = {
     }
     const backendPayload = { name: payload.name };
 
-    const response = await fetch(API_BASE, {
+    const response = await fetch(API_COLLECTION, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(backendPayload),

@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "8c3d6f1a2b4e"
 down_revision: Union[str, Sequence[str], None] = "7f4e2b9c8d1a"
@@ -18,20 +19,22 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    borrowing_mode = sa.Enum(
+    borrowing_mode = postgresql.ENUM(
         "classic",
         "trusted",
         "asynchronous",
         "external",
         name="borrowingmode",
+        create_type=False,
     )
-    borrowing_status = sa.Enum(
+    borrowing_status = postgresql.ENUM(
         "pending",
         "reserved",
         "borrowed",
         "returned",
         "rejected",
         name="borrowingstatus",
+        create_type=False,
     )
     borrowing_mode.create(op.get_bind(), checkfirst=True)
     borrowing_status.create(op.get_bind(), checkfirst=True)

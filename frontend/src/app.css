@@ -300,3 +300,129 @@ body {
   display: flex;
   justify-content: flex-end;
 }
+
+.row-selected td {
+  background: rgba(0, 105, 60, 0.18);
+}
+
+.location-panel {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.75fr) minmax(320px, 1.25fr);
+  gap: 0;
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.location-panel__summary {
+  padding: 20px;
+  border-right: 1px solid var(--border);
+}
+
+.location-panel__label {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.location-panel__summary h2 {
+  margin-top: 8px;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.location-panel__summary dl {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.location-panel__summary dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.location-panel__summary dd {
+  margin-top: 2px;
+}
+
+.location-map {
+  position: relative;
+  min-height: 320px;
+  overflow: hidden;
+  background: linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px), var(--surface-2);
+  background-size: 40px 40px;
+}
+
+.location-map::before {
+  content: '';
+  position: absolute;
+  inset: 20px;
+  border: 1px solid var(--text-muted);
+  opacity: 0.35;
+}
+
+.location-map__axis {
+  position: absolute;
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.location-map__axis--x {
+  right: 16px;
+  bottom: 8px;
+}
+
+.location-map__axis--y {
+  top: 12px;
+  left: 12px;
+}
+
+.location-map__pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--text);
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(0, 105, 60, 0.22);
+}
+
+.location-map__pin span {
+  position: absolute;
+  left: 18px;
+  top: -4px;
+  min-width: 140px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.location-map__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  padding: 24px;
+  text-align: center;
+}
+
+@media (max-width: 780px) {
+  .location-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .location-panel__summary {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}

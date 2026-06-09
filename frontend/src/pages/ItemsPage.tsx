@@ -15,6 +15,7 @@ interface ModalState {
 
 export default function ItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -107,6 +108,11 @@ export default function ItemsPage() {
 
   const getOwnerName = (id: number) =>
     owners.find((o) => o.id === id)?.fullName ?? '—';
+  const selectedItem =
+    items.find((item) => item.id === selectedItemId) ?? items[0];
+  const selectedLocation = selectedItem
+    ? locations.find((location) => location.id === selectedItem.locationId)
+    : undefined;
 
   return (
     <div className="page">
@@ -134,42 +140,57 @@ export default function ItemsPage() {
           <span>Ładowanie przedmiotów…</span>
         </div>
       ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Nazwa</th>
-              <th>Producent</th>
-              <th>Opis</th>
-              <th>Kategoria</th>
-              <th>Status</th>
-              <th>Lokalizacja</th>
-              <th>Właściciel / opiekun</th>
-              <th>Data zakupu</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id}>
-                <td className="td-name">{item.name}</td>
-
-                <td>{item.manufacturer}</td>
-
-                <td>{item.description ?? '—'}</td>
-
-                <td>{getCategoryName(item.categoryId)}</td>
-
-                <td>{getStatusName(item.statusId)}</td>
-
-                <td>{getLocationName(item.locationId)}</td>
-
-                <td>{getOwnerName(item.ownerId)}</td>
-
-                <td>{item.purchaseDate ?? '—'}</td>
+        <>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Nazwa</th>
+                <th>Producent</th>
+                <th>Opis</th>
+                <th>Kategoria</th>
+                <th>Status</th>
+                <th>Lokalizacja</th>
+                <th>Właściciel / opiekun</th>
+                <th>Data zakupu</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody>
+              {items.map((item) => (
+                <tr
+                  key={item.id}
+                  className={item.id === selectedItem?.id ? 'row-selected' : ''}
+                  onClick={() => setSelectedItemId(item.id)}
+                >
+                  <td className="td-name">{item.name}</td>
+
+                  <td>{item.manufacturer}</td>
+
+                  <td>{item.description ?? '—'}</td>
+
+                  <td>{getCategoryName(item.categoryId)}</td>
+
+                  <td>{getStatusName(item.statusId)}</td>
+
+                  <td>{getLocationName(item.locationId)}</td>
+
+                  <td>{getOwnerName(item.ownerId)}</td>
+
+                  <td>{item.purchaseDate ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {selectedItem && (
+            <LocationMapPanel
+              item={selectedItem}
+              location={selectedLocation}
+              ownerName={getOwnerName(selectedItem.ownerId)}
+              statusName={getStatusName(selectedItem.statusId)}
+            />
+          )}
+        </>
       )}
 
       {modal && (
@@ -198,6 +219,89 @@ export default function ItemsPage() {
       )}
     </div>
   );
+}
+
+function LocationMapPanel({
+  item,
+  location,
+  ownerName,
+  statusName,
+}: {
+  item: Item;
+  location: Location | undefined;
+  ownerName: string;
+  statusName: string;
+}) {
+  const hasCoordinates =
+    typeof location?.mapX === 'number' && typeof location?.mapY === 'number';
+  const x = clamp(location?.mapX ?? 50);
+  const y = clamp(location?.mapY ?? 50);
+
+  return (
+    <section
+      className="location-panel"
+      aria-label="Mapa lokalizacji przedmiotu"
+    >
+      <div className="location-panel__summary">
+        <p className="location-panel__label">Lokalizacja przedmiotu</p>
+        <h2>{item.name}</h2>
+        <dl>
+          <div>
+            <dt>Status</dt>
+            <dd>{statusName}</dd>
+          </div>
+          <div>
+            <dt>Opiekun</dt>
+            <dd>{ownerName}</dd>
+          </div>
+          <div>
+            <dt>Punkt</dt>
+            <dd>{location?.name ?? 'Brak przypisanej lokalizacji'}</dd>
+          </div>
+          <div>
+            <dt>Szczegóły</dt>
+            <dd>{formatLocationDetails(location)}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div className="location-map">
+        <div className="location-map__axis location-map__axis--x">mapX</div>
+        <div className="location-map__axis location-map__axis--y">mapY</div>
+        {hasCoordinates ? (
+          <div
+            className="location-map__pin"
+            style={{ left: `${x}%`, top: `${y}%` }}
+          >
+            <span>{location?.name}</span>
+          </div>
+        ) : (
+          <div className="location-map__empty">
+            Brak współrzędnych mapy dla tej lokalizacji
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function formatLocationDetails(location: Location | undefined): string {
+  if (!location) return '—';
+  const details = [
+    location.building,
+    location.room,
+    location.cabinet,
+    location.shelf,
+  ]
+    .filter(Boolean)
+    .join(' / ');
+  return (
+    details || (location.kind === 'external' ? 'Lokalizacja zewnętrzna' : '—')
+  );
+}
+
+function clamp(value: number): number {
+  return Math.min(100, Math.max(0, value));
 }
 
 // ---------- Formularz tworzenia ----------

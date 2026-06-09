@@ -1,9 +1,9 @@
 /**
  * API CONTRACT – replace mock with fetch after connecting the backend:
  *
- * GET    /api/v1/categories          → Category[]
- * POST   /api/v1/categories          → Category        body: CreateCategoryPayload
- * PUT    /api/v1/categories/:id      → Category        body: UpdateCategoryPayload
+ * GET    /api/v1/categories/         → Category[]
+ * POST   /api/v1/categories/         → Category        body: CreateCategoryPayload
+ * PATCH  /api/v1/categories/:id      → Category        body: UpdateCategoryPayload
  * DELETE /api/v1/categories/:id      → 204 No Content
  *
  * Validation errors: { detail: string } with code 422
@@ -19,6 +19,7 @@ import type {
 // Data source and API address configuration
 const USE_MOCKS = import.meta.env.MODE === 'test';
 const BASE_URL = '/api/v1/categories';
+const COLLECTION_URL = `${BASE_URL}/`;
 
 // Type reflecting the structure of FastAPI/ models (snake_case)
 interface BackendCategoryResponse {
@@ -168,7 +169,7 @@ const _checkDuplicateName = (
 export const categoryService = {
   async getAll(): Promise<Category[]> {
     if (!USE_MOCKS) {
-      const response = await fetch(BASE_URL);
+      const response = await fetch(COLLECTION_URL);
       await handleResponse(response);
       const data: BackendCategoryResponse[] = await response.json();
       return data.map(mapBackendToFrontend);
@@ -228,7 +229,7 @@ export const categoryService = {
         description: payload.description,
       };
 
-      const response = await fetch(BASE_URL, {
+      const response = await fetch(COLLECTION_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(backendPayload),
@@ -269,7 +270,7 @@ export const categoryService = {
         backendPayload.description = payload.description;
 
       const response = await fetch(`${BASE_URL}/${id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(backendPayload),
       });

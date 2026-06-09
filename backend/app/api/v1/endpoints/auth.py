@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserResponse
+from app.schemas.user import MockSsoLogin, UserCreate, UserResponse
 from app.services import auth as service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -21,6 +21,11 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
 ):
     return service.login_user(form_data.username, form_data.password, db)
+
+
+@router.post("/mock-sso")
+def mock_sso_login(data: MockSsoLogin, db: Session = Depends(get_db)):
+    return service.mock_sso_login(data, db)
 
 
 @router.get("/users", response_model=list[UserResponse])

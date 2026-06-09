@@ -30,6 +30,13 @@ interface BackendCategory {
 interface BackendLocation {
   id: number;
   name: string;
+  kind?: 'internal' | 'external';
+  building?: string | null;
+  room?: string | null;
+  cabinet?: string | null;
+  shelf?: string | null;
+  mapX?: number | null;
+  mapY?: number | null;
 }
 
 interface BackendStatus {
@@ -78,8 +85,23 @@ const mockCategories: Category[] = [
 ];
 
 const mockLocations: Location[] = [
-  { id: 1, name: 'Magazyn A' },
-  { id: 2, name: 'Sala 101' },
+  {
+    id: 1,
+    name: 'Magazyn A',
+    kind: 'internal',
+    building: 'D-17',
+    mapX: 28,
+    mapY: 42,
+  },
+  {
+    id: 2,
+    name: 'Sala 101',
+    kind: 'internal',
+    building: 'D-17',
+    room: '101',
+    mapX: 68,
+    mapY: 30,
+  },
 ];
 
 const mockOwners: Owner[] = [
@@ -147,7 +169,17 @@ export const itemService = {
     const response = await fetch('/api/v1/locations/');
     await ensureOk(response);
     const data: BackendLocation[] = await response.json();
-    return data.map((location) => ({ id: location.id, name: location.name }));
+    return data.map((location) => ({
+      id: location.id,
+      name: location.name,
+      kind: location.kind,
+      building: location.building ?? undefined,
+      room: location.room ?? undefined,
+      cabinet: location.cabinet ?? undefined,
+      shelf: location.shelf ?? undefined,
+      mapX: location.mapX ?? undefined,
+      mapY: location.mapY ?? undefined,
+    }));
   },
 
   async getOwners(): Promise<Owner[]> {

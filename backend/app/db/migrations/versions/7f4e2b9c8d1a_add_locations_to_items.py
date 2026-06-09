@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "7f4e2b9c8d1a"
 down_revision: Union[str, Sequence[str], None] = (
@@ -21,7 +22,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    location_kind = sa.Enum("internal", "external", name="locationkind")
+    location_kind = postgresql.ENUM(
+        "internal",
+        "external",
+        name="locationkind",
+        create_type=False,
+    )
     location_kind.create(op.get_bind(), checkfirst=True)
 
     op.create_table(

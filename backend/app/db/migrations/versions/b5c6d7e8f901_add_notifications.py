@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "b5c6d7e8f901"
 down_revision: Union[str, Sequence[str], None] = "a4b8c9d0e1f2"
@@ -18,11 +19,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    channel = sa.Enum("email", "push", name="notificationchannel")
-    event_type = sa.Enum(
+    channel = postgresql.ENUM(
+        "email",
+        "push",
+        name="notificationchannel",
+        create_type=False,
+    )
+    event_type = postgresql.ENUM(
         "return_due",
         "borrowing_approved",
         name="notificationeventtype",
+        create_type=False,
     )
     channel.create(op.get_bind(), checkfirst=True)
     event_type.create(op.get_bind(), checkfirst=True)

@@ -115,3 +115,22 @@ def test_login_wrong_email(client):
         },
     )
     assert response.status_code == 401
+
+
+def test_mock_sso_login_creates_approved_user_and_token(client):
+    response = client.post(
+        "/api/v1/auth/mock-sso",
+        json={"email": "mock.sso@agh.edu.pl", "role": "admin"},
+    )
+
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    assert response.json()["user"]["email"] == "mock.sso@agh.edu.pl"
+    assert response.json()["user"]["is_approved"] is True
+    assert response.json()["user"]["role"] == "admin"
+
+    users = client.get(
+        "/api/v1/auth/users",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert users.status_code == 200
