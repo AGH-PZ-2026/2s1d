@@ -57,59 +57,61 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            padding: '8px',
-            marginBottom: '4px',
-            backgroundColor: loading ? '#f5f5f5' : 'transparent',
-            borderRadius: '4px',
+            padding: '8px 10px',
+            marginBottom: '2px',
+            backgroundColor: loading ? 'var(--surface-2)' : 'transparent',
+            borderRadius: 'var(--radius-sm)',
             gap: '8px',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            if (!loading)
+              e.currentTarget.style.backgroundColor = 'var(--surface-2)';
+          }}
+          onMouseLeave={(e) => {
+            if (!loading) e.currentTarget.style.backgroundColor = 'transparent';
           }}
         >
           {/* Expand/Collapse Toggle */}
           {hasChildren ? (
             <button
               onClick={() => toggleExpanded(category.id)}
+              className="btn btn-ghost btn-sm"
               style={{
-                width: '24px',
-                height: '24px',
-                padding: '0',
-                border: '1px solid #ccc',
-                backgroundColor: '#fff',
-                cursor: 'pointer',
-                borderRadius: '2px',
+                width: 24,
+                height: 24,
+                padding: 0,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '12px',
+                fontSize: 10,
               }}
-              title={isExpanded ? 'Collapse' : 'Expand'}
+              title={isExpanded ? 'Zwiń' : 'Rozwiń'}
             >
               {isExpanded ? '▼' : '▶'}
             </button>
           ) : (
-            <div style={{ width: '24px' }} />
+            <div style={{ width: 24 }} />
           )}
 
           {/* Loading Spinner */}
           {loading && (
-            <span
-              style={{
-                display: 'inline-block',
-                width: '16px',
-                height: '16px',
-                border: '2px solid #e0e0e0',
-                borderTop: '2px solid #007bff',
-                borderRadius: '50%',
-                animation: 'spin 0.6s linear infinite',
-              }}
+            <div
+              className="spinner"
+              style={{ width: 14, height: 14, borderWidth: 1.5 }}
             />
           )}
 
           {/* Category Name and Description */}
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                fontWeight: 500,
+                fontWeight: 600,
+                fontSize: 13,
                 opacity: loading ? 0.6 : 1,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
               {category.name}
@@ -117,9 +119,12 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
             {category.description && (
               <div
                 style={{
-                  fontSize: '12px',
-                  color: '#666',
-                  marginTop: '2px',
+                  fontSize: 11,
+                  color: 'var(--text-muted)',
+                  marginTop: 2,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {category.description}
@@ -128,57 +133,33 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
             <button
               onClick={() => onAddSubcategory(category.id)}
               disabled={loading}
-              style={{
-                padding: '4px 8px',
-                fontSize: '12px',
-                backgroundColor: '#28a745',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '3px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-              }}
-              title="Add subcategory"
+              className="btn btn-sm btn-secondary"
+              style={{ fontSize: 11, padding: '3px 8px' }}
+              title="Dodaj podkategorię"
             >
-              Add
+              + Dodaj
             </button>
             <button
               onClick={() => onEdit(category)}
               disabled={loading}
-              style={{
-                padding: '4px 8px',
-                fontSize: '12px',
-                backgroundColor: '#007bff',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '3px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-              }}
-              title="Edit category"
+              className="btn btn-sm btn-secondary"
+              style={{ fontSize: 11, padding: '3px 8px' }}
+              title="Edytuj"
             >
-              Edit
+              Edytuj
             </button>
             <button
               onClick={() => onDelete(category.id)}
               disabled={loading}
-              style={{
-                padding: '4px 8px',
-                fontSize: '12px',
-                backgroundColor: '#dc3545',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '3px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-              }}
-              title="Delete category"
+              className="btn btn-sm btn-danger"
+              style={{ fontSize: 11, padding: '3px 8px' }}
+              title="Usuń"
             >
-              Delete
+              Usuń
             </button>
           </div>
         </div>
@@ -192,7 +173,7 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
   };
 
   return (
-    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div>
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }

@@ -167,9 +167,9 @@ export const CategoriesPage: React.FC = () => {
     return (
       <div style={styles.pageContainer}>
         <h1 style={styles.title}>Zarządzanie Kategoriami</h1>
-        <div style={styles.loadingContainer}>
-          <div style={styles.spinner} />
-          <p>Ładowanie kategorii...</p>
+        <div className="loading-state">
+          <div className="spinner" />
+          <span>Ładowanie kategorii...</span>
         </div>
       </div>
     );
@@ -181,8 +181,12 @@ export const CategoriesPage: React.FC = () => {
       <div style={styles.pageContainer}>
         <h1 style={styles.title}>Zarządzanie Kategoriami</h1>
         <div style={styles.errorContainer}>
-          <div style={styles.errorMessage}>{error}</div>
-          <button onClick={handleLoadTree} style={styles.retryButton}>
+          <div className="alert alert-error">{error}</div>
+          <button
+            onClick={handleLoadTree}
+            className="btn btn-primary"
+            style={{ marginTop: 12 }}
+          >
             Spróbuj ponownie
           </button>
         </div>
@@ -323,22 +327,20 @@ const findCategoryById = (
 
 const styles = {
   pageContainer: {
-    padding: '20px',
     maxWidth: '1400px',
-    margin: '0 auto',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
   } as React.CSSProperties,
   title: {
     marginTop: 0,
     marginBottom: '30px',
-    color: '#333',
+    color: 'var(--text)',
     fontSize: '28px',
   } as React.CSSProperties,
   sectionTitle: {
     marginTop: 0,
     marginBottom: '15px',
-    color: '#555',
-    fontSize: '18px',
+    color: 'var(--text)',
+    fontSize: '16px',
+    fontWeight: 700,
   } as React.CSSProperties,
   loadingContainer: {
     display: 'flex',
@@ -347,66 +349,33 @@ const styles = {
     justifyContent: 'center',
     padding: '40px 20px',
     gap: '20px',
-  } as React.CSSProperties,
-  spinner: {
-    width: '40px',
-    height: '40px',
-    border: '4px solid #e0e0e0',
-    borderTop: '4px solid #007bff',
-    borderRadius: '50%',
-    animation: 'spin 0.6s linear infinite',
+    color: 'var(--text-muted)',
   } as React.CSSProperties,
   errorContainer: {
     padding: '20px',
-    backgroundColor: '#2c1a1c',
-    border: '1px solid #f5c6cb',
-    borderRadius: '8px',
-    color: '#721c24',
+    backgroundColor: 'var(--danger-muted)',
+    border: '1px solid rgba(239, 68, 68, 0.2)',
+    borderRadius: 'var(--radius)',
+    color: 'var(--danger)',
   } as React.CSSProperties,
   errorMessage: {
     marginBottom: '15px',
     padding: '10px 12px',
-    backgroundColor: '#f8d7da',
-    color: '#721c24',
-    border: '1px solid #f5c6cb',
-    borderRadius: '4px',
-  } as React.CSSProperties,
-  operationErrorContainer: {
-    marginBottom: '20px',
-    padding: '12px 16px',
-    backgroundColor: '#f8d7da',
-    color: '#721c24',
-    border: '1px solid #f5c6cb',
-    borderRadius: '4px',
+    backgroundColor: 'var(--danger-muted)',
+    color: 'var(--danger)',
+    border: '1px solid rgba(239, 68, 68, 0.2)',
+    borderRadius: 'var(--radius-sm)',
   } as React.CSSProperties,
   retryButton: {
     padding: '10px 20px',
-    backgroundColor: '#007bff',
-    color: 'white',
+    backgroundColor: 'var(--accent)',
+    color: '#000',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: 'var(--radius-sm)',
     cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: 500,
-  } as React.CSSProperties,
-  actionButtonContainer: {
-    marginBottom: '20px',
-    display: 'flex',
-    gap: '10px',
-  } as React.CSSProperties,
-  primaryButton: {
-    padding: '10px 20px',
-    backgroundColor: '#28a745',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: 500,
-  } as React.CSSProperties,
-  disabledButton: {
-    opacity: 0.6,
-    cursor: 'not-allowed',
+    fontSize: '13px',
+    fontWeight: 600,
+    fontFamily: 'var(--font)',
   } as React.CSSProperties,
   contentContainer: {
     display: 'grid',
@@ -414,19 +383,19 @@ const styles = {
     gap: '20px',
   } as React.CSSProperties,
   treeContainer: {
-    border: '1px solid #333',
-    borderRadius: '8px',
-    padding: '20px',
-    backgroundColor: '#18181c',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '24px',
+    backgroundColor: 'var(--surface)',
   } as React.CSSProperties,
   treeContent: {
     minHeight: '200px',
   } as React.CSSProperties,
   formContainer: {
-    border: '1px solid #333',
-    borderRadius: '8px',
-    padding: '20px',
-    backgroundColor: '#1e1e24',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '24px',
+    backgroundColor: 'var(--surface)',
     height: 'fit-content',
     position: 'sticky',
     top: '20px',
@@ -434,10 +403,10 @@ const styles = {
   emptyMessage: {
     padding: '40px 20px',
     textAlign: 'center',
-    color: '#666',
+    color: 'var(--text-muted)',
     fontSize: '14px',
-    backgroundColor: '#121214',
-    borderRadius: '4px',
+    backgroundColor: 'var(--surface-2)',
+    borderRadius: 'var(--radius-sm)',
   } as React.CSSProperties,
 };
 
