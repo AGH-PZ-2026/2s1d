@@ -28,6 +28,10 @@ class UserApprovalResponse(UserResponse):
     pass
 
 
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
+
 class MockSsoLogin(BaseModel):
     email: EmailStr
     role: UserRole = UserRole.user

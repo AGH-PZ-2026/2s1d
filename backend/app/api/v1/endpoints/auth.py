@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import MockSsoLogin, UserCreate, UserResponse
+from app.schemas.user import MockSsoLogin, UserCreate, UserResponse, UserRoleUpdate
 from app.services import auth as service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -43,3 +43,13 @@ def approve_user(
     current_user: User = Depends(get_current_user),
 ):
     return service.approve_user(user_id, current_user, db)
+
+
+@router.patch("/users/{user_id}/role", response_model=UserResponse)
+def update_user_role(
+    user_id: int,
+    data: UserRoleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.update_user_role(user_id, data, current_user, db)

@@ -83,6 +83,40 @@ def test_admin_can_approve_registered_user(client, db):
     assert response.json()["is_approved"] is True
 
 
+def test_admin_can_assign_user_role(client, db, auth_headers):
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={"email": "role-change@test.com", "password": "password123"},
+    ).json()
+    admin = User(
+        email="role-admin@test.com",
+        hashed_password=get_password_hash("password123"),
+        role=UserRole.admin,
+    )
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+    token = client.post(
+        "/api/v1/auth/token",
+        data={"username": admin.email, "password": "password123"},
+    ).json()["access_token"]
+
+    response = client.patch(
+        f"/api/v1/auth/users/{registered['id']}/role",
+        json={"role": "admin"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    forbidden = client.patch(
+        f"/api/v1/auth/users/{registered['id']}/role",
+        json={"role": "user"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["role"] == "admin"
+    assert forbidden.status_code == 403
+
+
 def test_login_success(client, user):
     response = client.post(
         "/api/v1/auth/token",
