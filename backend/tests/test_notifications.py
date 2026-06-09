@@ -50,7 +50,7 @@ def test_approval_queues_notification_for_borrower(
     assert any(event["eventType"] == "borrowing_approved" for event in events.json())
 
 
-def test_due_reminder_queue_respects_preferences(
+def test_due_reminder_queue_and_dispatch_respects_preferences(
     client, db, other_auth_headers, other_user
 ):
     client.put(
@@ -66,12 +66,16 @@ def test_due_reminder_queue_respects_preferences(
     _create_due_borrowing(db, item.id, other_user.id)
 
     queued = client.post("/api/v1/notifications/queue-due-reminders")
+    dispatch = client.post("/api/v1/notifications/dispatch-pending")
     events = client.get("/api/v1/notifications/events", headers=other_auth_headers)
 
     assert queued.status_code == 200
     assert queued.json()["queued"] == 2
+    assert dispatch.status_code == 200
+    assert dispatch.json()["sent"] == 2
     assert {event["channel"] for event in events.json()} == {"email", "push"}
     assert all(event["eventType"] == "return_due" for event in events.json())
+    assert all(event["sentAt"] is not None for event in events.json())
 
 
 def _create_item(db, owner_id: int) -> Item:

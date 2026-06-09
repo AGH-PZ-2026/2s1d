@@ -94,6 +94,22 @@ def queue_due_reminders(db: Session, now: datetime | None = None) -> int:
     return queued
 
 
+def dispatch_pending_events(db: Session, now: datetime | None = None) -> int:
+    now = now or datetime.now(UTC)
+    pending = (
+        db.query(NotificationEvent)
+        .filter(
+            NotificationEvent.sent_at.is_(None),
+            NotificationEvent.scheduled_at <= now,
+        )
+        .all()
+    )
+    for event in pending:
+        event.sent_at = now
+    db.commit()
+    return len(pending)
+
+
 def _as_aware(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 

@@ -42,3 +42,8 @@ def list_events(
 @router.post("/queue-due-reminders")
 def queue_due_reminders(db: Session = Depends(get_db)):
     return {"queued": service.queue_due_reminders(db)}
+
+
+@router.post("/dispatch-pending")
+def dispatch_pending(db: Session = Depends(get_db)):
+    return {"sent": service.dispatch_pending_events(db)}
