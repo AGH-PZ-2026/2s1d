@@ -1,0 +1,368 @@
+Wymagania funkcjonalne 
+Ostatnia modyfikacja: 2026-05-11 11:35 
+Lista definicji i skrótów 
+ My: zespół Sales (2s) 
+ Wykonawca: zespół Dev (1d) 
+ US: User Story, czyli opis funkcjonalności z punktu widzenia użytkownika 
+ AC: Acceptance Criteria, czyli kryteria wg których oceniamy, czy zadanie zostało 
+wykonane 
+ Priorytety: 
+o Must Have: funkcjonalność krytyczna 
+o Should Have: funkcjonalność bardzo pożądana 
+o Could Have: funkcjonalność o najniższym priorytecie, którą należy dodać 
+tylko wtedy, gdy wszystkie funkcjonalności Must Have i Should Have 
+zostały dodane lub gdy implementacja jest trywialna 
+ Przedmiot, obiekt (zamiennie): fizyczny obiekt podlegający inwentaryzacji 
+Wprowadzenie 
+Klient zlecił wykonanie systemu do zarządzania aparaturą pomiarową należącą 
+do uczelni AGH. 
+Dokładna nazwa systemu zdefiniowana przez klienta brzmi następująco: 
+Zintegrowany i wszechstronny system do zarządzania bazą danych aparatury 
+pomiarowej. 
+System ma zarządzać fizycznymi obiektami w liczbie < 10 000 sztuk (urządzenia 
+elektroniczne, sprzęt pomiarowy, książki, myszki, kable itp.). System nie służy 
+do przechowywania pomiarów z urządzeń. 
+Użytkownikami systemu będą przede wszystkim pracownicy AGH. 
+  
+Forma współpracy 
+My (2s), oczekujemy, że Wykonawca (1d) będzie proponować gotowe rozwiązania, 
+zamiast oczekiwać decyzji implementacyjnych od klienta. 
+Dodatkowo, narzucamy iteracyjny model pracy: 
+- ciągłe zbieranie wymagań i doprecyzowanie funkcjonalności 
+- wykraczanie poza zakres wymagań zdefiniowany dla poszczególnych etapów 
+implementacji (scope creep) jest niewskazane 
+Jeżeli któreś wymagania funkcjonalne są niejasne lub nieoptymalne, to bardzo prosimy 
+o otwartą komunikację. 
+  
+Wymagania klienta 
+Wymagania klienta zostały podzielone na kategorie. Każda kategoria posiada User Story, 
+a każde User Story posiada Acceptance Criteria, priorytet oraz numer etapu projektu, 
+w którym dana funkcjonalność powinna zostać zaimplementowana. 
+Najważniejsze funkcjonalności dostarczamy w pierwszych etapach, aby jak 
+najszybciej przekonać klienta do naszego rozwiązania. Łącznie zdefiniowano trzy etapy 
+implementacyjne. 
+Zarządzanie przedmiotami 
+System ma umożliwiać zarządzanie przedmiotami uczelni wraz z ich klasyfikacją, 
+identyfikacją oraz śledzeniem statusu i lokalizacji. 
+US-01: Hierarchia kategorii 
+Jako administrator systemu 
+Chcę tworzyć i edytować hierarchię kategorii przedmiotów 
+Aby uporządkować zasoby w systemie. 
+AC: 
+- administrator może dodawać, edytować i usuwać kategorie przedmiotów 
+- kategorie muszą mieć strukturę drzewiastą o dowolnym poziomie zagłębienia, np. 
+urządzenie -> pomiarowe -> oscyloskop 
+- każdy przedmiot może zostać przypisany do wybranej kategorii 
+- administrator może definiować własne flagi statusu dla przedmiotów 
+(np. uszkodzony, zaginiony) 
+- zdefiniowane zostały podstawowe statusy przedmiotów: „dostępny”, 
+„wypożyczony”, „zarezerwowany”, „uszkodzony”, „oczekuje zatwierdzenia” 
+Priorytet: Must Have 
+Etap: 1  
+US-02: Dodawanie przedmiotów 
+Jako użytkownik 
+Chcę dodać nowy przedmiot do systemu inwentaryzacji 
+Aby inni użytkownicy mogli z niego korzystać. 
+AC: 
+- użytkownik może dodać nowy przedmiot do systemu 
+- przedmiot automatycznie otrzymuje unikalny identyfikator zgodnie z US-03: 
+Identyfikacja przedmiotów 
+- przedmiot posiada atrybuty takie jak nazwa, producent, opis, data zakupu / data 
+dodania, właściciel, a także status i kategoria zgodnie z US-01: Hierarchia 
+kategorii oraz lokalizacja zgodnie z US-01: Przypisanie i aktualizacja lokalizacji 
+Priorytet: Must Have 
+Etap: 1 
+US-03: Identyfikacja przedmiotów 
+Jako użytkownik 
+Chcę jednoznacznie identyfikować przedmioty za pomocą numerów seryjnych 
+lub kodów QR 
+Aby szybko odnaleźć informacje o danym przedmiocie. 
+AC: 
+- każdy przedmiot posiada unikalny identyfikator w systemie, który można później 
+zapisać w postaci kodu QR 
+- system obsługuje istniejące kody QR (*) 
+- interfejs użytkownika dostarcza możliwość skanowania kodów QR 
+(*) - kompatybilność z istniejącymi kodami QR nie jest krytyczna, uzasadnienie: 
+w najgorszym wypadku zostaną stworzone nowe etykiety dla tych przedmiotów; możemy 
+powiedzieć klientowi, że nowa struktura kodów QR zapewnia większe możliwości 
+Priorytet: Must Have 
+Etap: 1  
+US-04: “Szybkie akcje” po zeskanowaniu identyfikatora 
+Jako użytkownik 
+Chcę szybko po zeskanowaniu kodu QR przedmiotu sprawdzić jego docelową 
+lokalizację lub oznaczyć go jako uszkodzony 
+Aby usprawnić proces inwentaryzacji. 
+AC: 
+- po zeskanowaniu kodu QR wyświetlane są szczegóły przedmiotu i jego docelowa 
+lokalizacja 
+- jeżeli użytkownik jest właścicielem przedmiotu lub osobą z uprawnieniami edycji 
+nadanymi przez właściciela, to może natychmiast zmienić status przedmiotu na 
+uszkodzony (dedykowany przycisk) 
+Priorytet: Must Have (kluczowa funkcjonalność wg notatek ze spotkania) 
+Etap: 1 
+US-05: Dokumentacja zdjęciowa 
+Jako użytkownik 
+Chcę dodawać zdjęcia przedmiotów 
+Aby dokumentować ich stan techniczny. 
+AC: 
+- użytkownik może dodać zdjęcie do przedmiotu 
+- system zapisuje datę dodania zdjęcia 
+- zdjęcia mogą być dodawane przez każdego użytkownika, nie musi to być 
+właściciel ani osoba wypożyczająca 
+- użytkownik może przeglądać historię zdjęć przypisanych do przedmiotu 
+Priorytet: Should Have 
+Etap: 2  
+Zarządzanie lokalizacją przedmiotów 
+System ma pozwalać na przypisanie lokalizacji do przedmiotów, a także umożliwiać 
+wizualizację lokalizacji przedmiotów na dedykowanej mapie. 
+US-01: Przypisanie i aktualizacja lokalizacji 
+Jako właściciel przedmiotu 
+Chcę przypisać lub zmienić lokalizację przedmiotu 
+Aby wypożyczający wiedzieli, gdzie odłożyć lub skąd odebrać przedmiot.  
+AC: 
+- użytkownik może przypisać lokalizację do przedmiotu wybierając z listy 
+istniejących punktów (budynek, pokój, szafa) albo w łatwy sposób dodać nowy 
+punkt na mapie (*) 
+- lokalizacja może być oznaczona jako „wewnętrzna” lub „zewnętrzna” 
+(np. delegacja do CERN) 
+- właściciel może upoważnić inne osoby do aktualizowania lokalizacji przedmiotu 
+w systemie bez wszczynania procedury wypożyczenia 
+(*) - dla niektórych przedmiotów wskazanie pokoju jest wystarczające, natomiast dla 
+drobnych przedmiotów konieczna jest możliwość podania konkretnej szafy lub nawet 
+półki 
+Priorytet: Must Have 
+Etap: 1 
+US-02: Podgląd lokalizacji przedmiotu 
+Jako użytkownik 
+Chcę zobaczyć lokalizację wypożyczanego przedmiotu na mapie 
+Aby w łatwy sposób móc odnaleźć dany przedmiot. 
+AC: 
+- po wejściu w szczegóły danego przedmiotu, jego bieżące położenie jest widoczne 
+na mapie 
+Priorytet: Must Have 
+Etap: 1 
+  
+Role i uprawnienia 
+Zarządzanie właścicielami (zamiennie: opiekunami) przedmiotów, delegowaniem 
+uprawnień oraz kontrolą dostępu w środowisku zintegrowanym z SSO AGH. 
+Użytkownicy to głównie pracownicy wydziału (ok. 100-200 osób). 
+US-01: Przypisywanie opiekuna lub grupy do nowego przedmiotu 
+Jako administrator systemu 
+Chcę móc przypisać lub zmodyfikować opiekuna (osobę lub grupę) do każdego 
+zarejestrowanego przedmiotu 
+Aby jednoznacznie określić, kto zarządza danym przedmiotem i kto jest za niego 
+odpowiedzialny. 
+AC: 
+- system pozwala przypisać pojedynczą osobę lub grupę osób jako właścicieli 
+danego przedmiotu 
+Priorytet: Must Have 
+Etap: 1 
+US-02: Delegowanie uprawnień 
+Jako właściciel przedmiotu 
+Chcę delegować uprawnienia do edycji i zarządzania moim przedmiotem innym osobom 
+Aby mogły one aktualizować informacje na jego temat bez mojego potwierdzenia. 
+AC: 
+- system pozwala na dodanie użytkownika do listy delegatów z określonym 
+poziomem uprawnień 
+o uprawnienie „zarządzanie”: delegat ma prawie identyczne uprawnienia 
+jak właściciel, w szczególności zmianę lokalizacji przedmiotu, ale nie 
+może dodawać innych delegatów  
+o uprawnienie „edycja”: delegat może zmienić status i opis przedmiotu, 
+ale nic poza tym 
+Priorytet: Should Have 
+Etap: 2  
+US-03: Integracja z SSO i kontrola rejestracji 
+Jako administrator systemu 
+Chcę, aby dostęp do aplikacji był możliwy wyłącznie przez SSO AGH lub przez rejestrację 
+wymagającą zatwierdzenia administratora 
+Aby uniemożliwić dostęp niepożądanym osobom. 
+AC: 
+- logowanie odbywa się przez SSO AGH (etap 1) 
+- udane logowanie skutkuje otrzymaniem dostępu z odpowiednimi rolami (etap 1) 
+- rejestracja nowych użytkowników jest możliwa, ale wymaga zatwierdzenia 
+administratora (etap 2) 
+o po wypełnieniu formularza rejestracji użytkownik otrzymuje informację, 
+że „konto wymaga zatwierdzenia przez administratora” 
+Priorytet: Must Have 
+Etap: 1 i 2 
+US-04: Brak publicznego dostępu 
+Jako administrator systemu 
+Chcę mieć pewność, że w domyślnej konfiguracji użytkownicy (zarejestrowani bądź nie) 
+nie mają żadnych uprawnień (nawet „tylko do odczytu”), a dostęp nadawany jest jawnie 
+Aby mieć pełną kontrolę nad uprawnieniami i uniknąć wycieku danych. 
+AC: 
+- domyślny stan po rejestracji to brak żadnych uprawnień 
+- administrator musi ręcznie przypisać role (np. „pracownik AGH”, „admin”) 
+do każdego użytkownika lub może to wynikać z konfiguracji SSO AGH 
+Priorytet: Should Have 
+Etap: 2 
+  
+Wypożyczanie przedmiotów 
+System ma pozwalać na zarządzanie wypożyczeniami w czterech różnych trybach oraz 
+na automatyczne monitorowanie terminów zwrotu. 
+Standardowe wypożyczenia trwają od kilku dni do kilku miesięcy. Można wypożyczać 
+bezterminowo albo np. bez konkretnej daty. 
+US-01: Wypożyczenie klasyczne 
+Jako właściciel przedmiotu 
+Chcę ustawić tryb wypożyczenia, w którym zarówno wydanie jak i zwrot przedmiotu 
+są przeze mnie potwierdzane w systemie 
+Aby mieć pełną kontrolę nad stanem i lokalizacją przedmiotu.   
+AC: 
+- użytkownik może wystąpić z prośbą o wypożyczenie podając dodatkowo 
+planowany termin zwrotu; przedmiot otrzymuje status „oczekuje zatwierdzenia” 
+- po zgodzie właściciela na wypożyczenie, przedmiot otrzymuje status 
+„zarezerwowany” 
+- po fizycznym przekazaniu przedmiotu użytkownikowi właściciel może zmienić 
+status przedmiotu na „wypożyczony” 
+- po zwrocie przedmiotu przez użytkownika, właściciel może zmienić status 
+przedmiotu z powrotem na „dostępny” 
+- zwrot przedmiotu wymaga potwierdzenia przez właściciela, użytkownik nie może 
+zmienić statusu przedmiotu 
+o jeżeli właściciel zauważy jakieś uszkodzenia, to może dodać komentarz 
+do systemu opisujący problem ze zwrotem 
+Priorytet: Must Have 
+Etap: 1 
+US-02: Wypożyczenie oparte na zaufaniu 
+Jako właściciel przedmiotu 
+Chcę ustawić tryb wypożyczenia, w którym wypożyczający może samodzielnie 
+odnotować zwrot 
+Aby usprawnić proces wypożyczeń dla przedmiotów mniej wartościowych/krytycznych. 
+AC: 
+- użytkownik może wystąpić z prośbą o wypożyczenie podając dodatkowo 
+planowany termin zwrotu; przedmiot otrzymuje status „oczekuje zatwierdzenia” 
+- po zgodzie właściciela na wypożyczenie, przedmiotu otrzymuje status 
+„zarezerwowany” 
+- po fizycznym przekazaniu przedmiotu użytkownikowi właściciel może zmienić 
+status przedmiotu na „wypożyczony” 
+- wypożyczający może odnotować zwrot przedmiotu bez potwierdzenia 
+właściciela, przedmiot otrzymuje z powrotem status „dostępny” 
+Priorytet: Should Have 
+Etap: 2 
+US-03: Wypożyczenie asynchroniczne 
+Jako właściciel przedmiotu 
+Chcę ustawić tryb wypożyczenia, w którym użytkownik składa prośbę o wypożyczenie, 
+a po jej zatwierdzeniu może samodzielnie odebrać przedmiot 
+Aby maksymalnie przyspieszyć proces wypożyczenia przedmiotu. 
+AC: 
+- użytkownik może wystąpić z prośbą o wypożyczenie podając dodatkowo 
+planowany termin zwrotu; przedmiot otrzymuje status „oczekuje zatwierdzenia” 
+- po zgodzie właściciela na wypożyczenie, przedmiotu otrzymuje status 
+„zarezerwowany” 
+o użytkownik może samodzielnie odebrać przedmiot i potwierdzić 
+tę operację w systemie, przedmiot otrzymuje status „wypożyczony” 
+o użytkownik może samodzielnie zwrócić przedmiot i potwierdzić 
+tę operację w systemie, przedmiot otrzymuje status „dostępny” 
+Priorytet: Should Have 
+Etap: 2  
+US-04: Wypożyczenie szybkie/zewnętrzne 
+Jako właściciel przedmiotu 
+Chcę ustawić tryb wypożyczenia, w którym użytkownik może wypożyczyć przedmiot nie 
+będąc zarejestrowanym w systemie 
+Aby udostępnić przedmiot osobom z zewnętrz (spoza uczelni AGH). 
+AC: 
+- właściciel ręcznie dodaje informacje o odbiorcy oraz planowanej dacie zwrotu 
+o system zmienia status przedmiotu na „wypożyczony” 
+Priorytet: Could Have 
+Etap: 3 
+US-05: Monitorowanie terminów wypożyczeń 
+Jako właściciel przedmiotu / administrator systemu 
+Chcę generować raporty osób przetrzymujących przedmioty po terminie 
+Aby móc odpowiednio reagować i utrzymać sprawny obieg przedmiotów. 
+AC: 
+- właściciel może wygenerować raport PDF/CSV zawierający listę jego 
+przedmiotów, które są przetrzymywane po terminie 
+- administrator może wygenerować raport PDF/CSV zawierający listę wszystkich 
+przedmiotów przetrzymywanych po terminie 
+Priorytet: Must Have 
+Etap: 2 
+  
+Narzędzia 
+Rozbudowany zestaw narzędzi pozwalających na precyzyjne przeszukiwanie zasobów, 
+śledzenie historii zmian, konfigurowanie powiadomień, import danych oraz drukowanie 
+etykiet. 
+US-01: Zaawansowane filtrowanie 
+Jako użytkownik 
+Chcę wyszukiwać przedmioty po ich atrybutach (kategoria, status, właściciel, 
+producent, itp.) 
+Aby móc szybko odnaleźć potrzebne narzędzia i zweryfikować ich stan. 
+AC: 
+- interfejs umożliwia wprowadzenie filtrów dla każdego atrybutu przedmiotu 
+- wyniki są wyświetlane w tabeli z paginacją i możliwością sortowania po 
+kolumnach 
+Priorytet: Must Have 
+Etap: 1 
+US-02: Audit log 
+Jako administrator systemu 
+Chcę mieć dostęp do pełnych logów dla każdej zmiany dokonanej dla dowolnego 
+przedmiotu 
+Aby móc śledzić historię działań i zapewnić audytowalność systemu. 
+AC: 
+- dla każdej operacji na przedmiocie (np. dodanie zdjęcia, edycja uprawnień, 
+wypożyczenie, dodanie delegata lub właściciela) system zapisuje szczegółowe 
+informacje: data, użytkownik dokonujący zmian, rodzaj zmiany, wartość przed 
+i po 
+- logi powinny mieć prosty format, który jest kompatybilny z większością systemów 
+służących do analizy logów 
+- logi powinny być zapisywane w taki sposób, aby mogły być łatwo wysyłane do 
+narzędzi analizujących logi 
+Priorytet: Should Have 
+Etap: 2 
+  
+US-03: Konfigurowalne powiadomienia 
+Jako użytkownik 
+Chcę skonfigurować powiadomienia e-mail i/lub push (wybór!) 
+Aby otrzymywać powiadomienia o nadchodzącym terminie zwrotu lub o zaakceptowanej 
+prośbie o wypożyczenia przedmiotu. 
+AC: 
+- system wysyła powiadomienia e-mail i/lub push do użytkownika na jeden dzień 
+(lub czas zdefiniowany przez użytkownika) przed terminem zwrotu 
+- system wysyła powiadomienia e-mail i/lub push gdy prośba o wypożyczeniu 
+przedmiotu zostanie zaakceptowana 
+Priorytet: Could Have 
+Etap: 3 
+US-04: Migracja danych 
+Jako administrator 
+Chcę importować dane z arkuszy Excel (.xlsx) oraz z poprzedniego systemu 
+Aby zminimalizować czas związany z wprowadzaniem danych do systemu. 
+NOTE: szczegóły techniczne importu z poprzedniego systemu zostaną doprecyzowane 
+w toku prac 
+AC: 
+- system umożliwia przesłanie pliku Excel z mapowaniem kolumn na pola 
+przedmiotów w wewnętrznej bazie danych 
+- system raportuje ewentualne błędy i potwierdza zakończenie migracji 
+- system umożliwia import z poprzedniego systemu (etap 3) 
+Priorytet: Must Have 
+Etap: 2 i 3 
+  
+US-05: Etykietowanie i drukowanie kodów 
+Jako właściciel przedmiotu / administrator systemu 
+Chcę seryjnie (większymi partiami, nie tylko pojedynczo) drukować kody QR dla nowych 
+partii przedmiotów 
+Aby móc w szybki i łatwy sposób oznaczyć przedmioty. 
+AC: 
+- użytkownik może wybrać kilka przedmiotów w interfejsie i zbiorczo wygenerować 
+kody QR zawierające identyfikatory tych przedmiotów 
+- użytkownik może wybrać rozmiar kodu QR 
+Priorytet: Should Have 
+Etap: 3 
+  
+Etapy 
+Szczegółowe wymagania dla poszczególnych etapów zostały zdefiniowane w sekcji 
+Wymagania klienta. Poniżej znajduje się krótkie podsumowanie każdego z etapów. 
+Etap 1 (~3 tygodnie) 
+Etap składa się z absolutnie krytycznej funkcjonalności dotyczącej zarządzania 
+przedmiotami i uprawnieniami w systemie. 
+Budujemy fundację aplikacji, którą będziemy mogli zaprezentować klientowi i zebrać 
+feedback. Import danych z poprzedniego systemu bądź plików Excel nie jest tutaj 
+kluczowy. 
+Etap 2 (~2 tygodnie) 
+Na tym etapie wprowadzamy ewentualne poprawki wynikające z feedbacku od klienta z 
+Etapu 1, a także dodajemy ważne funkcjonalności, które rozszerzają istniejący 
+fundament systemu. 
+Możliwe, że na tym etapie klient poda więcej szczegółów dotyczących importu danych 
+z poprzedniego systemu, więc musimy wziąć to pod uwagę przy planowaniu pracy. 
+Etap 3 (~2 tygodnie) 
+Na tym etapie wprowadzamy ewentualne poprawki wynikające z feedbacku od klienta 
+z Etapu 2. Priorytetem jest dowiezienie wszystkich wymagań przeznaczonych na Etap 1 
+i Etap 2. Jeżeli wymagania te zostaną spełnione, wtedy przechodzimy do implementacji 
+wymagań faktycznie przeznaczonych na Etap 3.  
