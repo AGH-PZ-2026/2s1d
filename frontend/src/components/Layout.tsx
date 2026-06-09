@@ -34,6 +34,9 @@ export const Layout = () => {
         <Link to="/batch-qr" style={{ marginRight: '15px' }}>
           Batch QR
         </Link>
+        <Link to="/notifications" style={{ marginRight: '15px' }}>
+          Notifications
+        </Link>
         <Link to="/login" style={{ marginRight: '15px' }}>
           Login
         </Link>

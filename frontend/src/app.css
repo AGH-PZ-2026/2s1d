@@ -464,6 +464,24 @@ body {
   font-size: 13px;
 }
 
+.notification-form {
+  display: grid;
+  grid-template-columns: repeat(2, max-content) minmax(180px, 260px) max-content;
+  gap: 14px;
+  align-items: end;
+  margin-bottom: 24px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.notification-form label:not(.form-label) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+}
+
 .row-selected td {
   background: rgba(0, 105, 60, 0.18);
 }
@@ -638,6 +656,10 @@ body {
 
   .import-panel {
     border-right: none;
+  }
+
+  .notification-form {
+    grid-template-columns: 1fr;
   }
 
   .location-panel {

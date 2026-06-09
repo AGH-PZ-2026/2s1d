@@ -10,6 +10,7 @@ import DelegationsPage from './pages/DelegationsPage';
 import ExcelImportPage from './pages/ExcelImportPage';
 import ItemsPage from './pages/ItemsPage';
 import LoginPage from './pages/LoginPage';
+import NotificationsPage from './pages/NotificationsPage';
 import OverdueReportsPage from './pages/OverdueReportsPage';
 import QrScannerPage from './pages/QrScannerPage';
 
@@ -58,6 +59,10 @@ export const router = createBrowserRouter([
       {
         path: '/batch-qr',
         element: <BatchQrPage />,
+      },
+      {
+        path: '/notifications',
+        element: <NotificationsPage />,
       },
       {
         path: '/login',
