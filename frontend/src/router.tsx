@@ -7,6 +7,7 @@ import StatusesPage from './pages/StatusesPage';
 import CategoriesPage from './pages/CategoriesPage';
 import DelegationsPage from './pages/DelegationsPage';
 import ItemsPage from './pages/ItemsPage';
+import LoginPage from './pages/LoginPage';
 
 export const router = createBrowserRouter([
   {
@@ -37,6 +38,10 @@ export const router = createBrowserRouter([
       {
         path: '/items',
         element: <ItemsPage />,
+      },
+      {
+        path: '/login',
+        element: <LoginPage />,
       },
     ],
   },
