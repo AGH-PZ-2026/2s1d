@@ -16,8 +16,8 @@ import type {
 } from '../types/status';
 
 // Konfiguracja Mocków i adresu API
-const API_BASE = 'http://localhost:8000/api/v1/item-status';
-const USE_MOCKS = false;
+const API_BASE = '/api/v1/item-status';
+const USE_MOCKS = import.meta.env.MODE === 'test';
 
 interface BackendStatusResponse {
   id: number;
@@ -37,6 +37,12 @@ const mapBackendToFrontend = (b: BackendStatusResponse): Status => ({
   type: b.is_system ? 'system' : 'custom',
   description: undefined, // Backend aktualnie nie przechowuje ani nie zwraca opisu statusu
 });
+
+const makeSlug = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
 
 async function handleApiError(response: Response): Promise<never> {
   if (response.status === 422) {
@@ -138,20 +144,12 @@ export const statusService = {
     if (USE_MOCKS) {
       await delay(300);
 
-      const slugValid = /^[a-z0-9_]+$/.test(payload.slug);
-      if (!slugValid) {
-        throw new Error(
-          'Identyfikator może zawierać tylko małe litery, cyfry i podkreślniki.'
-        );
-      }
-
-      const slugExists = mockStatuses.some((s) => s.slug === payload.slug);
-      if (slugExists)
-        throw new Error('Status o takim identyfikatorze już istnieje.');
+      const nameExists = mockStatuses.some((s) => s.name === payload.name);
+      if (nameExists) throw new Error('Status with this name already exists');
       const newStatus: Status = {
         id: nextId++,
         name: payload.name,
-        slug: payload.slug,
+        slug: makeSlug(payload.name),
         type: 'custom',
         description: payload.description,
       };
@@ -176,9 +174,12 @@ export const statusService = {
       await delay(300);
       const status = mockStatuses.find((s) => s.id === id);
       if (!status) throw new Error('Status nie istnieje.');
-      if (status.type === 'system')
-        throw new Error('Nie można edytować statusów systemowych.');
-      const updated = { ...status, ...payload };
+      if (status.type === 'system') throw new Error('403');
+      const updated = {
+        ...status,
+        ...payload,
+        slug: payload.name ? makeSlug(payload.name) : status.slug,
+      };
       mockStatuses = mockStatuses.map((s) => (s.id === id ? updated : s));
       return updated;
     }
@@ -201,8 +202,7 @@ export const statusService = {
       await delay(300);
       const status = mockStatuses.find((s) => s.id === id);
       if (!status) throw new Error('Status nie istnieje.');
-      if (status.type === 'system')
-        throw new Error('Nie można usunąć statusów systemowych.');
+      if (status.type === 'system') throw new Error('403');
       mockStatuses = mockStatuses.filter((s) => s.id !== id);
       return;
     }

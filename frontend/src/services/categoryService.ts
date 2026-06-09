@@ -17,8 +17,8 @@ import type {
 } from '../types/category';
 
 // Data source and API address configuration
-const USE_MOCKS = false;
-const BASE_URL = 'http://localhost:8000/api/v1/categories';
+const USE_MOCKS = import.meta.env.MODE === 'test';
+const BASE_URL = '/api/v1/categories';
 
 // Type reflecting the structure of FastAPI/ models (snake_case)
 interface BackendCategoryResponse {
