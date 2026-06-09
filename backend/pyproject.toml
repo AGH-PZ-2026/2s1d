@@ -7,8 +7,10 @@ requires-python = ">=3.12"
 dependencies = [
   "alembic",
   "fastapi",
+  "openpyxl>=3.1.5",
   "psycopg2-binary",
   "pydantic-settings>=2.14.1",
+  "python-multipart>=0.0.30",
   "sqlalchemy",
   "uvicorn[standard]",
 ]
