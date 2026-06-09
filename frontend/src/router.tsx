@@ -6,6 +6,7 @@ import { ErrorPage } from './pages/ErrorPage';
 import StatusesPage from './pages/StatusesPage';
 import CategoriesPage from './pages/CategoriesPage';
 import DelegationsPage from './pages/DelegationsPage';
+import ExcelImportPage from './pages/ExcelImportPage';
 import ItemsPage from './pages/ItemsPage';
 import LoginPage from './pages/LoginPage';
 import QrScannerPage from './pages/QrScannerPage';
@@ -43,6 +44,10 @@ export const router = createBrowserRouter([
       {
         path: '/qr',
         element: <QrScannerPage />,
+      },
+      {
+        path: '/import',
+        element: <ExcelImportPage />,
       },
       {
         path: '/login',
