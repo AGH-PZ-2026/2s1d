@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router';
 import { Layout } from './components/Layout';
 import { HomePage } from './pages/HomePage';
 import { AboutPage } from './pages/AboutPage';
+import BatchQrPage from './pages/BatchQrPage';
 import { ErrorPage } from './pages/ErrorPage';
 import StatusesPage from './pages/StatusesPage';
 import CategoriesPage from './pages/CategoriesPage';
@@ -53,6 +54,10 @@ export const router = createBrowserRouter([
       {
         path: '/reports/overdue',
         element: <OverdueReportsPage />,
+      },
+      {
+        path: '/batch-qr',
+        element: <BatchQrPage />,
       },
       {
         path: '/login',

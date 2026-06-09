@@ -31,6 +31,9 @@ export const Layout = () => {
         <Link to="/reports/overdue" style={{ marginRight: '15px' }}>
           Reports
         </Link>
+        <Link to="/batch-qr" style={{ marginRight: '15px' }}>
+          Batch QR
+        </Link>
         <Link to="/login" style={{ marginRight: '15px' }}>
           Login
         </Link>
