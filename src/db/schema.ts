@@ -51,7 +51,9 @@ export const users = mysqlTable(
   {
     id: int("id").autoincrement().primaryKey(),
     email: varchar("email", { length: 255 }).notNull().unique(),
-    hashedPassword: varchar("hashed_password", { length: 255 }).notNull(),
+    hashedPassword: varchar("hashed_password", { length: 255 }),
+    googleId: varchar("google_id", { length: 255 }),
+    authProvider: mysqlEnum("auth_provider", ["local", "google"]).notNull().default("local"),
     isActive: boolean("is_active").notNull().default(true),
     isApproved: boolean("is_approved").notNull().default(true),
     role: mysqlEnum("role", ["admin", "user"]).notNull().default("user"),

@@ -14,7 +14,12 @@ export interface AuthSession {
   user: AuthUser;
 }
 
-interface MockSsoResponse {
+export interface AuthConfig {
+  devBypassAuth: boolean;
+  googleClientId: string;
+}
+
+interface GoogleLoginResponse {
   access_token: string;
   token_type: string;
   user: AuthUser;
@@ -29,14 +34,19 @@ export interface RegisterPayload {
 }
 
 export const authService = {
-  async mockSsoLogin(email: string, role: UserRole): Promise<AuthSession> {
-    const response = await fetch('/api/v1/auth/mock-sso', {
+
+  /**
+   * Google OAuth login.
+   * @param credential Google ID token from GIS (or email string when dev bypass is active)
+   */
+  async googleLogin(credential: string): Promise<AuthSession> {
+    const response = await fetch('/api/v1/auth/google-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, role }),
+      body: JSON.stringify({ credential }),
     });
     await ensureOk(response);
-    const data: MockSsoResponse = await response.json();
+    const data: GoogleLoginResponse = await response.json();
     const session = {
       accessToken: data.access_token,
       tokenType: data.token_type,
@@ -46,6 +56,15 @@ export const authService = {
     window.localStorage.setItem(USER_KEY, JSON.stringify(session.user));
     window.dispatchEvent(new Event('auth-session-changed'));
     return session;
+  },
+
+  /** Fetch auth configuration (dev bypass flag, Google client ID) */
+  async getConfig(): Promise<AuthConfig> {
+    const response = await fetch('/api/v1/auth/config');
+    if (!response.ok) {
+      return { devBypassAuth: false, googleClientId: '' };
+    }
+    return response.json();
   },
 
   getSessionUser(): AuthUser | null {

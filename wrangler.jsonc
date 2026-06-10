@@ -50,7 +50,9 @@
   },
 
   "vars": {
-    "JWT_SECRET": ""
+    "JWT_SECRET": "",
+    "DEV_BYPASS_AUTH": "true",
+    "GOOGLE_CLIENT_ID": ""
   },
 
   "env": {

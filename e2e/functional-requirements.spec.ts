@@ -580,12 +580,13 @@ async function mockApi(page: Page) {
     const path = url.pathname;
     const method = request.method();
 
-    if (path === '/api/v1/auth/mock-sso' && method === 'POST') {
-      const body = request.postDataJSON() as { email: string; role: string };
+    if (path === '/api/v1/auth/google-login' && method === 'POST') {
+      const body = request.postDataJSON() as { credential: string };
+      // For e2e tests, credential is plain email (dev bypass simulation)
       return json(route, {
         access_token: 'e2e-token',
         token_type: 'bearer',
-        user: { ...user, email: body.email, role: body.role },
+        user: { ...user, email: body.credential, role: user.role },
       });
     }
 

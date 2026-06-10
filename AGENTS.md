@@ -31,7 +31,7 @@ src/
 │   ├── auth.ts               # JWT (HS256, Web Crypto), authMiddleware
 │   └── db.ts                 # dbMiddleware — per-request DB connection
 ├── routes/
-│   ├── auth.ts               # /mock-sso, /register, /users
+│   ├── auth.ts               # /google-login, /register, /users, /config
 │   ├── items.ts              # CRUD przedmiotów + filtrowanie
 │   ├── categories.ts         # Drzewo kategorii + detekcja cykli
 │   ├── statuses.ts           # Statusy systemowe (nieusuwalne) + custom
@@ -112,8 +112,9 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 
 ## Auth
 
-- **Mock SSO**: `POST /api/v1/auth/mock-sso` — body: `{email, role}` → JWT access_token. Używane do developmentu.
-- **Rejestracja**: `POST /api/v1/auth/register` — body: `{email, password: min 8}` → konto `is_approved: false`; komunikat "Konto wymaga zatwierdzenia przez administratora".
+- **Google OAuth**: `POST /api/v1/auth/google-login` — body: `{ credential }` (Google ID token). Backend weryfikuje token przez Google `tokeninfo`, sprawdza domenę `@agh.edu.pl`, tworzy/linkuje użytkownika z `auth_provider = "google"`.
+- **Dev bypass**: `DEV_BYPASS_AUTH="true"` w `wrangler.jsonc` pomija weryfikację tokenu — `credential` traktowany jako email (tylko development).
+- **Rejestracja**: `POST /api/v1/auth/register` — body: `{email, password: min 8}` → konto `is_approved: false`, `auth_provider: "local"`.
 - **JWT**: HS256 z Web Crypto API. Secret z `c.env.JWT_SECRET`. Token ważny 24h.
 - **Role**: `admin` / `user`. Domyślnie po rejestracji brak uprawnień — admin musi zatwierdzić.
 
@@ -134,7 +135,7 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 | 1    | Lokalizacja US-01 Przypisanie/aktualizacja                           | ✅     |
 | 1    | Lokalizacja US-02 Podgląd na mapie                                   | ⚠️ (mapX/mapY są, mapa Leaflet niezintegrowana) |
 | 1    | Role US-01 Opiekun/grupa                                            | ✅     |
-| 1    | Role US-03 SSO + rejestracja                                        | ✅ (mock SSO) |
+| 1    | Role US-03 Google OAuth (konto @agh.edu.pl) + rejestracja            | ✅ |
 | 1    | Wypożyczenia US-01 (classic)                                        | ✅     |
 | 1    | Narzędzia US-01 Zaawansowane filtrowanie                            | ✅     |
 | 2    | US-05 Zdjęcia                                                       | ✅     |
@@ -156,7 +157,7 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 2. **Powiadomienia** — struktura w DB istnieje, ale nie ma cron-job/schedulera do faktycznego wysyłania e-mail/push. Na CF Workers wymagałoby `scheduled()` handlera.
 3. **Mapa** — pola `mapX`/`mapY` są w bazie, ale Leaflet/OpenStreetMap nie jest zintegrowany na frontendzie.
 4. **E2E** — katalog `e2e/` istnieje, `playwright.config.ts` jest, ale testy nie są zaimplementowane.
-5. **Mock SSO** nie integruje się z prawdziwym SSO AGH — w produkcji trzeba podmienić na OIDC/SAML flow.
+5. **Google OAuth** — działa z kontami Google w domenie `@agh.edu.pl`. W development `DEV_BYPASS_AUTH=true` pomija weryfikację tokenu. Wymagany `GOOGLE_CLIENT_ID` z Google Cloud Console.
 
 ## Konwencje kodu
 
