@@ -9,5 +9,5 @@ if [ ! -f .env ]; then
   exit 0
 fi
 
-docker compose up --build -d
-echo "Frontend: http://localhost:5173 | Backend: http://localhost:8000"
+docker compose up db -d
+pnpm dev
