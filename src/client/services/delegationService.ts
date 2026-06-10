@@ -1,13 +1,14 @@
 import type { CreateDelegationPayload, Delegation } from '../types/delegation';
+import type { AutocompleteOption } from '../components/Autocomplete';
 import { authHeaders, jsonAuthHeaders } from './authHeaders';
 
 const USE_MOCKS = import.meta.env.MODE === 'test';
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let mockDelegations: Delegation[] = [
-  { id: 1, item_id: 1, user_id: 2, group_id: null, permission: 'edit' },
-  { id: 2, item_id: 1, user_id: 3, group_id: null, permission: 'manage' },
-  { id: 3, item_id: 1, user_id: null, group_id: 1, permission: 'edit' },
+  { id: 1, item_id: 1, user_id: 2, group_id: null, permission: 'edit', user_email: 'jan@agh.edu.pl', group_name: null },
+  { id: 2, item_id: 1, user_id: 3, group_id: null, permission: 'manage', user_email: 'anna@agh.edu.pl', group_name: null },
+  { id: 3, item_id: 1, user_id: null, group_id: 1, permission: 'edit', user_email: null, group_name: 'Administratorzy' },
 ];
 let nextId = 4;
 
@@ -21,7 +22,11 @@ export const delegationService = {
     if (!payload.user_id && !payload.group_id) throw new Error('Podaj użytkownika lub grupę.');
     if (USE_MOCKS) {
       await delay(300);
-      const d: Delegation = { id: nextId++, item_id: itemId, user_id: payload.user_id ?? null, group_id: payload.group_id ?? null, permission: payload.permission };
+      const d: Delegation = {
+        id: nextId++, item_id: itemId,
+        user_id: payload.user_id ?? null, group_id: payload.group_id ?? null,
+        permission: payload.permission, user_email: null, group_name: null,
+      };
       mockDelegations = [...mockDelegations, d]; return d;
     }
     const response = await fetch(`/api/v1/items/${itemId}/delegations/`, { method: 'POST', headers: jsonAuthHeaders(), body: JSON.stringify(payload) });
@@ -31,6 +36,40 @@ export const delegationService = {
     if (USE_MOCKS) { await delay(300); mockDelegations = mockDelegations.filter((d) => d.id !== delegationId); return; }
     const response = await fetch(`/api/v1/items/${itemId}/delegations/${delegationId}`, { method: 'DELETE', headers: authHeaders() });
     await ensureOk(response);
+  },
+
+  async searchUsers(query: string): Promise<AutocompleteOption[]> {
+    if (USE_MOCKS) {
+      await delay(200);
+      const q = query.toLowerCase();
+      const allUsers = [
+        { value: 1, label: 'admin@agh.edu.pl' },
+        { value: 2, label: 'jan@agh.edu.pl' },
+        { value: 3, label: 'anna@agh.edu.pl' },
+        { value: 4, label: 'piotr@agh.edu.pl' },
+      ];
+      return allUsers.filter((u) => u.label.toLowerCase().includes(q));
+    }
+    const response = await fetch(`/api/v1/users/search?q=${encodeURIComponent(query)}`, { headers: authHeaders() });
+    await ensureOk(response);
+    const data: { id: number; email: string }[] = await response.json();
+    return data.map((u) => ({ value: u.id, label: u.email }));
+  },
+
+  async searchGroups(query: string): Promise<AutocompleteOption[]> {
+    if (USE_MOCKS) {
+      await delay(200);
+      const q = query.toLowerCase();
+      const allGroups = [
+        { value: 1, label: 'Administratorzy' },
+        { value: 2, label: 'Wydział Informatyki' },
+      ];
+      return allGroups.filter((g) => g.label.toLowerCase().includes(q));
+    }
+    const response = await fetch(`/api/v1/groups/search?q=${encodeURIComponent(query)}`, { headers: authHeaders() });
+    await ensureOk(response);
+    const data: { id: number; name: string }[] = await response.json();
+    return data.map((g) => ({ value: g.id, label: g.name }));
   },
 };
 

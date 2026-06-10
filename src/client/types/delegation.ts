@@ -6,6 +6,8 @@ export interface Delegation {
   user_id: number | null;
   group_id: number | null;
   permission: PermissionLevel;
+  user_email: string | null;
+  group_name: string | null;
 }
 
 export interface CreateDelegationPayload {

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, like } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import { groups, groupMembers, type Group } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
@@ -13,6 +13,7 @@ router.use("/*", authMiddleware);
 
 const createSchema = z.object({ name: z.string().min(1).max(255) });
 const addMemberSchema = z.object({ userId: z.number().int().positive() });
+const searchSchema = z.object({ q: z.string().min(1).max(255) });
 
 function toResponse(group: Group, memberIds?: number[]) {
   return { id: group.id, name: group.name, memberIds: memberIds ?? [] };
@@ -22,6 +23,17 @@ router.get("/", async (c) => {
   const db = c.get("db"); const rows = await db.select().from(groups);
   const result = await Promise.all(rows.map(async (g) => { const m = await db.select().from(groupMembers).where(eq(groupMembers.groupId, g.id)); return toResponse(g, m.map((x) => x.userId)); }));
   return c.json(result);
+});
+
+router.get("/search", zValidator("query", searchSchema), async (c) => {
+  const db = c.get("db");
+  const { q } = c.req.valid("query");
+  const rows = await db
+    .select({ id: groups.id, name: groups.name })
+    .from(groups)
+    .where(like(groups.name, `%${q}%`))
+    .limit(20);
+  return c.json(rows);
 });
 
 router.get("/:id", async (c) => {

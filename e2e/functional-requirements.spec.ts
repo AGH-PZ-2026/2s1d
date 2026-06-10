@@ -443,12 +443,23 @@ test('US delegacje: właściciel dodaje delegata z poziomem edycji lub zarządza
 }) => {
   await page.goto('/delegations');
 
+  // Existing delegation should show email, not just ID
+  await expect(page.getByRole('cell', { name: 'opiekun@agh.edu.pl' })).toBeVisible();
+
   await page.getByRole('button', { name: '+ Dodaj delegata' }).click();
-  await page.getByPlaceholder('np. 1').first().fill('2');
+
+  // Type into autocomplete for user email
+  await page.getByPlaceholder('Wpisz email użytkownika…').fill('laborant');
+  // Wait for autocomplete dropdown and select the item
+  await expect(page.getByText('laborant@agh.edu.pl')).toBeVisible();
+  await page.getByText('laborant@agh.edu.pl').click();
+
+  // Select permission
   await page.locator('.modal select').selectOption('manage');
   await page.getByRole('button', { name: 'Dodaj', exact: true }).click();
 
-  await expect(page.getByText('Użytkownik #2')).toBeVisible();
+  // Should now show the email in the table
+  await expect(page.getByRole('cell', { name: 'laborant@agh.edu.pl' })).toBeVisible();
   await expect(page.getByText('Zarządzanie')).toBeVisible();
 });
 
@@ -540,9 +551,18 @@ async function mockApi(page: Page) {
   let currentItems = [...items];
   let currentLocations = [...locations];
   let currentBorrowings = [...borrowings];
-  let currentDelegations = [
-    { id: 1, user_id: 1, group_id: null, permission: 'edit' },
+  let currentDelegations: Array<{
+    id: number;
+    item_id: number;
+    user_id: number | null;
+    group_id: number | null;
+    permission: string;
+    user_email: string | null;
+    group_name: string | null;
+  }> = [
+    { id: 1, item_id: 1, user_id: 1, group_id: null, permission: 'edit', user_email: 'opiekun@agh.edu.pl', group_name: null },
   ];
+  let _nextDelegationId = 2;
   let photos = [
     {
       id: 1,
@@ -675,8 +695,18 @@ async function mockApi(page: Page) {
     if (path === '/api/v1/auth/users' && method === 'GET') {
       return json(route, owners);
     }
+    if (path === '/api/v1/users/search' && method === 'GET') {
+      const q = (url.searchParams.get('q') ?? '').toLowerCase();
+      const results = owners.filter((o) => o.email.toLowerCase().includes(q));
+      return json(route, results);
+    }
     if (path === '/api/v1/groups/' && method === 'GET') {
       return json(route, groups);
+    }
+    if (path === '/api/v1/groups/search' && method === 'GET') {
+      const q = (url.searchParams.get('q') ?? '').toLowerCase();
+      const results = groups.filter((g) => g.name.toLowerCase().includes(q));
+      return json(route, results);
     }
 
     if (path.match(/\/api\/v1\/items\/\d+\/photos$/) && method === 'GET') {
@@ -794,8 +824,6 @@ async function mockApi(page: Page) {
         currentBorrowings.find((item) => item.id === id)
       );
     }
-    // handover uses approve endpoint in workers
-    if (false) { /* handover handled by approve below */ }
     if (path.match(/\/api\/v1\/borrowings\/\d+\/reject/)) {
       return json(route, {});
     }
@@ -809,16 +837,32 @@ async function mockApi(page: Page) {
       );
     }
 
+    // Delegation endpoints
     if (path === '/api/v1/items/1/delegations' && method === 'GET') {
       return json(route, currentDelegations);
     }
     if (path === '/api/v1/items/1/delegations' && method === 'POST') {
-      const body = request.postDataJSON() as Record<string, unknown>;
-      const created = { id: currentDelegations.length + 1, ...body };
-      currentDelegations = [
-        ...currentDelegations,
-        created as (typeof currentDelegations)[number],
-      ];
+      const body = request.postDataJSON() as { user_id?: number; group_id?: number; permission: string };
+      let userEmail: string | null = null;
+      let groupName: string | null = null;
+      if (body.user_id) {
+        const u = owners.find((o) => o.id === body.user_id);
+        if (u) userEmail = u.email;
+      }
+      if (body.group_id) {
+        const g = groups.find((g) => g.id === body.group_id);
+        if (g) groupName = g.name;
+      }
+      const created = {
+        id: _nextDelegationId++,
+        item_id: 1,
+        user_id: body.user_id ?? null,
+        group_id: body.group_id ?? null,
+        permission: body.permission,
+        user_email: userEmail,
+        group_name: groupName,
+      };
+      currentDelegations = [...currentDelegations, created];
       return json(route, created);
     }
 

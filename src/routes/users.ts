@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, like } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import { users } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
@@ -12,6 +12,7 @@ const router = new Hono<{ Variables: Variables; Bindings: Env }>();
 router.use("/*", authMiddleware);
 
 const updateRoleSchema = z.object({ role: z.enum(["admin", "user"]) });
+const searchSchema = z.object({ q: z.string().min(1).max(255) });
 
 router.get("/me", async (c) => {
   const db = c.get("db");
@@ -24,6 +25,17 @@ router.get("/", async (c) => {
   if (c.get("userRole") !== "admin") forbidden("Only admins can list users");
   const db = c.get("db");
   const rows = await db.select({ id: users.id, email: users.email, role: users.role, isActive: users.isActive, isApproved: users.isApproved }).from(users);
+  return c.json(rows);
+});
+
+router.get("/search", zValidator("query", searchSchema), async (c) => {
+  const db = c.get("db");
+  const { q } = c.req.valid("query");
+  const rows = await db
+    .select({ id: users.id, email: users.email, role: users.role, isActive: users.isActive, isApproved: users.isApproved })
+    .from(users)
+    .where(like(users.email, `%${q}%`))
+    .limit(20);
   return c.json(rows);
 });
 
