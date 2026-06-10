@@ -1,7 +1,8 @@
 import { HTTPException } from "hono/http-exception";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 export class AppError extends HTTPException {
-  constructor(status: number, detail: string) {
+  constructor(status: ContentfulStatusCode, detail: string) {
     super(status, { message: detail });
   }
 }

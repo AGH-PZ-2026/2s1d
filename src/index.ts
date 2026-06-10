@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { sql } from "drizzle-orm";
+import type { MySql2Database } from "drizzle-orm/mysql2";
 import { dbMiddleware } from "./middleware/db";
 import { authRouter } from "./routes/auth";
 import { statusesRouter } from "./routes/statuses";
@@ -20,7 +21,9 @@ import { itemPhotosRouter } from "./routes/item-photos";
 import { notificationsRouter } from "./routes/notifications";
 import { auditLogsRouter } from "./routes/audit-logs";
 
-const app = new Hono<{ Bindings: Env }>({ strict: false });
+type AppVariables = { db: MySql2Database<Record<string, never>> };
+
+const app = new Hono<{ Bindings: Env; Variables: AppVariables }>({ strict: false });
 
 app.use("*", cors());
 app.use("/api/*", dbMiddleware);

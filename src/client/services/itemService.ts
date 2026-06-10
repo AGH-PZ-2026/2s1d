@@ -72,7 +72,7 @@ export const itemService = {
     if (USE_MOCKS) { await delay(200); const loc: Location = { id: mockLocations.length + 1, name: payload.name, kind: payload.kind, building: payload.building, room: payload.room, cabinet: payload.cabinet, shelf: payload.shelf, mapX: payload.mapX, mapY: payload.mapY }; mockLocations.push(loc); return loc; }
     const r = await fetch('/api/v1/locations/', { method: 'POST', headers: jsonAuthHeaders(), body: JSON.stringify(payload) });
     await ensureOk(r);
-    const data = await r.json();
+    const data = await r.json() as BackendLocation;
     return mapLocation(data);
   },
   async updateLocation(itemId: number, locationId: number): Promise<void> {
@@ -94,6 +94,6 @@ function mapLocation(l: BackendLocation): Location { return { id: l.id, name: l.
 async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
-  try { const data = await response.json(); if (typeof data.detail === 'string') detail = data.detail; } catch {}
+  try { const data = await response.json() as Record<string, unknown>; if (typeof data.detail === 'string') detail = data.detail; } catch {}
   throw new Error(detail);
 }

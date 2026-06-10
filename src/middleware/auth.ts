@@ -17,8 +17,8 @@ interface TokenPayload {
   exp: number;
 }
 
-function base64url(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+function base64url(buf: Uint8Array): string {
+  return btoa(String.fromCharCode(...buf))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
@@ -27,7 +27,12 @@ function base64url(buf: ArrayBuffer): string {
 function base64urlDecode(str: string): Uint8Array {
   str = str.replace(/-/g, "+").replace(/_/g, "/");
   while (str.length % 4) str += "=";
-  return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 async function signToken(
@@ -53,7 +58,7 @@ async function signToken(
     encoder.encode(`${header}.${body}`),
   );
 
-  return `${header}.${body}.${base64url(signature)}`;
+  return `${header}.${body}.${base64url(new Uint8Array(signature))}`;
 }
 
 async function verifyToken(
@@ -77,7 +82,12 @@ async function verifyToken(
     const data = `${parts[0]}.${parts[1]}`;
     const sig = base64urlDecode(parts[2]);
 
-    const valid = await crypto.subtle.verify("HMAC", key, sig, encoder.encode(data));
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      sig.buffer as ArrayBuffer,
+      encoder.encode(data),
+    );
 
     if (!valid) return null;
 
@@ -124,7 +134,7 @@ export const authMiddleware = createMiddleware<{
       unauthorized("Auth not configured");
     }
 
-    const payload = await verifyToken(token as string, secret);
+    const payload = await verifyToken(token, secret);
     if (!payload) {
       unauthorized("Invalid or expired token");
     }
