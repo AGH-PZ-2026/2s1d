@@ -1,3 +1,4 @@
+// ─── Cloudflare Workers bindings (used in production on CF) ───────────────
 declare interface Hyperdrive {
   connectionString: string;
   host: string;
@@ -91,4 +92,44 @@ declare interface QueueSendOptions {
 declare interface MessageSendRequest<Body = unknown> {
   body: Body;
   options?: QueueSendOptions;
+}
+
+// ─── Environment shape ────────────────────────────────────────────────────
+// On Cloudflare, this is the bindings object exposed to the worker.
+// On Node.js, we provide a shim that reads from process.env and uses
+// filesystem/S3 for storage (see src/server.ts).
+declare interface Env {
+  // CF-only bindings
+  HYPERDRIVE?: Hyperdrive;
+  PHOTOS_BUCKET?: R2Bucket;
+  NOTIFICATION_QUEUE?: Queue;
+
+  // Self-hosted equivalents (read from process.env by src/server.ts)
+  DATABASE_URL?: string;
+  MYSQL_HOST?: string;
+  MYSQL_PORT?: string;
+  MYSQL_USER?: string;
+  MYSQL_PASSWORD?: string;
+  MYSQL_DATABASE?: string;
+
+  // Storage backends for self-hosted
+  PHOTOS_BACKEND?: 'local' | 's3' | 'r2';
+  PHOTOS_LOCAL_DIR?: string;
+  PHOTOS_PUBLIC_URL?: string; // e.g. https://photos.example.com
+  S3_ENDPOINT?: string;
+  S3_REGION?: string;
+  S3_BUCKET?: string;
+  S3_ACCESS_KEY_ID?: string;
+  S3_SECRET_ACCESS_KEY?: string;
+  S3_PUBLIC_URL?: string; // CDN or public endpoint
+
+  // Shared vars
+  JWT_SECRET?: string;
+  DEV_BYPASS_AUTH?: string;
+  GOOGLE_CLIENT_ID?: string;
+
+  // Node-only
+  PORT?: string;
+  HOST?: string;
+  STATIC_DIR?: string; // path to built SPA, e.g. ./dist/client
 }

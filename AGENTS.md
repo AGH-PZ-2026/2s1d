@@ -2,15 +2,31 @@
 
 Zintegrowany i wszechstronny system do zarządzania bazą danych aparatury pomiarowej AGH.
 
+## Tryby uruchomienia
+
+Aplikacja jest **runtime-agnostic** — ten sam kod źródłowy Hono działa zarówno na Cloudflare Workers, jak i na zwykłym serwerze Node.js:
+
+| Tryb               | Entry point          | Adapter            | Kiedy                                       |
+| ------------------ | -------------------- | ------------------ | ------------------------------------------- |
+| Cloudflare Workers | `src/index.ts`       | workerd            | Produkcja, edge, darmowy tier CF            |
+| Self-hosted (Node) | `src/server.ts`      | `@hono/node-server`| Własny serwer, kontener Docker, on-prem     |
+
+Wybór trybu odbywa się przez to, **co uruchamiasz**: `wrangler dev` / `wrangler deploy` vs `pnpm start` / `docker compose up app`. Nie trzeba nic zmieniać w kodzie.
+
+Abstrakcje pozwalające na to są w:
+- `src/db/client.ts` — `createDb(env)` akceptuje `HYPERDRIVE` (binding CF), `DATABASE_URL` albo `MYSQL_*` env vars
+- `src/lib/storage.ts` — `ObjectStorage` ma 3 implementacje: `R2ObjectStorage` (binding CF), `S3ObjectStorage` (S3/MinIO/R2-S3), `LocalFsStorage` (dysk)
+
 ## Stack
 
 | Warstwa     | Technologia                                            |
 | ----------- | ------------------------------------------------------ |
-| Runtime     | Cloudflare Workers                                     |
+| Runtime     | Cloudflare Workers **lub** Node.js 22+ (Bun też działa) |
 | Framework   | [Hono](https://hono.dev/)                              |
 | ORM         | [Drizzle](https://orm.drizzle.team/) + `drizzle-kit`   |
-| DB          | MySQL 8.4 przez [Hyperdrive](https://developers.cloudflare.com/hyperdrive/) |
+| DB          | MySQL 8.4 przez [Hyperdrive](https://developers.cloudflare.com/hyperdrive/) (CF) lub bezpośrednio mysql2 (self-hosted) |
 | Frontend    | React 19 + Vite 8 + react-router-dom 7                 |
+| Bundler     | Vite (frontend) + esbuild (server)                     |
 | Testy       | Vitest 3 (`@cloudflare/vitest-pool-workers` dla workera) |
 | Środowisko  | Nix (`flake.nix`), `pnpm` jako package manager         |
 | Walidacja   | Zod + `@hono/zod-validator`                            |
@@ -20,16 +36,22 @@ Zintegrowany i wszechstronny system do zarządzania bazą danych aparatury pomia
 
 ```
 src/
-├── index.ts                  # Hono app — entry point workera
-├── env.d.ts                  # Deklaracje typów Hyperdrive, R2Bucket, Queue
+├── index.ts                  # Hono app — entry point (działa w obu trybach)
+├── server.ts                 # Self-hosted Node.js entrypoint (tylko dla self-hosted)
+├── env.d.ts                  # Typy Hyperdrive/R2/Queue + Node.js env shape
 ├── db/
 │   ├── schema.ts             # 12 tabel Drizzle (MySQL)
-│   ├── client.ts             # Hyperdrive → mysql2 → Drizzle
+│   ├── client.ts             # createDb(env) — Hyperdrive / DATABASE_URL / MYSQL_*
 │   ├── seed.ts               # Systemowe statusy + domyślne lokalizacje + slugify
+│   ├── import-koidc.ts       # Skrypt importu z bazy referencyjnej
 │   └── migrations/           # Migracje SQL generowane przez drizzle-kit
 ├── middleware/
 │   ├── auth.ts               # JWT (HS256, Web Crypto), authMiddleware
 │   └── db.ts                 # dbMiddleware — per-request DB connection
+├── lib/
+│   ├── errors.ts             # AppError + notFound/badRequest/forbidden/unauthorized
+│   ├── storage.ts            # ObjectStorage: R2 / S3 / LocalFs
+│   └── storageProxy.ts       # /storage/<key> route (self-hosted)
 ├── routes/
 │   ├── auth.ts               # /google-login, /register, /users, /config
 │   ├── items.ts              # CRUD przedmiotów + filtrowanie
@@ -44,18 +66,22 @@ src/
 │   ├── quick-action.ts       # Szybkie akcje (/mark-damaged)
 │   ├── batch-qr.ts           # Drukowanie zbiorcze kodów QR
 │   ├── excel-import.ts       # Import CSV
-│   ├── item-photos.ts        # Zdjęcia (R2 bucket)
+│   ├── item-photos.ts        # Zdjęcia (R2 / S3 / local FS)
 │   ├── notifications.ts      # Preferencje + eventy
 │   └── audit-logs.ts         # Logi operacji (admin only)
-├── lib/
-│   └── errors.ts             # AppError + notFound/badRequest/forbidden/unauthorized
-├── client/                   # React SPA (Vite)
-│   ├── main.tsx / App.tsx / router.tsx
-│   ├── components/           # Layout, AuthGate, Autocomplete, CategoryTree, itd.
-│   ├── pages/                # Wszystkie strony (Items, QrScanner, BatchQr, Borrowings, itd.)
-│   ├── services/             # Klienckie serwisy API (z mockami dla MODE=test)
-│   ├── types/                # TypeScript typy
-│   └── hooks/                # useAuth
+└── client/                   # React SPA (Vite)
+    ├── main.tsx / App.tsx / router.tsx
+    ├── components/           # Layout, AuthGate, Autocomplete, CategoryTree, itd.
+    ├── pages/                # Wszystkie strony (Items, Categories, Borrowings, itd.)
+    ├── services/             # Klienckie serwisy API (z mockami dla MODE=test)
+    ├── types/                # TypeScript typy
+    └── hooks/                # useAuth
+
+scripts/
+└── build-server.mjs          # esbuild bundle → dist-server/server.js
+
+Dockerfile                    # Multi-stage build (client → server → runtime)
+docker-compose.yml            # MySQL + app (+ opcjonalne MinIO)
 worker-configuration.d.ts     # Generowane przez `wrangler types` — NIE edytować ręcznie
 ```
 
@@ -72,8 +98,25 @@ docker compose up db               # MySQL 8.4 na localhost:3306
 pnpm run db:migrate                # Aplikuj migracje
 pnpm run db:generate               # Generuj migrację ze zmian w schema.ts
 
-# Dev server
+# Dev — Cloudflare (workerd)
 pnpm run dev                       # vite build + wrangler dev → localhost:8787
+
+# Dev — Self-hosted (Node)
+pnpm run dev:server                # vite build + tsx watch src/server.ts
+# albo do szybkiego testu bez watch:
+DATABASE_URL=... JWT_SECRET=... pnpm run start:dev
+
+# Build
+pnpm run build                     # = build:client + build:server (self-hosted prod)
+pnpm run build:client              # Vite → dist/client
+pnpm run build:server              # esbuild → dist-server/server.js (52 KB)
+
+# Self-hosted start (po build)
+DATABASE_URL=... JWT_SECRET=... pnpm start
+
+# Docker
+docker compose up -d --build app   # self-hosted kontener + MySQL
+docker build -t pz-worker .        # standalone build
 
 # TypeScript
 pnpm exec tsc --noEmit             # Type check
@@ -83,6 +126,41 @@ pnpm exec wrangler types           # Regeneruj worker-configuration.d.ts
 pnpm exec vitest run tests/business-logic.test.ts       # Testy logiki (szybkie)
 pnpm exec vitest run --config vitest.client.config.ts   # Testy klienckie (jsdom)
 pnpm test                          # Oba powyższe (bez vitest-pool-workers)
+```
+
+## Self-hosted — env vars
+
+Patrz `.env.example`. Najważniejsze:
+
+```bash
+# Baza danych (DATABASE_URL wygrywa z MYSQL_*)
+DATABASE_URL=mysql://user:pass@host:3306/db
+# albo
+MYSQL_HOST=db
+MYSQL_PORT=3306
+MYSQL_USER=pz_user
+MYSQL_PASSWORD=pz_pass
+MYSQL_DATABASE=pz_db
+
+# Auth
+JWT_SECRET=<openssl rand -hex 32>     # wymagane
+DEV_BYPASS_AUTH=false                 # true w dev = logowanie przez email
+GOOGLE_CLIENT_ID=                     # opcjonalnie, OAuth Google
+
+# Storage
+PHOTOS_BACKEND=local                  # local | s3
+PHOTOS_LOCAL_DIR=./storage            # dla local
+S3_ENDPOINT=                          # dla s3 (MinIO/R2/AWS)
+S3_REGION=us-east-1
+S3_BUCKET=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_PUBLIC_URL=                        # opcjonalnie, dla CDN
+
+# Server
+PORT=8787
+HOST=0.0.0.0
+STATIC_DIR=./dist/client              # path do zbudowanego frontu
 ```
 
 ## Testy — ważne
@@ -105,7 +183,7 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 | `users`                   | Użytkownicy (email, hashed_password, role, is_approved) |
 | `groups`                  | Grupy użytkowników                              |
 | `group_members`           | Członkostwo w grupach (PK: group_id + user_id)  |
-| `item_photos`             | Zdjęcia przedmiotów (R2 storage_path)           |
+| `item_photos`             | Zdjęcia przedmiotów (storage_path)             |
 | `audit_logs`              | Logi zdarzeń (user_id, action, old_value, new_value JSON) |
 | `notification_preferences`| Preferencje powiadomień per user                |
 | `notification_events`     | Zdarzenia powiadomień (return_due, borrowing_approved) |
@@ -113,7 +191,7 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 ## Auth
 
 - **Google OAuth**: `POST /api/v1/auth/google-login` — body: `{ credential }` (Google ID token). Backend weryfikuje token przez Google `tokeninfo`, sprawdza domenę `@agh.edu.pl`, tworzy/linkuje użytkownika z `auth_provider = "google"`.
-- **Dev bypass**: `DEV_BYPASS_AUTH="true"` w `wrangler.jsonc` pomija weryfikację tokenu — `credential` traktowany jako email (tylko development).
+- **Dev bypass**: `DEV_BYPASS_AUTH="true"` w `wrangler.jsonc` lub `.env` pomija weryfikację tokenu — `credential` traktowany jako email (tylko development).
 - **Rejestracja**: `POST /api/v1/auth/register` — body: `{email, password: min 8}` → konto `is_approved: false`, `auth_provider: "local"`.
 - **JWT**: HS256 z Web Crypto API. Secret z `c.env.JWT_SECRET`. Token ważny 24h.
 - **Role**: `admin` / `user`. Domyślnie po rejestracji brak uprawnień — admin musi zatwierdzić.
@@ -123,6 +201,14 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 - `src/lib/errors.ts` — rzuca `AppError(HTTPException)` z kodem i komunikatem
 - `index.ts` `onError` — łapie HTTPException → `{detail}` z kodem; nieobsłużone → 500
 - Serwisy klienckie: `handleApiError` / `ensureOk` parsują `response.json().detail`
+
+## Docker — ważne szczegóły implementacyjne
+
+- **pnpm 11+** wymaga Node 22+ (używa `node:sqlite` builtin) — `Dockerfile` używa `node:22-bookworm-slim`.
+- **Runtime stage** używa `pnpm install --prod --frozen-lockfile --shamefully-hoist`. Flaga `--shamefully-hoist` jest krytyczna — bez niej pnpm nie tworzy top-level `node_modules/mysql2/`, a serwer bundle importuje `mysql2/promise` bezpośrednio.
+- **Bezpieczeństwo**: runtime user to `node` (non-root), port 8787, healthcheck na `/api/health`.
+- **Wolumeny**: `photos_data` zamontowany na `/app/storage` dla zachowania uploadowanych zdjęć.
+- **Bundle**: `dist-server/server.js` ma 52 KB (cały backend Hono + Drizzle + esbuild). Reszta to node_modules.
 
 ## Wymagania — pokrycie
 
@@ -168,3 +254,5 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 - **API shape**: `POST/PATCH` z JSON body walidowanym przez `zValidator`, błędy przez `AppError`
 - **Frontend services**: każdy service ma tryb mock (`USE_MOCKS = import.meta.env.MODE === 'test'`)
 - **Testy**: `describe`/`it` Vitest, mocki w service'ach (nie mockuje się fetch)
+- **Storage**: nigdy nie importuj `c.env.PHOTOS_BUCKET` bezpośrednio — użyj `createObjectStorage(c.env)` z `src/lib/storage.ts`
+- **DB**: nigdy nie czytaj `c.env.HYPERDRIVE` wprost — użyj `createDb(c.env)` z `src/db/client.ts`

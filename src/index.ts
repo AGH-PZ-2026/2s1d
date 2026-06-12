@@ -3,8 +3,8 @@ import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { sql } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
-import type { Connection } from 'mysql2/promise';
 import { dbMiddleware } from './middleware/db';
+import { autoMigrateMiddleware } from './middleware/auto-migrate';
 import { authRouter } from './routes/auth';
 import { statusesRouter } from './routes/statuses';
 import { categoriesRouter } from './routes/categories';
@@ -23,10 +23,11 @@ import { itemPhotosRouter } from './routes/item-photos';
 import { notificationsRouter } from './routes/notifications';
 import { auditLogsRouter } from './routes/audit-logs';
 import { staffRouter } from './routes/staff';
+import { storageProxyApp } from './lib/storageProxy';
 
 type AppVariables = {
   db: MySql2Database<Record<string, never>>;
-  rawDb: Connection;
+  rawDb: unknown;
 };
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>({
@@ -35,6 +36,7 @@ const app = new Hono<{ Bindings: Env; Variables: AppVariables }>({
 
 app.use('*', cors());
 app.use('/api/*', dbMiddleware);
+app.use('/api/*', autoMigrateMiddleware);
 
 app.route('/api/v1/auth', authRouter);
 app.route('/api/v1/item-status', statusesRouter);
@@ -56,8 +58,14 @@ app.route('/api/v1/items', delegationsRouter);
 app.route('/api/v1/items', itemPhotosRouter);
 app.route('/api/v1/items', itemsRouter);
 
+// Self-hosted storage proxy: GET /storage/<key>  → file bytes
+// On Cloudflare we don't need this (the R2 binding or a custom domain
+// serves files directly). On Node, the storage adapter returns
+// `/storage/...` as its publicUrl by default, and this router serves them.
+app.route('/storage', storageProxyApp);
+
 app.get('/api/health', async (c) => {
-  let dbStatus: 'ok' | 'error';
+  let dbStatus: 'ok' | 'error' = 'error';
   try {
     const db = c.get('db');
     await db.execute(sql`SELECT 1`);

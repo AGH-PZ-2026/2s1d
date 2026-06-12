@@ -100,7 +100,13 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
   if (!user.isApproved)
     unauthorized('Konto wymaga zatwierdzenia przez administratora');
 
-  const token = await createAuthToken(user.id, user.role, c.env.JWT_SECRET);
+  const secret = c.env.JWT_SECRET;
+  if (!secret) unauthorized('Auth not configured');
+  const token = await createAuthToken(
+    user.id,
+    user.role as 'admin' | 'user',
+    secret
+  );
 
   return c.json({
     access_token: token,
@@ -280,7 +286,13 @@ router.post(
     if (!user.isApproved)
       unauthorized('Konto wymaga zatwierdzenia przez administratora');
 
-    const token = await createAuthToken(user.id, user.role, c.env.JWT_SECRET);
+    const secret = c.env.JWT_SECRET;
+    if (!secret) unauthorized('Auth not configured');
+    const token = await createAuthToken(
+      user.id,
+      user.role as 'admin' | 'user',
+      secret
+    );
 
     return c.json({
       access_token: token,
