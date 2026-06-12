@@ -20,14 +20,14 @@ export interface CreateLocationPayload {
   mapY?: number;
 }
 
-interface BackendItem { id: number; systemId?: string | null; name: string; manufacturer?: string | null; description?: string | null; purchaseDate?: string | null; categoryId?: number | null; statusId?: number | null; locationId?: number | null; ownerId?: number | null; owner_id?: number | null; ownerGroupId?: number | null; }
+interface BackendItem { id: number; systemId?: string | null; name: string; manufacturer?: string | null; model?: string | null; serial?: string | null; inventoryNumber?: string | null; description?: string | null; purchaseDate?: string | null; addedAt?: string | null; categoryId?: number | null; statusId?: number | null; locationId?: number | null; ownerId?: number | null; owner_id?: number | null; ownerGroupId?: number | null; legacyItemId?: number | null; }
 interface BackendCat { id: number; name: string; parent_id?: number | null; }
 interface BackendLocation { id: number; name: string; kind?: 'internal' | 'external'; building?: string | null; room?: string | null; cabinet?: string | null; shelf?: string | null; mapX?: number | null; mapY?: number | null; }
 interface BackendGroup { id: number; name: string; }
 
 let mockItems: Item[] = [
-  { id: 1, name: 'Oscyloskop Tektronix TBS1102', manufacturer: 'Tektronix', description: 'Oscyloskop laboratoryjny 100MHz', purchaseDate: '2024-03-15', categoryId: 1, statusId: 1, locationId: 1, ownerId: 1 },
-  { id: 2, name: 'Multimetr UNI-T UT61E', manufacturer: 'UNI-T', description: 'Cyfrowy multimetr laboratoryjny', purchaseDate: '2023-11-08', categoryId: 2, statusId: 2, locationId: 2, ownerId: 2 },
+  { id: 1, name: 'Oscyloskop Tektronix TBS1102', manufacturer: 'Tektronix', model: 'TBS1102', serial: 'SER001', inventoryNumber: 'INV-2024-001', description: 'Oscyloskop laboratoryjny 100MHz', purchaseDate: '2024-03-15', categoryId: 1, statusId: 1, locationId: 1, ownerId: 1 },
+  { id: 2, name: 'Multimetr UNI-T UT61E', manufacturer: 'UNI-T', model: 'UT61E', serial: 'SER002', inventoryNumber: 'INV-2023-045', description: 'Cyfrowy multimetr laboratoryjny', purchaseDate: '2023-11-08', categoryId: 2, statusId: 2, locationId: 2, ownerId: 2 },
 ];
 let nextId = 3;
 
@@ -44,7 +44,7 @@ export const itemService = {
     return ((await r.json()) as BackendItem[]).map(mapItem);
   },
   async create(payload: CreateItemPayload): Promise<Item> {
-    if (USE_MOCKS) { await delay(500); const i: Item = { id: nextId++, ...payload }; mockItems = [...mockItems, i]; return i; }
+    if (USE_MOCKS) { await delay(500); const i: Item = { id: nextId++, name: payload.name, manufacturer: payload.manufacturer || "", model: payload.model, serial: payload.serial, inventoryNumber: payload.inventoryNumber, description: payload.description, purchaseDate: payload.purchaseDate, categoryId: payload.categoryId ?? 0, statusId: payload.statusId ?? 0, locationId: payload.locationId ?? 0, ownerId: payload.ownerId ?? 0, ownerGroupId: payload.ownerGroupId }; mockItems = [...mockItems, i]; return i; }
     const r = await fetch('/api/v1/items/', { method: 'POST', headers: jsonAuthHeaders(), body: JSON.stringify(payload) });
     await ensureOk(r); return mapItem(await r.json());
   },
@@ -87,7 +87,26 @@ export const itemService = {
   },
 };
 
-function mapItem(i: BackendItem): Item { return { id: i.id, name: i.name, manufacturer: i.manufacturer ?? '', description: i.description ?? undefined, purchaseDate: i.purchaseDate ?? undefined, categoryId: i.categoryId ?? 0, statusId: i.statusId ?? 0, locationId: i.locationId ?? 0, ownerId: i.ownerId ?? i.owner_id ?? 0, ownerGroupId: i.ownerGroupId ?? undefined }; }
+function mapItem(i: BackendItem): Item {
+  return {
+    id: i.id,
+    systemId: i.systemId ?? undefined,
+    name: i.name,
+    manufacturer: i.manufacturer ?? '',
+    model: i.model ?? undefined,
+    serial: i.serial ?? undefined,
+    inventoryNumber: i.inventoryNumber ?? undefined,
+    description: i.description ?? undefined,
+    purchaseDate: i.purchaseDate ?? undefined,
+    addedAt: i.addedAt ?? undefined,
+    categoryId: i.categoryId ?? 0,
+    statusId: i.statusId ?? 0,
+    locationId: i.locationId ?? 0,
+    ownerId: i.ownerId ?? i.owner_id ?? 0,
+    ownerGroupId: i.ownerGroupId ?? undefined,
+    legacyItemId: i.legacyItemId ?? undefined,
+  };
+}
 
 function mapLocation(l: BackendLocation): Location { return { id: l.id, name: l.name, kind: l.kind ?? 'internal', building: l.building ?? undefined, room: l.room ?? undefined, cabinet: l.cabinet ?? undefined, shelf: l.shelf ?? undefined, mapX: l.mapX ?? undefined, mapY: l.mapY ?? undefined }; }
 

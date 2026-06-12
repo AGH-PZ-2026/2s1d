@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "bfeee1dd-c829-4913-a462-7d2e8d12342d",
+  "id": "d6a4f790-e12d-4e02-b666-f12b44d1af98",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "audit_logs": {
@@ -220,6 +220,13 @@
         },
         "parent_id": {
           "name": "parent_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "legacy_type_id": {
+          "name": "legacy_type_id",
           "type": "int",
           "primaryKey": false,
           "notNull": false,
@@ -620,6 +627,27 @@
           "notNull": false,
           "autoincrement": false
         },
+        "model": {
+          "name": "model",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "serial": {
+          "name": "serial",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "inventory_number": {
+          "name": "inventory_number",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "description": {
           "name": "description",
           "type": "text",
@@ -675,6 +703,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "legacy_item_id": {
+          "name": "legacy_item_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -682,6 +717,27 @@
           "name": "items_system_id_idx",
           "columns": [
             "system_id"
+          ],
+          "isUnique": false
+        },
+        "items_serial_idx": {
+          "name": "items_serial_idx",
+          "columns": [
+            "serial"
+          ],
+          "isUnique": false
+        },
+        "items_inv_num_idx": {
+          "name": "items_inv_num_idx",
+          "columns": [
+            "inventory_number"
+          ],
+          "isUnique": false
+        },
+        "items_legacy_id_idx": {
+          "name": "items_legacy_id_idx",
+          "columns": [
+            "legacy_item_id"
           ],
           "isUnique": false
         }
@@ -852,6 +908,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": true
+        },
+        "legacy_room_id": {
+          "name": "legacy_room_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -1065,8 +1128,23 @@
           "name": "hashed_password",
           "type": "varchar(255)",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
+        },
+        "google_id": {
+          "name": "google_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "auth_provider": {
+          "name": "auth_provider",
+          "type": "enum('local','google')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'local'"
         },
         "is_active": {
           "name": "is_active",

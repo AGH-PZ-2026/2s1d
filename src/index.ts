@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { sql } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
+import type { Connection } from "mysql2/promise";
 import { dbMiddleware } from "./middleware/db";
 import { authRouter } from "./routes/auth";
 import { statusesRouter } from "./routes/statuses";
@@ -20,8 +21,9 @@ import { excelImportRouter } from "./routes/excel-import";
 import { itemPhotosRouter } from "./routes/item-photos";
 import { notificationsRouter } from "./routes/notifications";
 import { auditLogsRouter } from "./routes/audit-logs";
+import { staffRouter } from "./routes/staff";
 
-type AppVariables = { db: MySql2Database<Record<string, never>> };
+type AppVariables = { db: MySql2Database<Record<string, never>>; rawDb: Connection };
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>({ strict: false });
 
@@ -41,6 +43,7 @@ app.route("/api/v1/quick-actions", quickActionRouter);
 app.route("/api/v1/excel", excelImportRouter);
 app.route("/api/v1/notifications", notificationsRouter);
 app.route("/api/v1/audit-logs", auditLogsRouter);
+app.route("/api/v1/staff", staffRouter);
 // Mount nested routers BEFORE generic items router
 app.route("/api/v1/items", delegationsRouter);
 app.route("/api/v1/items", itemPhotosRouter);

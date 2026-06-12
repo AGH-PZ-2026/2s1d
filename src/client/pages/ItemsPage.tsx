@@ -11,7 +11,7 @@ import type { Status } from '../types/status';
 
 interface ModalState { mode: 'create'; }
 
-type SortKey = 'name' | 'manufacturer' | 'category' | 'status' | 'location';
+type SortKey = 'name' | 'manufacturer' | 'model' | 'serial' | 'category' | 'status' | 'location';
 type SortDirection = 'asc' | 'desc';
 
 const PAGE_SIZE = 5;
@@ -67,7 +67,7 @@ export default function ItemsPage() {
     const query = filters.query.trim().toLowerCase();
     const manufacturer = filters.manufacturer.trim().toLowerCase();
     const visible = items.filter((item) => {
-      const matchesQuery = !query || item.name.toLowerCase().includes(query) || item.description?.toLowerCase().includes(query);
+      const matchesQuery = !query || item.name.toLowerCase().includes(query) || item.description?.toLowerCase().includes(query) || item.serial?.toLowerCase().includes(query) || item.inventoryNumber?.toLowerCase().includes(query) || item.model?.toLowerCase().includes(query);
       const matchesManufacturer = !manufacturer || item.manufacturer.toLowerCase().includes(manufacturer);
       const matchesCategory = !filters.categoryId || item.categoryId === Number(filters.categoryId);
       const matchesStatus = !filters.statusId || item.statusId === Number(filters.statusId);
@@ -125,15 +125,15 @@ export default function ItemsPage() {
           <thead><tr>
             <th><SortButton active={sort.key === 'name'} direction={sort.direction} label="Nazwa" onClick={() => setSort(nextSort(sort, 'name'))} /></th>
             <th><SortButton active={sort.key === 'manufacturer'} direction={sort.direction} label="Producent" onClick={() => setSort(nextSort(sort, 'manufacturer'))} /></th>
-            <th>Opis</th>
+            <th>Model</th>
+            <th>Nr seryjny</th>
             <th><SortButton active={sort.key === 'category'} direction={sort.direction} label="Kategoria" onClick={() => setSort(nextSort(sort, 'category'))} /></th>
             <th><SortButton active={sort.key === 'status'} direction={sort.direction} label="Status" onClick={() => setSort(nextSort(sort, 'status'))} /></th>
             <th><SortButton active={sort.key === 'location'} direction={sort.direction} label="Lokalizacja" onClick={() => setSort(nextSort(sort, 'location'))} /></th>
             <th>Właściciel / opiekun</th>
-            <th>Data zakupu</th>
           </tr></thead>
           <tbody>
-            {paginatedItems.length === 0 ? (<tr><td colSpan={8}>Brak przedmiotów spełniających filtry.</td></tr>) : paginatedItems.map((item) => (<tr key={item.id} className={item.id === selectedItem?.id ? 'row-selected' : ''} onClick={() => setSelectedItemId(item.id)}><td className="td-name">{item.name}</td><td>{item.manufacturer}</td><td>{item.description ?? '—'}</td><td>{getCategoryName(item.categoryId)}</td><td>{getStatusName(item.statusId)}</td><td>{getLocationName(item.locationId)}</td><td>{getOwnerName(item)}</td><td>{item.purchaseDate ?? '—'}</td></tr>))}
+            {paginatedItems.length === 0 ? (<tr><td colSpan={9}>Brak przedmiotów spełniających filtry.</td></tr>) : paginatedItems.map((item) => (<tr key={item.id} className={item.id === selectedItem?.id ? 'row-selected' : ''} onClick={() => setSelectedItemId(item.id)}><td className="td-name">{item.name}</td><td>{item.manufacturer}</td><td>{item.model ?? '—'}</td><td>{item.serial ?? '—'}</td><td>{getCategoryName(item.categoryId)}</td><td>{getStatusName(item.statusId)}</td><td>{getLocationName(item.locationId)}</td><td>{getOwnerName(item)}</td></tr>))}
           </tbody>
         </table>
         <div className="table-pagination"><span>Strona {currentPage} z {totalPages} · Wyniki: {filteredItems.length}</span><div className="td-actions"><button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">Poprzednia</button><button className="btn btn-secondary" disabled={currentPage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">Następna</button></div></div>
@@ -146,7 +146,7 @@ export default function ItemsPage() {
 
 function ItemsFilters({ categories, filters, locations, onChange, owners, statuses }: { categories: Category[]; filters: { query: string; categoryId: string; statusId: string; locationId: string; ownerId: string; manufacturer: string; }; locations: Location[]; onChange: (patch: Partial<typeof filters>) => void; owners: Owner[]; statuses: Status[] }) {
   return (<section className="filters-panel" aria-label="Filtry przedmiotów">
-    <label className="form-label" htmlFor="item-filter-query">Nazwa lub opis</label><input className="form-input" id="item-filter-query" onChange={(event) => onChange({ query: event.target.value })} placeholder="np. oscyloskop" value={filters.query} />
+    <label className="form-label" htmlFor="item-filter-query">Szukaj (nazwa, opis, model, seryjny, inwentarzowy)</label><input className="form-input" id="item-filter-query" onChange={(event) => onChange({ query: event.target.value })} placeholder="np. oscyloskop" value={filters.query} />
     <label className="form-label" htmlFor="item-filter-manufacturer">Producent</label><input className="form-input" id="item-filter-manufacturer" onChange={(event) => onChange({ manufacturer: event.target.value })} placeholder="np. Tektronix" value={filters.manufacturer} />
     <label className="form-label" htmlFor="item-filter-category">Kategoria</label><select className="form-input" id="item-filter-category" onChange={(event) => onChange({ categoryId: event.target.value })} value={filters.categoryId}><option value="">Wszystkie</option>{categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}</select>
     <label className="form-label" htmlFor="item-filter-status">Status</label><select className="form-input" id="item-filter-status" onChange={(event) => onChange({ statusId: event.target.value })} value={filters.statusId}><option value="">Wszystkie</option>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
@@ -162,7 +162,12 @@ function SortButton({ active, direction, label, onClick }: { active: boolean; di
 function nextSort(current: { key: SortKey; direction: SortDirection }, key: SortKey): { key: SortKey; direction: SortDirection } { return { key, direction: (current.key === key && current.direction === 'asc' ? 'desc' : 'asc') as SortDirection }; }
 
 function sortValue(item: Item, key: SortKey, helpers: { getCategoryName: (id: number) => string; getStatusName: (id: number) => string; getLocationName: (id: number) => string }): string {
-  if (key === 'category') return helpers.getCategoryName(item.categoryId); if (key === 'status') return helpers.getStatusName(item.statusId); if (key === 'location') return helpers.getLocationName(item.locationId); return item[key] ?? '';
+  if (key === 'category') return helpers.getCategoryName(item.categoryId);
+  if (key === 'status') return helpers.getStatusName(item.statusId);
+  if (key === 'location') return helpers.getLocationName(item.locationId);
+  if (key === 'model') return item.model ?? '';
+  if (key === 'serial') return item.serial ?? '';
+  return item[key] ?? '';
 }
 
 function LocationMapPanel({ item, location, locations, onCreateLocation, onLocationChange, ownerName, statusName }: { item: Item; location: Location | undefined; locations: Location[]; onCreateLocation: (p: CreateLocationPayload) => void; onLocationChange: (locationId: number) => void; ownerName: string; statusName: string }) {
@@ -170,7 +175,17 @@ function LocationMapPanel({ item, location, locations, onCreateLocation, onLocat
   const hasCoordinates = typeof location?.mapX === 'number' && typeof location?.mapY === 'number';
   const x = clamp(location?.mapX ?? 50); const y = clamp(location?.mapY ?? 50);
   return (<section className="location-panel" aria-label="Mapa lokalizacji przedmiotu">
-    <div className="location-panel__summary"><p className="location-panel__label">Lokalizacja przedmiotu</p><h2>{item.name}</h2><dl><div><dt>Status</dt><dd>{statusName}</dd></div><div><dt>Opiekun</dt><dd>{ownerName}</dd></div><div><dt>Punkt</dt><dd>{location?.name ?? 'Brak przypisanej lokalizacji'}</dd></div><div><dt>Szczegóły</dt><dd>{formatLocationDetails(location)}</dd></div></dl></div>
+    <div className="location-panel__summary"><p className="location-panel__label">Lokalizacja przedmiotu</p><h2>{item.name}</h2><dl>
+      <div><dt>Producent</dt><dd>{item.manufacturer}</dd></div>
+      {item.model && <div><dt>Model</dt><dd>{item.model}</dd></div>}
+      {item.serial && <div><dt>Nr seryjny</dt><dd>{item.serial}</dd></div>}
+      {item.inventoryNumber && <div><dt>Nr inwentarzowy</dt><dd>{item.inventoryNumber}</dd></div>}
+      {item.systemId && <div><dt>System ID</dt><dd>{item.systemId}</dd></div>}
+      <div><dt>Status</dt><dd>{statusName}</dd></div>
+      <div><dt>Opiekun</dt><dd>{ownerName}</dd></div>
+      <div><dt>Punkt</dt><dd>{location?.name ?? 'Brak przypisanej lokalizacji'}</dd></div>
+      <div><dt>Szczegóły</dt><dd>{formatLocationDetails(location)}</dd></div>
+    </dl></div>
     <div className="location-map"><div className="location-map__axis location-map__axis--x">mapX</div><div className="location-map__axis location-map__axis--y">mapY</div>{hasCoordinates ? (<div className="location-map__pin" style={{ left: `${x}%`, top: `${y}%` }}><span>{location?.name}</span></div>) : (<div className="location-map__empty">Brak współrzędnych mapy dla tej lokalizacji</div>)}</div>
     <div className="location-controls">
       <div className="form"><label className="form-label" htmlFor="item-location-select">Zmień lokalizację</label><select className="form-input" id="item-location-select" onChange={(event) => onLocationChange(Number(event.target.value))} value={item.locationId}>{locations.map((currentLocation) => (<option key={currentLocation.id} value={currentLocation.id}>{currentLocation.name}</option>))}</select></div>
@@ -187,11 +202,14 @@ function ItemPhotosPanel({ item, photos: itemPhotos, error: photosError, loading
 }
 
 function CreateForm({ categories, groups, locations, owners, statuses, onSubmit, loading }: { categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: CreateItemPayload) => void; loading: boolean }) {
-  const [name, setName] = useState(''); const [manufacturer, setManufacturer] = useState(''); const [description, setDescription] = useState(''); const [purchaseDate, setPurchaseDate] = useState(''); const [categoryId, setCategoryId] = useState(categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(statuses[0]?.id ?? 1); const [locationId, setLocationId] = useState(locations[0]?.id ?? 1); const [ownerId, setOwnerId] = useState(owners[0]?.id ?? 1); const [ownerGroupId, setOwnerGroupId] = useState('');
-  const submit = () => { if (!name.trim() || !manufacturer.trim()) return; onSubmit({ name: name.trim(), manufacturer: manufacturer.trim(), description: description.trim() || undefined, purchaseDate: purchaseDate || undefined, categoryId, statusId, locationId, ownerId, ownerGroupId: ownerGroupId ? Number(ownerGroupId) : undefined }); };
+  const [name, setName] = useState(''); const [manufacturer, setManufacturer] = useState(''); const [model, setModel] = useState(''); const [serial, setSerial] = useState(''); const [inventoryNumber, setInventoryNumber] = useState(''); const [description, setDescription] = useState(''); const [purchaseDate, setPurchaseDate] = useState(''); const [categoryId, setCategoryId] = useState(categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(statuses[0]?.id ?? 1); const [locationId, setLocationId] = useState(locations[0]?.id ?? 1); const [ownerId, setOwnerId] = useState(owners[0]?.id ?? 1); const [ownerGroupId, setOwnerGroupId] = useState('');
+  const submit = () => { if (!name.trim()) return; onSubmit({ name: name.trim(), manufacturer: manufacturer.trim() || undefined, model: model.trim() || undefined, serial: serial.trim() || undefined, inventoryNumber: inventoryNumber.trim() || undefined, description: description.trim() || undefined, purchaseDate: purchaseDate || undefined, categoryId, statusId, locationId, ownerId, ownerGroupId: ownerGroupId ? Number(ownerGroupId) : undefined }); };
   return (<div className="form">
-    <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="np. Laptop Dell" />
-    <label className="form-label">Producent *</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="np. Dell" />
+    <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="np. Oscyloskop Tektronix" />
+    <label className="form-label">Producent</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="np. Tektronix" />
+    <label className="form-label">Model</label><input className="form-input" value={model} onChange={(e) => setModel(e.target.value)} placeholder="np. TBS1102" />
+    <label className="form-label">Nr seryjny</label><input className="form-input" value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="np. MY52430015" />
+    <label className="form-label">Nr inwentarzowy</label><input className="form-input" value={inventoryNumber} onChange={(e) => setInventoryNumber(e.target.value)} placeholder="np. W7/262" />
     <label className="form-label">Opis</label><textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcjonalny opis" />
     <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
     <label className="form-label">Kategoria *</label><select className="form-input" value={categoryId} onChange={(e) => setCategoryId(Number(e.target.value))}>{categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}</select>
@@ -199,6 +217,6 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
     <label className="form-label">Lokalizacja *</label><select className="form-input" value={locationId} onChange={(e) => setLocationId(Number(e.target.value))}>{locations.map((location) => (<option key={location.id} value={location.id}>{location.name}</option>))}</select>
     <label className="form-label">Właściciel / opiekun *</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
     <label className="form-label">Grupa opiekunów</label><select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}><option value="">Brak grupy</option>{groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}</select>
-    <div className="form-actions"><button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim() || !manufacturer.trim()}>{loading ? 'Zapisywanie…' : 'Utwórz'}</button></div>
+    <div className="form-actions"><button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim()}>{loading ? 'Zapisywanie…' : 'Utwórz'}</button></div>
   </div>);
 }

@@ -22,6 +22,7 @@ export const categories = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     name: varchar("name", { length: 255 }).notNull(),
     parentId: int("parent_id"),
+    legacyTypeId: int("legacy_type_id"),
   },
   (table) => ({
     parentFk: foreignKey({
@@ -102,6 +103,7 @@ export const locations = mysqlTable(
     mapY: float("map_y"),
     notes: text("notes"),
     isActive: boolean("is_active").notNull().default(true),
+    legacyRoomId: int("legacy_room_id"),
   },
 );
 
@@ -112,6 +114,9 @@ export const items = mysqlTable(
     systemId: varchar("system_id", { length: 32 }).unique(),
     name: varchar("name", { length: 100 }).notNull(),
     manufacturer: varchar("manufacturer", { length: 100 }),
+    model: varchar("model", { length: 100 }),
+    serial: varchar("serial", { length: 100 }),
+    inventoryNumber: varchar("inventory_number", { length: 100 }),
     description: text("description"),
     purchaseDate: date("purchase_date"),
     addedAt: datetime("added_at"),
@@ -120,9 +125,13 @@ export const items = mysqlTable(
     locationId: int("location_id"),
     ownerId: int("owner_id"),
     ownerGroupId: int("owner_group_id"),
+    legacyItemId: int("legacy_item_id"),
   },
   (table) => ({
     systemIdIdx: index("items_system_id_idx").on(table.systemId),
+    serialIdx: index("items_serial_idx").on(table.serial),
+    inventoryNumberIdx: index("items_inv_num_idx").on(table.inventoryNumber),
+    legacyIdIdx: index("items_legacy_id_idx").on(table.legacyItemId),
     categoryFk: foreignKey({
       name: "items_category_fk",
       columns: [table.categoryId],

@@ -12,3 +12,4 @@ Thumbs.db
 .wrangler/
 worker-configuration.d.ts
 coverage/
+2025-03-06_koidc.sql

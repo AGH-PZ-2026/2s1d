@@ -98,7 +98,7 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 | ------------------------- | ---------------------------------------------- |
 | `categories`              | Drzewo kategorii (self-referencing FK parent_id) |
 | `item_status`             | Statusy (systemowe is_system=true + custom)     |
-| `items`                   | Przedmioty (system_id, nazwa, producent, itd.) |
+| `items`                   | Przedmioty (system_id, nazwa, producent, model, serial, nr_inw, itd.) + legacy_item_id |
 | `locations`               | Lokalizacje (building/room/cabinet/shelf/mapX/mapY) |
 | `borrowings`              | Wypożyczenia (4 tryby: classic/trusted/asynchronous/external) |
 | `delegations`             | Delegacje uprawnień (manage/edit, user_id/group_id) |
@@ -157,7 +157,8 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 2. **Powiadomienia** — struktura w DB istnieje, ale nie ma cron-job/schedulera do faktycznego wysyłania e-mail/push. Na CF Workers wymagałoby `scheduled()` handlera.
 3. **Mapa** — pola `mapX`/`mapY` są w bazie, ale Leaflet/OpenStreetMap nie jest zintegrowany na frontendzie.
 4. **E2E** — katalog `e2e/` istnieje, `playwright.config.ts` jest, ale testy nie są zaimplementowane.
-5. **Google OAuth** — działa z kontami Google w domenie `@agh.edu.pl`. W development `DEV_BYPASS_AUTH=true` pomija weryfikację tokenu. Wymagany `GOOGLE_CLIENT_ID` z Google Cloud Console.
+5. **Google OAuth** — działa z kontami Google w domenie `@agh.edu.pl`.
+6. **Baza referencyjna koidc** — aplikacja wspiera współistnienie z tabelami referencyjnymi (`inv_urzadzenia`, `pracownicy`, `publikacje`, itd.) z bazy `2025-03-06_koidc.sql`. Tabele referencyjne są read-only. Import danych do tabel aplikacji przez `src/db/import-koidc.ts`. Pracownicy są dostępni przez API `/api/v1/staff`. W development `DEV_BYPASS_AUTH=true` pomija weryfikację tokenu. Wymagany `GOOGLE_CLIENT_ID` z Google Cloud Console.
 
 ## Konwencje kodu
 

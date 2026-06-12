@@ -20,6 +20,9 @@ router.use("/*", authMiddleware);
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   manufacturer: z.string().max(100).optional().default(""),
+  model: z.string().max(100).optional(),
+  serial: z.string().max(100).optional(),
+  inventoryNumber: z.string().max(100).optional(),
   description: z.string().optional(),
   purchaseDate: z.string().optional(),
   systemId: z.string().max(32).optional(),
@@ -37,6 +40,9 @@ function toResponse(item: Item) {
     systemId: item.systemId,
     name: item.name,
     manufacturer: item.manufacturer,
+    model: item.model,
+    serial: item.serial,
+    inventoryNumber: item.inventoryNumber,
     description: item.description,
     purchaseDate: item.purchaseDate,
     addedAt: item.addedAt,
@@ -45,6 +51,7 @@ function toResponse(item: Item) {
     locationId: item.locationId,
     ownerId: item.ownerId,
     ownerGroupId: item.ownerGroupId,
+    legacyItemId: item.legacyItemId,
   };
 }
 
@@ -54,7 +61,18 @@ router.get("/", async (c) => {
   const statusId = c.req.query("statusId");
   const locationId = c.req.query("locationId");
   const conditions = [];
-  if (search) conditions.push(or(like(items.name, `%${search}%`), like(items.manufacturer, `%${search}%`), like(items.systemId, `%${search}%`)));
+  if (search) {
+    conditions.push(
+      or(
+        like(items.name, `%${search}%`),
+        like(items.manufacturer, `%${search}%`),
+        like(items.model, `%${search}%`),
+        like(items.serial, `%${search}%`),
+        like(items.inventoryNumber, `%${search}%`),
+        like(items.systemId, `%${search}%`)
+      )
+    );
+  }
   if (statusId) conditions.push(eq(items.statusId, Number(statusId)));
   if (locationId) conditions.push(eq(items.locationId, Number(locationId)));
   const rows = await db.select().from(items).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(desc(items.id));
@@ -73,11 +91,13 @@ router.post("/", zValidator("json", createSchema), async (c) => {
   const db = c.get("db");
   const body = c.req.valid("json");
   if (!body.name.trim()) badRequest("Nazwa przedmiotu jest wymagana.");
-  if (!body.manufacturer?.trim()) badRequest("Producent jest wymagany.");
 
   const insertValues: Record<string, unknown> = {
     name: body.name,
     manufacturer: body.manufacturer || null,
+    model: body.model ?? null,
+    serial: body.serial ?? null,
+    inventoryNumber: body.inventoryNumber ?? null,
     description: body.description ?? null,
     addedAt: sql`NOW()`,
     categoryId: body.categoryId ?? null,
@@ -104,6 +124,9 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
   const updateData: Record<string, unknown> = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.manufacturer !== undefined) updateData.manufacturer = body.manufacturer || null;
+  if (body.model !== undefined) updateData.model = body.model ?? null;
+  if (body.serial !== undefined) updateData.serial = body.serial ?? null;
+  if (body.inventoryNumber !== undefined) updateData.inventoryNumber = body.inventoryNumber ?? null;
   if (body.description !== undefined) updateData.description = body.description ?? null;
   if (body.purchaseDate !== undefined) updateData.purchaseDate = body.purchaseDate ?? null;
   if (body.systemId !== undefined) updateData.systemId = body.systemId ?? null;

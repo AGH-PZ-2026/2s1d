@@ -29,6 +29,7 @@ CREATE TABLE `categories` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`parent_id` int,
+	`legacy_type_id` int,
 	CONSTRAINT `categories_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
@@ -79,6 +80,9 @@ CREATE TABLE `items` (
 	`system_id` varchar(32),
 	`name` varchar(100) NOT NULL,
 	`manufacturer` varchar(100),
+	`model` varchar(100),
+	`serial` varchar(100),
+	`inventory_number` varchar(100),
 	`description` text,
 	`purchase_date` date,
 	`added_at` datetime,
@@ -87,6 +91,7 @@ CREATE TABLE `items` (
 	`location_id` int,
 	`owner_id` int,
 	`owner_group_id` int,
+	`legacy_item_id` int,
 	CONSTRAINT `items_id` PRIMARY KEY(`id`),
 	CONSTRAINT `items_system_id_unique` UNIQUE(`system_id`)
 );
@@ -103,6 +108,7 @@ CREATE TABLE `locations` (
 	`map_y` float,
 	`notes` text,
 	`is_active` boolean NOT NULL DEFAULT true,
+	`legacy_room_id` int,
 	CONSTRAINT `locations_id` PRIMARY KEY(`id`),
 	CONSTRAINT `locations_name_unique` UNIQUE(`name`)
 );
@@ -133,7 +139,9 @@ CREATE TABLE `notification_preferences` (
 CREATE TABLE `users` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`email` varchar(255) NOT NULL,
-	`hashed_password` varchar(255) NOT NULL,
+	`hashed_password` varchar(255),
+	`google_id` varchar(255),
+	`auth_provider` enum('local','google') NOT NULL DEFAULT 'local',
 	`is_active` boolean NOT NULL DEFAULT true,
 	`is_approved` boolean NOT NULL DEFAULT true,
 	`role` enum('admin','user') NOT NULL DEFAULT 'user',
@@ -158,4 +166,7 @@ ALTER TABLE `items` ADD CONSTRAINT `items_owner_fk` FOREIGN KEY (`owner_id`) REF
 ALTER TABLE `items` ADD CONSTRAINT `items_owner_group_fk` FOREIGN KEY (`owner_group_id`) REFERENCES `groups`(`id`) ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `notification_events` ADD CONSTRAINT `notification_events_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `notification_events` ADD CONSTRAINT `notification_events_borrowing_fk` FOREIGN KEY (`borrowing_id`) REFERENCES `borrowings`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX `items_system_id_idx` ON `items` (`system_id`);
+CREATE INDEX `items_system_id_idx` ON `items` (`system_id`);--> statement-breakpoint
+CREATE INDEX `items_serial_idx` ON `items` (`serial`);--> statement-breakpoint
+CREATE INDEX `items_inv_num_idx` ON `items` (`inventory_number`);--> statement-breakpoint
+CREATE INDEX `items_legacy_id_idx` ON `items` (`legacy_item_id`);

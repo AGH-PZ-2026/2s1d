@@ -11,13 +11,12 @@ services:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./docker/init-migrations.sh:/docker-entrypoint-initdb.d/init-migrations.sh:ro
-      - ./src/db/migrations:/migrations:ro
+      - ./2025-03-06_koidc.sql:/docker-entrypoint-initdb.d/2025-03-06_koidc.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
       timeout: 5s
       retries: 5
+      interval: 10s
 
 volumes:
   mysql_data:

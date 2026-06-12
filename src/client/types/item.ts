@@ -1,24 +1,34 @@
 export interface Item {
   id: number;
+  systemId?: string;
   name: string;
   manufacturer: string;
+  model?: string;
+  serial?: string;
+  inventoryNumber?: string;
   description?: string;
   purchaseDate?: string;
+  addedAt?: string;
   categoryId: number;
   statusId: number;
   locationId: number;
   ownerId: number;
   ownerGroupId?: number;
+  legacyItemId?: number;
 }
 
 export interface CreateItemPayload {
   name: string;
-  manufacturer: string;
+  manufacturer?: string;
+  model?: string;
+  serial?: string;
+  inventoryNumber?: string;
   description?: string;
   purchaseDate?: string;
-  categoryId: number;
-  statusId: number;
-  locationId: number;
-  ownerId: number;
+  systemId?: string;
+  categoryId?: number;
+  statusId?: number;
+  locationId?: number;
+  ownerId?: number;
   ownerGroupId?: number;
 }
