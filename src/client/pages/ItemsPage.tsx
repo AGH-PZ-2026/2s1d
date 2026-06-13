@@ -3,12 +3,15 @@ import { X } from 'lucide-react';
 import LeafletMap from '../components/LeafletMap';
 import { itemService, type CreateLocationPayload } from '../services/itemService';
 import { itemPhotoService, type ItemPhoto } from '../services/itemPhotoService';
+import { delegationService } from '../services/delegationService';
+import { useAuth } from '../hooks/useAuth';
 import type { Item, CreateItemPayload } from '../types/item';
 import type { Category } from '../types/category';
 import type { Group } from '../types/group';
 import type { Location } from '../types/location';
 import type { Owner } from '../types/owner';
 import type { Status } from '../types/status';
+import type { Delegation } from '../types/delegation';
 
 interface ModalState { mode: 'create'; }
 
@@ -37,6 +40,9 @@ export default function ItemsPage() {
   const [filters, setFilters] = useState({ query: '', categoryId: '', statusId: '', locationId: '', ownerId: '', manufacturer: '' });
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'name', direction: 'asc' });
   const [page, setPage] = useState(1);
+  
+  const { user } = useAuth();
+  const [itemDelegations, setItemDelegations] = useState<Delegation[]>([]);
 
   const fetchItems = useCallback(async () => {
     setLoading(true); setError(null);
@@ -92,8 +98,21 @@ export default function ItemsPage() {
 
   useEffect(() => {
     async function loadPhotos(itemId: number) { setPhotoError(null); setPhotoLoading(true); try { setPhotos(await itemPhotoService.list(itemId)); } catch { setPhotoError('Nie udało się pobrać historii zdjęć.'); } finally { setPhotoLoading(false); } }
-    if (selectedItem) void loadPhotos(selectedItem.id);
+    async function loadDelegations(itemId: number) { try { setItemDelegations(await delegationService.getAll(itemId)); } catch { setItemDelegations([]); } }
+    if (selectedItem) {
+      void loadPhotos(selectedItem.id);
+      void loadDelegations(selectedItem.id);
+    }
   }, [selectedItem]);
+
+  const canEditSelected = useMemo(() => {
+    if (!selectedItem || !user) return false;
+    if (user.role === 'admin') return true;
+    if (selectedItem.ownerId === user.id) return true;
+    const hasDelegation = itemDelegations.some(d => d.user_id === user.id && (d.permission === 'edit' || d.permission === 'manage'));
+    if (hasDelegation) return true;
+    return false;
+  }, [selectedItem, user, itemDelegations]);
 
   const handlePhotoUpload = async (file: File) => {
     if (!selectedItem) return;
@@ -138,7 +157,7 @@ export default function ItemsPage() {
           </tbody>
         </table>
         <div className="table-pagination"><span>Strona {currentPage} z {totalPages} · Wyniki: {filteredItems.length}</span><div className="td-actions"><button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">Poprzednia</button><button className="btn btn-secondary" disabled={currentPage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">Następna</button></div></div>
-        {selectedItem && (<><LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} /><ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} /></>)}
+        {selectedItem && (<><LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} canEdit={canEditSelected} /><ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} /></>)}
       </>)}
       {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>Nowy przedmiot</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}<CreateForm categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} /></div></div>)}
     </div>
@@ -171,7 +190,7 @@ function sortValue(item: Item, key: SortKey, helpers: { getCategoryName: (id: nu
   return item[key] ?? '';
 }
 
-function LocationMapPanel({ item, location, locations, onCreateLocation, onLocationChange, ownerName, statusName }: { item: Item; location: Location | undefined; locations: Location[]; onCreateLocation: (p: CreateLocationPayload) => void; onLocationChange: (locationId: number) => void; ownerName: string; statusName: string }) {
+function LocationMapPanel({ item, location, locations, onCreateLocation, onLocationChange, ownerName, statusName, canEdit }: { item: Item; location: Location | undefined; locations: Location[]; onCreateLocation: (p: CreateLocationPayload) => void; onLocationChange: (locationId: number) => void; ownerName: string; statusName: string; canEdit: boolean }) {
   const [newLocation, setNewLocation] = useState({ name: '', kind: 'internal' as 'internal' | 'external', building: '', room: '', cabinet: '', shelf: '', mapX: '19.9236', mapY: '50.0646' });
   
   return (<section className="location-panel" aria-label="Mapa lokalizacji przedmiotu">
@@ -190,13 +209,17 @@ function LocationMapPanel({ item, location, locations, onCreateLocation, onLocat
       <LeafletMap 
         mapX={location?.mapX} 
         mapY={location?.mapY} 
-        onLocationSelect={(x, y) => setNewLocation(current => ({ ...current, mapX: x.toFixed(6), mapY: y.toFixed(6) }))}
+        onLocationSelect={canEdit ? ((x, y) => setNewLocation(current => ({ ...current, mapX: x.toFixed(6), mapY: y.toFixed(6) }))) : undefined}
       />
     </div>
-    <div className="location-controls">
-      <div className="form"><label className="form-label" htmlFor="item-location-select">Zmień lokalizację</label><select className="form-input" id="item-location-select" onChange={(event) => onLocationChange(Number(event.target.value))} value={item.locationId}>{locations.map((currentLocation) => (<option key={currentLocation.id} value={currentLocation.id}>{currentLocation.name}</option>))}</select></div>
-      <div className="form"><label className="form-label" htmlFor="new-location-name">Nowy punkt na mapie (kliknij na mapie by wybrać współrzędne)</label><input className="form-input" id="new-location-name" onChange={(event) => setNewLocation((current) => ({ ...current, name: event.target.value }))} placeholder="np. D-17 / 102 / Szafa B" value={newLocation.name} /><div className="location-controls__grid"><select aria-label="Typ lokalizacji" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, kind: event.target.value as 'internal' | 'external' }))} value={newLocation.kind}><option value="internal">Wewnętrzna</option><option value="external">Zewnętrzna</option></select><input aria-label="Budynek" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, building: event.target.value }))} placeholder="Budynek" value={newLocation.building} /><input aria-label="Pokój" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, room: event.target.value }))} placeholder="Pokój" value={newLocation.room} /><input aria-label="Szafa" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, cabinet: event.target.value }))} placeholder="Szafa" value={newLocation.cabinet} /><input aria-label="Półka" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, shelf: event.target.value }))} placeholder="Półka" value={newLocation.shelf} /><input aria-label="mapX (długość geo.)" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, mapX: event.target.value }))} type="number" step="any" value={newLocation.mapX} /><input aria-label="mapY (szerokość geo.)" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, mapY: event.target.value }))} type="number" step="any" value={newLocation.mapY} /></div><button className="btn btn-secondary" disabled={!newLocation.name.trim()} onClick={() => onCreateLocation({ name: newLocation.name.trim(), kind: newLocation.kind, building: newLocation.building.trim() || undefined, room: newLocation.room.trim() || undefined, cabinet: newLocation.cabinet.trim() || undefined, shelf: newLocation.shelf.trim() || undefined, mapX: Number(newLocation.mapX), mapY: Number(newLocation.mapY) })} type="button">Dodaj punkt i przypisz</button></div>
-    </div>
+    {canEdit ? (
+      <div className="location-controls">
+        <div className="form"><label className="form-label" htmlFor="item-location-select">Zmień lokalizację</label><select className="form-input" id="item-location-select" onChange={(event) => onLocationChange(Number(event.target.value))} value={item.locationId}>{locations.map((currentLocation) => (<option key={currentLocation.id} value={currentLocation.id}>{currentLocation.name}</option>))}</select></div>
+        <div className="form"><label className="form-label" htmlFor="new-location-name">Nowy punkt na mapie (kliknij na mapie by wybrać współrzędne)</label><input className="form-input" id="new-location-name" onChange={(event) => setNewLocation((current) => ({ ...current, name: event.target.value }))} placeholder="np. D-17 / 102 / Szafa B" value={newLocation.name} /><div className="location-controls__grid"><select aria-label="Typ lokalizacji" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, kind: event.target.value as 'internal' | 'external' }))} value={newLocation.kind}><option value="internal">Wewnętrzna</option><option value="external">Zewnętrzna</option></select><input aria-label="Budynek" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, building: event.target.value }))} placeholder="Budynek" value={newLocation.building} /><input aria-label="Pokój" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, room: event.target.value }))} placeholder="Pokój" value={newLocation.room} /><input aria-label="Szafa" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, cabinet: event.target.value }))} placeholder="Szafa" value={newLocation.cabinet} /><input aria-label="Półka" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, shelf: event.target.value }))} placeholder="Półka" value={newLocation.shelf} /><input aria-label="mapX (długość geo.)" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, mapX: event.target.value }))} type="number" step="any" value={newLocation.mapX} /><input aria-label="mapY (szerokość geo.)" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, mapY: event.target.value }))} type="number" step="any" value={newLocation.mapY} /></div><button className="btn btn-secondary" disabled={!newLocation.name.trim()} onClick={() => onCreateLocation({ name: newLocation.name.trim(), kind: newLocation.kind, building: newLocation.building.trim() || undefined, room: newLocation.room.trim() || undefined, cabinet: newLocation.cabinet.trim() || undefined, shelf: newLocation.shelf.trim() || undefined, mapX: Number(newLocation.mapX), mapY: Number(newLocation.mapY) })} type="button">Dodaj punkt i przypisz</button></div>
+      </div>
+    ) : (
+      <div className="alert alert-info" style={{ marginTop: '1rem' }}>Nie masz uprawnień do zmiany lokalizacji tego przedmiotu.</div>
+    )}
   </section>);
 }
 

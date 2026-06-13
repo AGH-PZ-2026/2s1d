@@ -121,6 +121,43 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
   const id = Number(c.req.param("id"));
   const existing = await db.select().from(items).where(eq(items.id, id)).limit(1);
   if (existing.length === 0) notFound("Item not found");
+  
+  const item = existing[0];
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  let canEdit = false;
+  if (userRole === "admin") {
+    canEdit = true;
+  } else if (item.ownerId === userId) {
+    canEdit = true;
+  } else {
+    if (item.ownerGroupId) {
+      const { groupMembers } = await import("../db/schema");
+      const isMember = await db.select().from(groupMembers).where(and(eq(groupMembers.groupId, item.ownerGroupId), eq(groupMembers.userId, userId))).limit(1);
+      if (isMember.length > 0) canEdit = true;
+    }
+    if (!canEdit) {
+      const { delegations, groupMembers } = await import("../db/schema");
+      
+      const userDelegation = await db.select().from(delegations).where(and(eq(delegations.itemId, id), eq(delegations.userId, userId))).limit(1);
+      if (userDelegation.length > 0) canEdit = true;
+
+      if (!canEdit) {
+        const userGroups = await db.select({ groupId: groupMembers.groupId }).from(groupMembers).where(eq(groupMembers.userId, userId));
+        const groupIds = userGroups.map(g => g.groupId);
+        if (groupIds.length > 0) {
+          const { inArray } = await import("drizzle-orm");
+          const groupDelegation = await db.select().from(delegations).where(and(eq(delegations.itemId, id), inArray(delegations.groupId, groupIds))).limit(1);
+          if (groupDelegation.length > 0) canEdit = true;
+        }
+      }
+    }
+  }
+  
+  if (!canEdit) {
+    forbidden("Brak uprawnień do edycji tego przedmiotu");
+  }
 
   const body = c.req.valid("json");
   const updateData: Record<string, unknown> = {};
