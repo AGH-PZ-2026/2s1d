@@ -133,7 +133,7 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 | 1    | US-03 Identyfikacja (QR, systemId)                                  | ✅     |
 | 1    | US-04 Szybkie akcje po QR                                           | ✅     |
 | 1    | Lokalizacja US-01 Przypisanie/aktualizacja                           | ✅     |
-| 1    | Lokalizacja US-02 Podgląd na mapie                                   | ⚠️ (mapX/mapY są, mapa Leaflet niezintegrowana) |
+| 1    | Lokalizacja US-02 Podgląd na mapie                                   | ✅     |
 | 1    | Role US-01 Opiekun/grupa                                            | ✅     |
 | 1    | Role US-03 Google OAuth (konto @agh.edu.pl) + rejestracja            | ✅ |
 | 1    | Wypożyczenia US-01 (classic)                                        | ✅     |
@@ -155,7 +155,7 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 
 1. **`wrangler.jsonc`** `compatibility_date: "2026-06-09"` — lokalny workerd wspiera max `2025-09-06`. Na produkcji OK, lokalnie tylko warningi.
 2. **Powiadomienia** — struktura w DB istnieje, ale nie ma cron-job/schedulera do faktycznego wysyłania e-mail/push. Na CF Workers wymagałoby `scheduled()` handlera.
-3. **Mapa** — pola `mapX`/`mapY` są w bazie, ale Leaflet/OpenStreetMap nie jest zintegrowany na frontendzie.
+3. **Mapa** — mapa Leaflet została zintegrowana w widoku przedmiotów.
 4. **E2E** — katalog `e2e/` istnieje, `playwright.config.ts` jest, ale testy nie są zaimplementowane.
 5. **Google OAuth** — działa z kontami Google w domenie `@agh.edu.pl`.
 6. **Baza referencyjna koidc** — aplikacja wspiera współistnienie z tabelami referencyjnymi (`inv_urzadzenia`, `pracownicy`, `publikacje`, itd.) z bazy `2025-03-06_koidc.sql`. Tabele referencyjne są read-only. Import danych do tabel aplikacji przez `src/db/import-koidc.ts`. Pracownicy są dostępni przez API `/api/v1/staff`. W development `DEV_BYPASS_AUTH=true` pomija weryfikację tokenu. Wymagany `GOOGLE_CLIENT_ID` z Google Cloud Console.

@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { X } from 'lucide-react';
+import LeafletMap from '../components/LeafletMap';
 import { itemService, type CreateLocationPayload } from '../services/itemService';
 import { itemPhotoService, type ItemPhoto } from '../services/itemPhotoService';
+import { delegationService } from '../services/delegationService';
+import { useAuth } from '../hooks/useAuth';
 import type { Item, CreateItemPayload } from '../types/item';
 import type { Category } from '../types/category';
 import type { Group } from '../types/group';
 import type { Location } from '../types/location';
 import type { Owner } from '../types/owner';
 import type { Status } from '../types/status';
+import type { Delegation } from '../types/delegation';
 
 interface ModalState { mode: 'create'; }
 
@@ -36,6 +40,9 @@ export default function ItemsPage() {
   const [filters, setFilters] = useState({ query: '', categoryId: '', statusId: '', locationId: '', ownerId: '', manufacturer: '' });
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'name', direction: 'asc' });
   const [page, setPage] = useState(1);
+  
+  const { user } = useAuth();
+  const [itemDelegations, setItemDelegations] = useState<Delegation[]>([]);
 
   const fetchItems = useCallback(async () => {
     setLoading(true); setError(null);
@@ -91,8 +98,21 @@ export default function ItemsPage() {
 
   useEffect(() => {
     async function loadPhotos(itemId: number) { setPhotoError(null); setPhotoLoading(true); try { setPhotos(await itemPhotoService.list(itemId)); } catch { setPhotoError('Nie udało się pobrać historii zdjęć.'); } finally { setPhotoLoading(false); } }
-    if (selectedItem) void loadPhotos(selectedItem.id);
+    async function loadDelegations(itemId: number) { try { setItemDelegations(await delegationService.getAll(itemId)); } catch { setItemDelegations([]); } }
+    if (selectedItem) {
+      void loadPhotos(selectedItem.id);
+      void loadDelegations(selectedItem.id);
+    }
   }, [selectedItem]);
+
+  const canEditSelected = useMemo(() => {
+    if (!selectedItem || !user) return false;
+    if (user.role === 'admin') return true;
+    if (selectedItem.ownerId === user.id) return true;
+    const hasDelegation = itemDelegations.some(d => d.user_id === user.id && (d.permission === 'edit' || d.permission === 'manage'));
+    if (hasDelegation) return true;
+    return false;
+  }, [selectedItem, user, itemDelegations]);
 
   const handlePhotoUpload = async (file: File) => {
     if (!selectedItem) return;
@@ -137,7 +157,7 @@ export default function ItemsPage() {
           </tbody>
         </table>
         <div className="table-pagination"><span>Strona {currentPage} z {totalPages} · Wyniki: {filteredItems.length}</span><div className="td-actions"><button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">Poprzednia</button><button className="btn btn-secondary" disabled={currentPage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">Następna</button></div></div>
-        {selectedItem && (<><LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} /><ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} /></>)}
+        {selectedItem && (<><LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} canEdit={canEditSelected} /><ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} /></>)}
       </>)}
       {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>Nowy przedmiot</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}<CreateForm categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} /></div></div>)}
     </div>
@@ -170,10 +190,10 @@ function sortValue(item: Item, key: SortKey, helpers: { getCategoryName: (id: nu
   return item[key] ?? '';
 }
 
-function LocationMapPanel({ item, location, locations, onCreateLocation, onLocationChange, ownerName, statusName }: { item: Item; location: Location | undefined; locations: Location[]; onCreateLocation: (p: CreateLocationPayload) => void; onLocationChange: (locationId: number) => void; ownerName: string; statusName: string }) {
-  const [newLocation, setNewLocation] = useState({ name: '', kind: 'internal' as 'internal' | 'external', building: '', room: '', cabinet: '', shelf: '', mapX: '50', mapY: '50' });
-  const hasCoordinates = typeof location?.mapX === 'number' && typeof location?.mapY === 'number';
-  const x = clamp(location?.mapX ?? 50); const y = clamp(location?.mapY ?? 50);
+function LocationMapPanel({ item, location, locations, onCreateLocation, onLocationChange, ownerName, statusName, canEdit }: { item: Item; location: Location | undefined; locations: Location[]; onCreateLocation: (p: CreateLocationPayload) => void; onLocationChange: (locationId: number) => void; ownerName: string; statusName: string; canEdit: boolean }) {
+  const [newLocation, setNewLocation] = useState({ name: '', kind: 'internal' as 'internal' | 'external', building: '', room: '', cabinet: '', shelf: '', mapX: '', mapY: '' });
+  const [previewCoords, setPreviewCoords] = useState<{x: number, y: number} | null>(null);
+  
   return (<section className="location-panel" aria-label="Mapa lokalizacji przedmiotu">
     <div className="location-panel__summary"><p className="location-panel__label">Lokalizacja przedmiotu</p><h2>{item.name}</h2><dl>
       <div><dt>Producent</dt><dd>{item.manufacturer}</dd></div>
@@ -186,24 +206,76 @@ function LocationMapPanel({ item, location, locations, onCreateLocation, onLocat
       <div><dt>Punkt</dt><dd>{location?.name ?? 'Brak przypisanej lokalizacji'}</dd></div>
       <div><dt>Szczegóły</dt><dd>{formatLocationDetails(location)}</dd></div>
     </dl></div>
-    <div className="location-map"><div className="location-map__axis location-map__axis--x">mapX</div><div className="location-map__axis location-map__axis--y">mapY</div>{hasCoordinates ? (<div className="location-map__pin" style={{ left: `${x}%`, top: `${y}%` }}><span>{location?.name}</span></div>) : (<div className="location-map__empty">Brak współrzędnych mapy dla tej lokalizacji</div>)}</div>
-    <div className="location-controls">
-      <div className="form"><label className="form-label" htmlFor="item-location-select">Zmień lokalizację</label><select className="form-input" id="item-location-select" onChange={(event) => onLocationChange(Number(event.target.value))} value={item.locationId}>{locations.map((currentLocation) => (<option key={currentLocation.id} value={currentLocation.id}>{currentLocation.name}</option>))}</select></div>
-      <div className="form"><label className="form-label" htmlFor="new-location-name">Nowy punkt na mapie</label><input className="form-input" id="new-location-name" onChange={(event) => setNewLocation((current) => ({ ...current, name: event.target.value }))} placeholder="np. D-17 / 102 / Szafa B" value={newLocation.name} /><div className="location-controls__grid"><select aria-label="Typ lokalizacji" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, kind: event.target.value as 'internal' | 'external' }))} value={newLocation.kind}><option value="internal">Wewnętrzna</option><option value="external">Zewnętrzna</option></select><input aria-label="Budynek" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, building: event.target.value }))} placeholder="Budynek" value={newLocation.building} /><input aria-label="Pokój" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, room: event.target.value }))} placeholder="Pokój" value={newLocation.room} /><input aria-label="Szafa" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, cabinet: event.target.value }))} placeholder="Szafa" value={newLocation.cabinet} /><input aria-label="Półka" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, shelf: event.target.value }))} placeholder="Półka" value={newLocation.shelf} /><input aria-label="mapX" className="form-input" max={100} min={0} onChange={(event) => setNewLocation((current) => ({ ...current, mapX: event.target.value }))} type="number" value={newLocation.mapX} /><input aria-label="mapY" className="form-input" max={100} min={0} onChange={(event) => setNewLocation((current) => ({ ...current, mapY: event.target.value }))} type="number" value={newLocation.mapY} /></div><button className="btn btn-secondary" disabled={!newLocation.name.trim()} onClick={() => onCreateLocation({ name: newLocation.name.trim(), kind: newLocation.kind, building: newLocation.building.trim() || undefined, room: newLocation.room.trim() || undefined, cabinet: newLocation.cabinet.trim() || undefined, shelf: newLocation.shelf.trim() || undefined, mapX: Number(newLocation.mapX), mapY: Number(newLocation.mapY) })} type="button">Dodaj punkt i przypisz</button></div>
+    <div className="location-map-container" style={{ marginBottom: '1rem' }}>
+      <LeafletMap 
+        mapX={location?.mapX} 
+        mapY={location?.mapY} 
+        previewX={previewCoords?.x}
+        previewY={previewCoords?.y}
+        onLocationSelect={canEdit ? ((x, y) => {
+          setPreviewCoords({x, y});
+          setNewLocation(current => ({ ...current, mapX: x.toFixed(6), mapY: y.toFixed(6) }));
+        }) : undefined}
+      />
     </div>
+    {canEdit ? (
+      <div className="location-controls">
+        <div className="form"><label className="form-label" htmlFor="item-location-select">Zmień lokalizację</label><select className="form-input" id="item-location-select" onChange={(event) => {
+          onLocationChange(Number(event.target.value));
+          setPreviewCoords(null);
+        }} value={item.locationId}>{locations.map((currentLocation) => (<option key={currentLocation.id} value={currentLocation.id}>{currentLocation.name}</option>))}</select></div>
+        <div className="form"><label className="form-label" htmlFor="new-location-name">Nowy punkt na mapie (kliknij na mapie by wybrać współrzędne)</label><input className="form-input" id="new-location-name" onChange={(event) => setNewLocation((current) => ({ ...current, name: event.target.value }))} placeholder="np. D-17 / 102 / Szafa B" value={newLocation.name} /><div className="location-controls__grid"><select aria-label="Typ lokalizacji" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, kind: event.target.value as 'internal' | 'external' }))} value={newLocation.kind}><option value="internal">Wewnętrzna</option><option value="external">Zewnętrzna</option></select><input aria-label="Budynek" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, building: event.target.value }))} placeholder="Budynek" value={newLocation.building} /><input aria-label="Pokój" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, room: event.target.value }))} placeholder="Pokój" value={newLocation.room} /><input aria-label="Szafa" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, cabinet: event.target.value }))} placeholder="Szafa" value={newLocation.cabinet} /><input aria-label="Półka" className="form-input" onChange={(event) => setNewLocation((current) => ({ ...current, shelf: event.target.value }))} placeholder="Półka" value={newLocation.shelf} /><input aria-label="mapX (długość geo.)" className="form-input" onChange={(event) => {
+          setNewLocation((current) => ({ ...current, mapX: event.target.value }));
+          const val = parseFloat(event.target.value);
+          if (!isNaN(val)) setPreviewCoords(prev => ({ x: val, y: prev?.y ?? 50.0646 }));
+        }} type="number" step="any" value={newLocation.mapX} /><input aria-label="mapY (szerokość geo.)" className="form-input" onChange={(event) => {
+          setNewLocation((current) => ({ ...current, mapY: event.target.value }));
+          const val = parseFloat(event.target.value);
+          if (!isNaN(val)) setPreviewCoords(prev => ({ x: prev?.x ?? 19.9236, y: val }));
+        }} type="number" step="any" value={newLocation.mapY} /></div><button className="btn btn-secondary" disabled={!newLocation.name.trim()} onClick={() => {
+          onCreateLocation({ name: newLocation.name.trim(), kind: newLocation.kind, building: newLocation.building.trim() || undefined, room: newLocation.room.trim() || undefined, cabinet: newLocation.cabinet.trim() || undefined, shelf: newLocation.shelf.trim() || undefined, mapX: Number(newLocation.mapX), mapY: Number(newLocation.mapY) });
+          setPreviewCoords(null);
+          setNewLocation({ name: '', kind: 'internal', building: '', room: '', cabinet: '', shelf: '', mapX: '', mapY: '' });
+        }} type="button">Dodaj punkt i przypisz</button></div>
+      </div>
+    ) : (
+      <div className="alert alert-info" style={{ marginTop: '1rem' }}>Nie masz uprawnień do zmiany lokalizacji tego przedmiotu.</div>
+    )}
   </section>);
 }
 
 function formatLocationDetails(location: Location | undefined): string { if (!location) return '—'; const details = [location.building, location.room, location.cabinet, location.shelf].filter(Boolean).join(' / '); return details || (location.kind === 'external' ? 'Lokalizacja zewnętrzna' : '—'); }
-function clamp(value: number): number { return Math.min(100, Math.max(0, value)); }
 
 function ItemPhotosPanel({ item, photos: itemPhotos, error: photosError, loading: photosLoading, onUpload }: { item: Item; photos: ItemPhoto[]; error: string | null; loading: boolean; onUpload: (file: File) => void }) {
   return (<section className="photos-panel"><div><p className="location-panel__label">Dokumentacja zdjęciowa</p><h2>{item.name}</h2></div><label className="btn btn-secondary photos-upload">Dodaj zdjęcie<input accept="image/*" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) onUpload(file); event.target.value = ''; }} /></label>{photosError ? <div className="alert alert-error">{photosError}</div> : null}{photosLoading ? (<div className="loading-state"><div className="spinner" />Ładowanie zdjęć...</div>) : (<table className="table photos-table"><thead><tr><th>Plik</th><th>Typ</th><th>Dodano</th><th>Użytkownik</th></tr></thead><tbody>{itemPhotos.map((photo) => (<tr key={photo.id}><td>{photo.originalFilename}</td><td>{photo.contentType}</td><td>{new Date(photo.addedAt).toLocaleString('pl-PL')}</td><td>{photo.uploadedById}</td></tr>))}</tbody></table>)}</section>);
 }
 
 function CreateForm({ categories, groups, locations, owners, statuses, onSubmit, loading }: { categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: CreateItemPayload) => void; loading: boolean }) {
-  const [name, setName] = useState(''); const [manufacturer, setManufacturer] = useState(''); const [model, setModel] = useState(''); const [serial, setSerial] = useState(''); const [inventoryNumber, setInventoryNumber] = useState(''); const [description, setDescription] = useState(''); const [purchaseDate, setPurchaseDate] = useState(''); const [categoryId, setCategoryId] = useState(categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(statuses[0]?.id ?? 1); const [locationId, setLocationId] = useState(locations[0]?.id ?? 1); const [ownerId, setOwnerId] = useState(owners[0]?.id ?? 1); const [ownerGroupId, setOwnerGroupId] = useState('');
-  const submit = () => { if (!name.trim()) return; onSubmit({ name: name.trim(), manufacturer: manufacturer.trim() || undefined, model: model.trim() || undefined, serial: serial.trim() || undefined, inventoryNumber: inventoryNumber.trim() || undefined, description: description.trim() || undefined, purchaseDate: purchaseDate || undefined, categoryId, statusId, locationId, ownerId, ownerGroupId: ownerGroupId ? Number(ownerGroupId) : undefined }); };
+  const [name, setName] = useState(''); const [manufacturer, setManufacturer] = useState(''); const [model, setModel] = useState(''); const [serial, setSerial] = useState(''); const [inventoryNumber, setInventoryNumber] = useState(''); const [description, setDescription] = useState(''); const [purchaseDate, setPurchaseDate] = useState(''); 
+  const [categoryId, setCategoryId] = useState<number | ''>(categories[0]?.id ?? ''); 
+  const [statusId, setStatusId] = useState<number | ''>(statuses[0]?.id ?? ''); 
+  const [locationId, setLocationId] = useState<number | ''>(locations[0]?.id ?? ''); 
+  const [ownerId, setOwnerId] = useState<number | ''>(owners[0]?.id ?? ''); 
+  const [ownerGroupId, setOwnerGroupId] = useState('');
+  
+  const submit = () => { 
+    if (!name.trim()) return; 
+    onSubmit({ 
+      name: name.trim(), 
+      manufacturer: manufacturer.trim() || undefined, 
+      model: model.trim() || undefined, 
+      serial: serial.trim() || undefined, 
+      inventoryNumber: inventoryNumber.trim() || undefined, 
+      description: description.trim() || undefined, 
+      purchaseDate: purchaseDate || undefined, 
+      categoryId: categoryId !== '' ? categoryId : undefined, 
+      statusId: statusId !== '' ? statusId : undefined, 
+      locationId: locationId !== '' ? locationId : undefined, 
+      ownerId: ownerId !== '' ? ownerId : undefined, 
+      ownerGroupId: ownerGroupId ? Number(ownerGroupId) : undefined 
+    }); 
+  };
+  
   return (<div className="form">
     <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="np. Oscyloskop Tektronix" />
     <label className="form-label">Producent</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="np. Tektronix" />
@@ -212,10 +284,10 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
     <label className="form-label">Nr inwentarzowy</label><input className="form-input" value={inventoryNumber} onChange={(e) => setInventoryNumber(e.target.value)} placeholder="np. W7/262" />
     <label className="form-label">Opis</label><textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcjonalny opis" />
     <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
-    <label className="form-label">Kategoria *</label><select className="form-input" value={categoryId} onChange={(e) => setCategoryId(Number(e.target.value))}>{categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}</select>
-    <label className="form-label">Status *</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
-    <label className="form-label">Lokalizacja *</label><select className="form-input" value={locationId} onChange={(e) => setLocationId(Number(e.target.value))}>{locations.map((location) => (<option key={location.id} value={location.id}>{location.name}</option>))}</select>
-    <label className="form-label">Właściciel / opiekun *</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
+    <label className="form-label">Kategoria</label><select className="form-input" value={categoryId} onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}</select>
+    <label className="form-label">Status</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
+    <label className="form-label">Lokalizacja</label><select className="form-input" value={locationId} onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{locations.map((location) => (<option key={location.id} value={location.id}>{location.name}</option>))}</select>
+    <label className="form-label">Właściciel / opiekun</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
     <label className="form-label">Grupa opiekunów</label><select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}><option value="">Brak grupy</option>{groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}</select>
     <div className="form-actions"><button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim()}>{loading ? 'Zapisywanie…' : 'Utwórz'}</button></div>
   </div>);
