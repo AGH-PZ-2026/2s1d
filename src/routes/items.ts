@@ -6,6 +6,7 @@ import type { MySql2Database } from "drizzle-orm/mysql2";
 import { items, type Item } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { notFound, badRequest, forbidden } from "../lib/errors";
+import { getItemPermissionLevel } from "../lib/permissions";
 
 type Variables = {
   db: MySql2Database<Record<string, never>>;
@@ -123,43 +124,20 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
   if (existing.length === 0) notFound("Item not found");
   
   const item = existing[0];
-  const userId = c.get("userId");
-  const userRole = c.get("userRole");
-
-  let canEdit = false;
-  if (userRole === "admin") {
-    canEdit = true;
-  } else if (item.ownerId === userId) {
-    canEdit = true;
-  } else {
-    if (item.ownerGroupId) {
-      const { groupMembers } = await import("../db/schema");
-      const isMember = await db.select().from(groupMembers).where(and(eq(groupMembers.groupId, item.ownerGroupId), eq(groupMembers.userId, userId))).limit(1);
-      if (isMember.length > 0) canEdit = true;
-    }
-    if (!canEdit) {
-      const { delegations, groupMembers } = await import("../db/schema");
-      
-      const userDelegation = await db.select().from(delegations).where(and(eq(delegations.itemId, id), eq(delegations.userId, userId))).limit(1);
-      if (userDelegation.length > 0) canEdit = true;
-
-      if (!canEdit) {
-        const userGroups = await db.select({ groupId: groupMembers.groupId }).from(groupMembers).where(eq(groupMembers.userId, userId));
-        const groupIds = userGroups.map(g => g.groupId);
-        if (groupIds.length > 0) {
-          const { inArray } = await import("drizzle-orm");
-          const groupDelegation = await db.select().from(delegations).where(and(eq(delegations.itemId, id), inArray(delegations.groupId, groupIds))).limit(1);
-          if (groupDelegation.length > 0) canEdit = true;
-        }
-      }
-    }
-  }
-  
-  if (!canEdit) {
-    forbidden("Brak uprawnień do edycji tego przedmiotu");
-  }
+  const permission = await getItemPermissionLevel(db, id, c.get("userId"), c.get("userRole"), item.ownerId);
+  if (!permission) forbidden("Brak uprawnień do edycji tego przedmiotu");
 
   const body = c.req.valid("json");
+
+  if (permission === "edit") {
+    const allowedKeys = ["statusId", "description"];
+    const requestedKeys = Object.keys(body).filter((k) => (body as any)[k] !== undefined);
+    const hasForbiddenKeys = requestedKeys.some((k) => !allowedKeys.includes(k));
+    if (hasForbiddenKeys) {
+      forbidden("Delegat z uprawnieniami do edycji może zmienić tylko status i opis");
+    }
+  }
+
   const updateData: Record<string, unknown> = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.manufacturer !== undefined) updateData.manufacturer = body.manufacturer || null;
