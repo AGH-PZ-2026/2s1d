@@ -66,6 +66,17 @@ router.post("/", zValidator("json", createSchema), async (c) => {
   const db = c.get("db"); const body = c.req.valid("json");
   const itemRows = await db.select().from(items).where(eq(items.id, body.itemId)).limit(1);
   if (itemRows.length === 0) notFound("Item not found");
+
+  if (body.mode === "external") {
+    const isAdmin = c.get("userRole") === "admin";
+    const isOwner = itemRows[0].ownerId === c.get("userId");
+    if (!isAdmin && !isOwner) {
+      forbidden("Only admins or item owners can create external borrowings");
+    }
+  }
+  if (!body.plannedReturnAt) {
+    badRequest("Poda datę planowanego zwrotu");
+  }
   const active = await db.select().from(borrowings).where(and(eq(borrowings.itemId, body.itemId), eq(borrowings.status, "borrowed"))).limit(1);
   if (active.length > 0) badRequest("Item is already borrowed");
   const values: Record<string, unknown> = {
@@ -73,9 +84,9 @@ router.post("/", zValidator("json", createSchema), async (c) => {
     borrowerId: body.borrowerId ?? c.get("userId"),
     externalBorrower: body.externalBorrower ?? null,
     mode: body.mode,
-    status: "pending",
-    approvedAt: null,
-    handedOverAt: null,
+    status: body.mode === "external" ? "borrowed" : "pending",
+    approvedAt: body.mode === "external" ? sql`NOW()` : null,
+    handedOverAt: body.mode === "external" ? sql`NOW()` : null,
   };
   if (body.plannedReturnAt) values.plannedReturnAt = new Date(body.plannedReturnAt);
   const result = await db.insert(borrowings).values(values as typeof borrowings.$inferInsert);

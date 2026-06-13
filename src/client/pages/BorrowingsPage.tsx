@@ -283,15 +283,20 @@ function BorrowingRequestForm({ items, loading, onSubmit }: { items: Item[]; loa
   const [itemId, setItemId] = useState(items[0]?.id ?? 0);
   const [mode, setMode] = useState<BorrowingRequestPayload['mode']>('classic');
   const [plannedReturnAt, setPlannedReturnAt] = useState('');
+  const [dateError, setDateError] = useState<string | null>(null);
   return (
     <div className="form">
       <label className="form-label">Przedmiot *</label>
       <select className="form-input" value={itemId} onChange={(event) => setItemId(Number(event.target.value))}>{items.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}</select>
       <label className="form-label">Tryb *</label>
       <select className="form-input" value={mode} onChange={(event) => setMode(event.target.value as BorrowingRequestPayload['mode'])}><option value="classic">Klasyczne</option><option value="trusted">Zaufane</option><option value="asynchronous">Asynchroniczne</option></select>
-      <label className="form-label">Planowany zwrot</label>
-      <input className="form-input" type="datetime-local" value={plannedReturnAt} onChange={(event) => setPlannedReturnAt(event.target.value)} />
-      <div className="form-actions"><button className="btn btn-primary" disabled={loading || !itemId} onClick={() => onSubmit({ itemId, mode, plannedReturnAt: toIsoDate(plannedReturnAt) })} type="button">{loading ? 'Zapisywanie...' : 'Utwórz wniosek'}</button></div>
+      <label className="form-label">Planowany zwrot *</label>
+      <input className="form-input" type="datetime-local" value={plannedReturnAt} onChange={(event) => { setPlannedReturnAt(event.target.value); setDateError(null); }} />
+      {dateError ? <div className="alert alert-error">{dateError}</div> : null}
+      <div className="form-actions"><button className="btn btn-primary" disabled={loading || !itemId} onClick={() => {
+        if (!plannedReturnAt) { setDateError('Dodaj datę planowanego zwrotu'); return; }
+        onSubmit({ itemId, mode, plannedReturnAt: toIsoDate(plannedReturnAt) });
+      }} type="button">{loading ? 'Zapisywanie...' : 'Utwórz wniosek'}</button></div>
     </div>
   );
 }
@@ -300,15 +305,20 @@ function ExternalBorrowingForm({ items, loading, onSubmit }: { items: Item[]; lo
   const [itemId, setItemId] = useState(items[0]?.id ?? 0);
   const [externalBorrower, setExternalBorrower] = useState('');
   const [plannedReturnAt, setPlannedReturnAt] = useState('');
+  const [dateError, setDateError] = useState<string | null>(null);
   return (
     <div className="form">
       <label className="form-label">Przedmiot *</label>
       <select className="form-input" value={itemId} onChange={(event) => setItemId(Number(event.target.value))}>{items.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}</select>
       <label className="form-label">Odbiorca zewnętrzny *</label>
       <input className="form-input" value={externalBorrower} onChange={(event) => setExternalBorrower(event.target.value)} placeholder="Nazwa osoby lub instytucji" />
-      <label className="form-label">Planowany zwrot</label>
-      <input className="form-input" type="datetime-local" value={plannedReturnAt} onChange={(event) => setPlannedReturnAt(event.target.value)} />
-      <div className="form-actions"><button className="btn btn-primary" disabled={loading || !itemId || !externalBorrower.trim()} onClick={() => onSubmit({ itemId, externalBorrower, plannedReturnAt: toIsoDate(plannedReturnAt) })} type="button">{loading ? 'Zapisywanie...' : 'Wypożycz'}</button></div>
+      <label className="form-label">Planowany zwrot *</label>
+      <input className="form-input" type="datetime-local" value={plannedReturnAt} onChange={(event) => { setPlannedReturnAt(event.target.value); setDateError(null); }} />
+      {dateError ? <div className="alert alert-error">{dateError}</div> : null}
+      <div className="form-actions"><button className="btn btn-primary" disabled={loading || !itemId || !externalBorrower.trim()} onClick={() => {
+        if (!plannedReturnAt) { setDateError('Dodaj datę planowanego zwrotu'); return; }
+        onSubmit({ itemId, externalBorrower, plannedReturnAt: toIsoDate(plannedReturnAt) });
+      }} type="button">{loading ? 'Zapisywanie...' : 'Wypożycz'}</button></div>
     </div>
   );
 }
