@@ -207,8 +207,31 @@ function ItemPhotosPanel({ item, photos: itemPhotos, error: photosError, loading
 }
 
 function CreateForm({ categories, groups, locations, owners, statuses, onSubmit, loading }: { categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: CreateItemPayload) => void; loading: boolean }) {
-  const [name, setName] = useState(''); const [manufacturer, setManufacturer] = useState(''); const [model, setModel] = useState(''); const [serial, setSerial] = useState(''); const [inventoryNumber, setInventoryNumber] = useState(''); const [description, setDescription] = useState(''); const [purchaseDate, setPurchaseDate] = useState(''); const [categoryId, setCategoryId] = useState(categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(statuses[0]?.id ?? 1); const [locationId, setLocationId] = useState(locations[0]?.id ?? 1); const [ownerId, setOwnerId] = useState(owners[0]?.id ?? 1); const [ownerGroupId, setOwnerGroupId] = useState('');
-  const submit = () => { if (!name.trim()) return; onSubmit({ name: name.trim(), manufacturer: manufacturer.trim() || undefined, model: model.trim() || undefined, serial: serial.trim() || undefined, inventoryNumber: inventoryNumber.trim() || undefined, description: description.trim() || undefined, purchaseDate: purchaseDate || undefined, categoryId, statusId, locationId, ownerId, ownerGroupId: ownerGroupId ? Number(ownerGroupId) : undefined }); };
+  const [name, setName] = useState(''); const [manufacturer, setManufacturer] = useState(''); const [model, setModel] = useState(''); const [serial, setSerial] = useState(''); const [inventoryNumber, setInventoryNumber] = useState(''); const [description, setDescription] = useState(''); const [purchaseDate, setPurchaseDate] = useState(''); 
+  const [categoryId, setCategoryId] = useState<number | ''>(categories[0]?.id ?? ''); 
+  const [statusId, setStatusId] = useState<number | ''>(statuses[0]?.id ?? ''); 
+  const [locationId, setLocationId] = useState<number | ''>(locations[0]?.id ?? ''); 
+  const [ownerId, setOwnerId] = useState<number | ''>(owners[0]?.id ?? ''); 
+  const [ownerGroupId, setOwnerGroupId] = useState('');
+  
+  const submit = () => { 
+    if (!name.trim()) return; 
+    onSubmit({ 
+      name: name.trim(), 
+      manufacturer: manufacturer.trim() || undefined, 
+      model: model.trim() || undefined, 
+      serial: serial.trim() || undefined, 
+      inventoryNumber: inventoryNumber.trim() || undefined, 
+      description: description.trim() || undefined, 
+      purchaseDate: purchaseDate || undefined, 
+      categoryId: categoryId !== '' ? categoryId : undefined, 
+      statusId: statusId !== '' ? statusId : undefined, 
+      locationId: locationId !== '' ? locationId : undefined, 
+      ownerId: ownerId !== '' ? ownerId : undefined, 
+      ownerGroupId: ownerGroupId ? Number(ownerGroupId) : undefined 
+    }); 
+  };
+  
   return (<div className="form">
     <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="np. Oscyloskop Tektronix" />
     <label className="form-label">Producent</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="np. Tektronix" />
@@ -217,10 +240,10 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
     <label className="form-label">Nr inwentarzowy</label><input className="form-input" value={inventoryNumber} onChange={(e) => setInventoryNumber(e.target.value)} placeholder="np. W7/262" />
     <label className="form-label">Opis</label><textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcjonalny opis" />
     <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
-    <label className="form-label">Kategoria *</label><select className="form-input" value={categoryId} onChange={(e) => setCategoryId(Number(e.target.value))}>{categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}</select>
-    <label className="form-label">Status *</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
-    <label className="form-label">Lokalizacja *</label><select className="form-input" value={locationId} onChange={(e) => setLocationId(Number(e.target.value))}>{locations.map((location) => (<option key={location.id} value={location.id}>{location.name}</option>))}</select>
-    <label className="form-label">Właściciel / opiekun *</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
+    <label className="form-label">Kategoria</label><select className="form-input" value={categoryId} onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}</select>
+    <label className="form-label">Status</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
+    <label className="form-label">Lokalizacja</label><select className="form-input" value={locationId} onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{locations.map((location) => (<option key={location.id} value={location.id}>{location.name}</option>))}</select>
+    <label className="form-label">Właściciel / opiekun</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
     <label className="form-label">Grupa opiekunów</label><select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}><option value="">Brak grupy</option>{groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}</select>
     <div className="form-actions"><button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim()}>{loading ? 'Zapisywanie…' : 'Utwórz'}</button></div>
   </div>);

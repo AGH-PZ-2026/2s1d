@@ -30,6 +30,7 @@ const createSchema = z.object({
   statusId: z.number().int().positive().optional(),
   locationId: z.number().int().positive().optional(),
   ownerId: z.number().int().positive().optional(),
+  ownerGroupId: z.number().int().positive().optional(),
 });
 
 const updateSchema = createSchema.partial();
@@ -104,6 +105,7 @@ router.post("/", zValidator("json", createSchema), async (c) => {
     statusId: body.statusId ?? null,
     locationId: body.locationId ?? null,
     ownerId: body.ownerId ?? null,
+    ownerGroupId: body.ownerGroupId ?? null,
   };
   if (body.systemId) insertValues.systemId = body.systemId;
   if (body.purchaseDate) insertValues.purchaseDate = body.purchaseDate;
@@ -134,6 +136,7 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
   if (body.statusId !== undefined) updateData.statusId = body.statusId ?? null;
   if (body.locationId !== undefined) updateData.locationId = body.locationId ?? null;
   if (body.ownerId !== undefined) updateData.ownerId = body.ownerId ?? null;
+  if (body.ownerGroupId !== undefined) updateData.ownerGroupId = body.ownerGroupId ?? null;
   if (Object.keys(updateData).length === 0) badRequest("No fields to update");
 
   await db.update(items).set(updateData).where(eq(items.id, id));
