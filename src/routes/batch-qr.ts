@@ -20,15 +20,7 @@ router.post("/print", zValidator("json", batchSchema), async (c) => {
   const rows = await db.select({ id: items.id, systemId: items.systemId, name: items.name }).from(items).where(inArray(items.id, body.item_ids));
   if (rows.length === 0) notFound("No items found");
 
-  // Generate a simple text-based "PDF" (in production this would render actual QR codes)
-  const lines = rows.map((item, i) =>
-    `Item ${i + 1}: ${item.name} (ID: ${item.id}, System: ${item.systemId ?? "N/A"})`
-  );
-  const content = `QR Labels (${body.size} size)\n${"=".repeat(40)}\n${lines.join("\n")}`;
-
-  return new Response(content, {
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": "attachment; filename=qr_labels.pdf" },
-  });
+  return c.json({ items: rows });
 });
 
 export { router as batchQrRouter };
