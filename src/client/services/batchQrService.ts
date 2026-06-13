@@ -2,18 +2,18 @@ import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { jsonAuthHeaders } from './authHeaders';
 
-export type QrSize = 'small' | 'medium' | 'large';
+
 
 export const batchQrService = {
-  async download(itemIds: number[], size: QrSize): Promise<void> {
-    const response = await fetch('/api/v1/batch-qr/print', { method: 'POST', headers: jsonAuthHeaders(), body: JSON.stringify({ item_ids: itemIds, size }) });
+  async download(itemIds: number[]): Promise<void> {
+    const response = await fetch('/api/v1/batch-qr/print', { method: 'POST', headers: jsonAuthHeaders(), body: JSON.stringify({ item_ids: itemIds }) });
     await ensureOk(response);
     const data = await response.json() as { items: { id: number, systemId: string | null, name: string }[] };
     const items = data.items;
     
     const doc = new jsPDF();
     doc.setFontSize(16);
-    doc.text(`Etykiety QR (Rozmiar: ${size})`, 20, 20);
+    doc.text(`Etykiety QR`, 20, 20);
     
     let y = 40;
     for (let index = 0; index < items.length; index++) {

@@ -11,8 +11,8 @@ type Variables = { db: MySql2Database<Record<string, never>>; userId: number; us
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
 router.use("/*", authMiddleware);
 
-// POST /api/v1/batch-qr/print — frontend sends { item_ids, size }
-const batchSchema = z.object({ item_ids: z.array(z.number().int().positive()).min(1).max(100), size: z.enum(["small", "medium", "large"]).default("medium") });
+// POST /api/v1/batch-qr/print — frontend sends { item_ids }
+const batchSchema = z.object({ item_ids: z.array(z.number().int().positive()).min(1).max(100) });
 
 router.post("/print", zValidator("json", batchSchema), async (c) => {
   const db = c.get("db");
