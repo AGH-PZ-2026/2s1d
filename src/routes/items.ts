@@ -112,8 +112,14 @@ router.post("/", zValidator("json", createSchema), async (c) => {
   if (body.purchaseDate) insertValues.purchaseDate = body.purchaseDate;
 
   const result = await db.insert(items).values(insertValues as typeof items.$inferInsert);
+  const insertedId = result[0].insertId;
 
-  const created = await db.select().from(items).where(eq(items.id, result[0].insertId)).limit(1);
+  if (!body.systemId) {
+    const generatedSystemId = `INV-${String(insertedId).padStart(6, '0')}`;
+    await db.update(items).set({ systemId: generatedSystemId }).where(eq(items.id, insertedId));
+  }
+
+  const created = await db.select().from(items).where(eq(items.id, insertedId)).limit(1);
   return c.json(toResponse(created[0]), 201);
 });
 
