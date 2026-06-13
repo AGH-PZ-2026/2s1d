@@ -121,13 +121,13 @@ export default function Autocomplete({ placeholder, onSearch, onSelect, onClear 
             zIndex: 999,
             maxHeight: 200,
             overflowY: 'auto',
-            background: '#fff',
-            border: '1px solid #ddd',
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border)',
             borderRadius: 4,
             margin: 0,
             padding: 0,
             listStyle: 'none',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            boxShadow: 'var(--shadow-lg)',
           }}
         >
           {options.map((opt, i) => (
@@ -138,7 +138,8 @@ export default function Autocomplete({ placeholder, onSearch, onSelect, onClear 
               style={{
                 padding: '6px 10px',
                 cursor: 'pointer',
-                background: i === highlightIndex ? '#e8f0fe' : 'transparent',
+                background: i === highlightIndex ? 'var(--accent-muted)' : 'transparent',
+                color: 'var(--text)',
               }}
             >
               {opt.label}
