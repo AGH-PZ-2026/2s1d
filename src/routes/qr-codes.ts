@@ -16,7 +16,15 @@ router.get("/scan/:qrData", async (c) => {
   const db = c.get("db");
   const qrData = decodeURIComponent(c.req.param("qrData"));
   let parsed: { id?: number; systemId?: string };
-  try { parsed = JSON.parse(qrData); } catch { parsed = { systemId: qrData }; }
+  try { 
+    parsed = JSON.parse(qrData); 
+  } catch { 
+    if (qrData.startsWith('ITEM-')) {
+      parsed = { id: parseInt(qrData.replace('ITEM-', ''), 10) };
+    } else {
+      parsed = { systemId: qrData }; 
+    }
+  }
 
   const itemId = parsed.id;
   const rows = itemId
