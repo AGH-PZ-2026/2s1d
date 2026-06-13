@@ -19,7 +19,7 @@
     {
       "binding": "HYPERDRIVE",
       "id": "<YOUR_HYPERDRIVE_CONFIG_ID>",
-      "localConnectionString": "mysql://pz_user:pz_pass@localhost:3306/pz_db"
+      "localConnectionString": "mysql://pz_user:pz_pass@127.0.0.1:3306/pz_db"
     }
   ],
 
