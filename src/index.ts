@@ -12,6 +12,7 @@ import { itemsRouter } from "./routes/items";
 import { locationsRouter } from "./routes/locations";
 import { borrowingsRouter } from "./routes/borrowings";
 import { delegationsRouter } from "./routes/delegations";
+import { globalDelegationsRouter } from "./routes/global-delegations";
 import { groupsRouter } from "./routes/groups";
 import { usersRouter } from "./routes/users";
 import { qrCodesRouter } from "./routes/qr-codes";
@@ -44,6 +45,7 @@ app.route("/api/v1/excel", excelImportRouter);
 app.route("/api/v1/notifications", notificationsRouter);
 app.route("/api/v1/audit-logs", auditLogsRouter);
 app.route("/api/v1/staff", staffRouter);
+app.route("/api/v1/delegations", globalDelegationsRouter);
 // Mount nested routers BEFORE generic items router
 app.route("/api/v1/items", delegationsRouter);
 app.route("/api/v1/items", itemPhotosRouter);

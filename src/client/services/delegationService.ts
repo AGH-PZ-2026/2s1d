@@ -1,3 +1,7 @@
+export interface GlobalDelegation extends Delegation {
+  item_name: string;
+}
+
 import type { CreateDelegationPayload, Delegation } from '../types/delegation';
 import type { AutocompleteOption } from '../components/Autocomplete';
 import { authHeaders, jsonAuthHeaders } from './authHeaders';
@@ -18,6 +22,11 @@ export const delegationService = {
     const response = await fetch(`/api/v1/items/${itemId}/delegations/`, { headers: authHeaders() });
     await ensureOk(response); return response.json();
   },
+  async getAllGlobal(): Promise<GlobalDelegation[]> {
+    if (USE_MOCKS) { await delay(100); return []; }
+    const response = await fetch(`/api/v1/delegations/`, { headers: authHeaders() });
+    await ensureOk(response); return response.json();
+  },
   async create(itemId: number, payload: CreateDelegationPayload): Promise<Delegation> {
     if (!payload.user_id && !payload.group_id) throw new Error('Podaj użytkownika lub grupę.');
     if (USE_MOCKS) {
@@ -35,6 +44,11 @@ export const delegationService = {
   async remove(itemId: number, delegationId: number): Promise<void> {
     if (USE_MOCKS) { await delay(300); mockDelegations = mockDelegations.filter((d) => d.id !== delegationId); return; }
     const response = await fetch(`/api/v1/items/${itemId}/delegations/${delegationId}`, { method: 'DELETE', headers: authHeaders() });
+    await ensureOk(response);
+  },
+  async removeGlobal(delegationId: number): Promise<void> {
+    if (USE_MOCKS) { await delay(300); return; }
+    const response = await fetch(`/api/v1/delegations/${delegationId}`, { method: 'DELETE', headers: authHeaders() });
     await ensureOk(response);
   },
 
