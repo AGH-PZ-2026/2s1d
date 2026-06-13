@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and, desc, sql } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
-import { borrowings, items } from "../db/schema";
+import { borrowings, items, users } from "../db/schema";
 import type { Borrowing } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { notFound, badRequest, forbidden } from "../lib/errors";
@@ -40,19 +40,80 @@ router.get("/overdue", async (c) => {
   const db = c.get("db");
   const includeAll = c.req.query("includeAll") === "true";
   const baseCondition = and(eq(borrowings.status, "borrowed"), sql`${borrowings.plannedReturnAt} < NOW()`);
-  const filterByUser = !includeAll && c.get("userRole") !== "admin";
-  const rows = await db.select().from(borrowings)
-    .where(filterByUser ? and(baseCondition, eq(borrowings.borrowerId, c.get("userId"))) : baseCondition)
-    .orderBy(borrowings.plannedReturnAt);
+  const userId = c.get("userId");
+  const isAdmin = c.get("userRole") === "admin";
+  if (!isAdmin && includeAll) {
+    forbidden("Only admins can view all overdue borrowings");
+  }
+  let rows;
+  if (isAdmin) {
+    rows = await db.select().from(borrowings)
+      .where(baseCondition)
+      .orderBy(borrowings.plannedReturnAt);
+  } else {
+    // owner — tylko przedmioty których jest właścicielem
+    const ownedItems = await db.select({ id: items.id }).from(items).where(eq(items.ownerId, userId));
+    const ownedItemIds = ownedItems.map((i) => i.id);
+    if (ownedItemIds.length === 0) return c.json([]);
+    rows = await db.select().from(borrowings)
+      .where(and(baseCondition, sql`${borrowings.itemId} IN (${sql.join(ownedItemIds.map((id) => sql`${id}`), sql`, `)})`))
+      .orderBy(borrowings.plannedReturnAt);
+  }
   const result = rows.map((b) => ({
-    borrowingId: b.id, itemId: b.itemId, itemName: "", ownerId: null, borrowerId: b.borrowerId, externalBorrower: b.externalBorrower, plannedReturnAt: b.plannedReturnAt, daysOverdue: b.plannedReturnAt ? Math.floor((Date.now() - new Date(b.plannedReturnAt).getTime()) / 86400000) : 0,
+    borrowingId: b.id, itemId: b.itemId, itemName: "", ownerId: null, borrowerId: b.borrowerId, borrowerEmail: null as string | null, externalBorrower: b.externalBorrower, plannedReturnAt: b.plannedReturnAt, daysOverdue: b.plannedReturnAt ? Math.floor((Date.now() - new Date(b.plannedReturnAt).getTime()) / 86400000) : 0,
   }));
   // Resolve item name
   for (const r of result) {
     const item = await db.select({ name: items.name }).from(items).where(eq(items.id, r.itemId)).limit(1);
     r.itemName = item[0]?.name ?? "Unknown";
+    if (r.borrowerId) {
+      const user = await db.select({ email: users.email }).from(users).where(eq(users.id, r.borrowerId)).limit(1);
+      r.borrowerEmail = user[0]?.email ?? null;
+    }
   }
   return c.json(result);
+});
+
+router.get("/overdue.csv", async (c) => {
+  const db = c.get("db");
+  const includeAll = c.req.query("includeAll") === "true";
+  const isAdmin = c.get("userRole") === "admin";
+  const userId = c.get("userId");
+  const baseCondition = and(eq(borrowings.status, "borrowed"), sql`${borrowings.plannedReturnAt} < NOW()`);
+
+  let rows: typeof borrowings.$inferSelect[] = [];
+  if (isAdmin) {
+    rows = await db.select().from(borrowings).where(baseCondition).orderBy(borrowings.plannedReturnAt);
+  } else {
+    const ownedItems = await db.select({ id: items.id }).from(items).where(eq(items.ownerId, userId));
+    const ownedItemIds = ownedItems.map((i) => i.id);
+    if (ownedItemIds.length === 0) {
+      c.header("Content-Type", "text/csv");
+      c.header("Content-Disposition", "attachment; filename=overdue.csv");
+      return c.text("ID,Przedmiot,Odbiorca,Planowany zwrot,Dni po terminie\n");
+    }
+    rows = await db.select().from(borrowings)
+      .where(and(baseCondition, sql`${borrowings.itemId} IN (${sql.join(ownedItemIds.map((id) => sql`${id}`), sql`, `)})`))
+      .orderBy(borrowings.plannedReturnAt);
+  }
+
+  let csv = "\uFEFFID;Przedmiot;Odbiorca;Planowany zwrot;Dni po terminie\n";
+  for (const b of rows) {
+    const item = await db.select({ name: items.name }).from(items).where(eq(items.id, b.itemId)).limit(1);
+    const itemName = item[0]?.name ?? "Unknown";
+    let borrower = b.externalBorrower ?? "";
+    if (b.borrowerId) {
+      const user = await db.select({ email: users.email }).from(users).where(eq(users.id, b.borrowerId)).limit(1);
+      borrower = user[0]?.email ?? String(b.borrowerId);
+    }
+    const daysOverdue = b.plannedReturnAt ? Math.floor((Date.now() - new Date(b.plannedReturnAt).getTime()) / 86400000) : 0;
+    const plannedReturn = b.plannedReturnAt ? new Date(b.plannedReturnAt).toLocaleString('pl-PL') : "—";
+    csv += `${b.id};"${itemName}";"${borrower}";"${plannedReturn}";${daysOverdue}\n`;
+  }
+
+  c.header("Content-Type", "text/csv");
+  c.header("Content-Disposition", "attachment; filename=overdue.csv");
+  return c.text(csv);
 });
 
 router.get("/:id", async (c) => {
