@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
-import { items, borrowings, auditLogs, itemStatus } from "../db/schema";
+import { items, borrowings, auditLogs, itemStatus, locations } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { notFound, forbidden } from "../lib/errors";
 import { getItemPermissionLevel } from "../lib/permissions";
@@ -13,10 +13,18 @@ router.use("/*", authMiddleware);
 // GET /api/v1/quick-actions/:itemId
 router.get("/:itemId", async (c) => {
   const db = c.get("db"); const itemId = Number(c.req.param("itemId"));
-  const rows = await db.select().from(items).where(eq(items.id, itemId)).limit(1);
+  const rows = await db.select({
+    id: items.id, name: items.name, ownerId: items.ownerId, 
+    statusName: itemStatus.name, locationName: locations.name
+  }).from(items)
+  .leftJoin(itemStatus, eq(items.statusId, itemStatus.id))
+  .leftJoin(locations, eq(items.locationId, locations.id))
+  .where(eq(items.id, itemId)).limit(1);
+  
   if (rows.length === 0) notFound("Item not found");
   const item = rows[0];
-  return c.json({ id: item.id, name: item.name, location: item.locationId ? String(item.locationId) : "Brak lokalizacji", owner_id: item.ownerId, status: item.statusId ? String(item.statusId) : "Nieznany" });
+  const permission = await getItemPermissionLevel(db, itemId, c.get("userId"), c.get("userRole"), item.ownerId);
+  return c.json({ id: item.id, name: item.name, location: item.locationName || "Brak lokalizacji", owner_id: item.ownerId, status: item.statusName || "Nieznany", canEdit: !!permission });
 });
 
 // PATCH /api/v1/quick-actions/:itemId/mark-damaged
@@ -34,7 +42,15 @@ router.patch("/:itemId/mark-damaged", async (c) => {
 
   await db.update(items).set({ statusId: damagedStatusId }).where(eq(items.id, itemId));
   await db.insert(auditLogs).values({ userId, action: "mark_damaged", itemId, oldValue: { statusId: rows[0].statusId }, newValue: { statusId: damagedStatusId } });
-  return c.json({ id: itemId, name: rows[0].name, location: rows[0].locationId ? String(rows[0].locationId) : "Brak lokalizacji", owner_id: rows[0].ownerId, status: String(damagedStatusId) });
+  
+  const updated = await db.select({
+    locationName: locations.name, statusName: itemStatus.name
+  }).from(items)
+  .leftJoin(itemStatus, eq(items.statusId, itemStatus.id))
+  .leftJoin(locations, eq(items.locationId, locations.id))
+  .where(eq(items.id, itemId)).limit(1);
+
+  return c.json({ id: itemId, name: rows[0].name, location: updated[0]?.locationName || "Brak lokalizacji", owner_id: rows[0].ownerId, status: updated[0]?.statusName || "uszkodzony", canEdit: true });
 });
 
 export { router as quickActionRouter };

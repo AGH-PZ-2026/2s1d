@@ -1,7 +1,7 @@
 import { authHeaders } from './authHeaders';
 
 export interface ScannedQrItem { id: number; system_id: string | null; name: string; description: string | null; qr_data: string; }
-export interface QuickActionItem { id: number; name: string; location: string; owner_id: number | null; status: string; }
+export interface QuickActionItem { id: number; name: string; location: string; owner_id: number | null; status: string; canEdit: boolean; }
 
 export const qrService = {
   async scan(qrData: string): Promise<ScannedQrItem> {
