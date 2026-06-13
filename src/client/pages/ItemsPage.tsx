@@ -1,19 +1,22 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { X } from 'lucide-react';
 import LeafletMap from '../components/LeafletMap';
+import { useAuth } from '../hooks/useAuth';
+import type { AuthUser } from '../services/authService';
 import { itemService, type CreateLocationPayload } from '../services/itemService';
 import { itemPhotoService, type ItemPhoto } from '../services/itemPhotoService';
 import { delegationService } from '../services/delegationService';
-import { useAuth } from '../hooks/useAuth';
+import Autocomplete, { type AutocompleteOption } from '../components/Autocomplete';
+import CategoryDropdown from '../components/CategoryDropdown';
 import type { Item, CreateItemPayload } from '../types/item';
 import type { Category } from '../types/category';
 import type { Group } from '../types/group';
 import type { Location } from '../types/location';
 import type { Owner } from '../types/owner';
 import type { Status } from '../types/status';
-import type { Delegation } from '../types/delegation';
+import type { Delegation, CreateDelegationPayload, PermissionLevel } from '../types/delegation';
 
-interface ModalState { mode: 'create'; }
+interface ModalState { mode: 'create' | 'edit'; itemId?: number; }
 
 type SortKey = 'name' | 'manufacturer' | 'model' | 'serial' | 'category' | 'status' | 'location';
 type SortDirection = 'asc' | 'desc';
@@ -40,6 +43,13 @@ export default function ItemsPage() {
   const [filters, setFilters] = useState({ query: '', categoryId: '', statusId: '', locationId: '', ownerId: '', manufacturer: '' });
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'name', direction: 'asc' });
   const [page, setPage] = useState(1);
+  const modalRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    if (formError && modalRef.current) {
+      modalRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [formError]);
   
   const { user } = useAuth();
   const [itemDelegations, setItemDelegations] = useState<Delegation[]>([]);
@@ -63,7 +73,24 @@ export default function ItemsPage() {
     finally { setFormLoading(false); }
   };
 
+  const handleEdit = async (payload: Partial<CreateItemPayload>) => {
+    if (!selectedItemId) return;
+    setFormLoading(true); setFormError(null);
+    try { await itemService.update(selectedItemId, payload); await fetchItems(); setSuccessMessage('Przedmiot został zaktualizowany.'); setModal(null); }
+    catch (e: unknown) { setFormError(e instanceof Error ? e.message : 'Wystąpił błąd podczas aktualizacji.'); }
+    finally { setFormLoading(false); }
+  };
+
   const openCreate = () => { setFormError(null); setModal({ mode: 'create' }); };
+  const openEdit = () => { 
+    if (!canEditSelected) {
+      setError('Nie masz uprawnień do edycji tego przedmiotu.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setFormError(null); 
+    setModal({ mode: 'edit', itemId: selectedItemId ?? undefined }); 
+  };
 
   const getCategoryName = useCallback((id: number) => categories.find((c) => c.id === id)?.name ?? '—', [categories]);
   const getStatusName = useCallback((id: number) => statuses.find((s) => s.id === id)?.name ?? '—', [statuses]);
@@ -114,12 +141,41 @@ export default function ItemsPage() {
     return false;
   }, [selectedItem, user, itemDelegations]);
 
+  const canManageLocation = useMemo(() => {
+    if (!selectedItem || !user) return false;
+    if (user.role === 'admin') return true;
+    if (selectedItem.ownerId === user.id) return true;
+    const hasDelegation = itemDelegations.some(d => d.user_id === user.id && d.permission === 'manage');
+    if (hasDelegation) return true;
+    return false;
+  }, [selectedItem, user, itemDelegations]);
+
   const handlePhotoUpload = async (file: File) => {
     if (!selectedItem) return;
     setPhotoError(null); setPhotoLoading(true);
     try { await itemPhotoService.upload(selectedItem.id, file); setPhotos(await itemPhotoService.list(selectedItem.id)); setSuccessMessage('Zdjęcie zostało dodane.'); }
     catch (err) { setPhotoError(err instanceof Error ? err.message : 'Nie udało się dodać zdjęcia.'); }
     finally { setPhotoLoading(false); }
+  };
+
+  const handleCreateDelegation = async (payload: CreateDelegationPayload) => {
+    if (!selectedItem) return;
+    try { 
+      await delegationService.create(selectedItem.id, payload); 
+      setItemDelegations(await delegationService.getAll(selectedItem.id));
+      setSuccessMessage('Delegacja została dodana.'); 
+    }
+    catch (err) { setError(err instanceof Error ? err.message : 'Nie udało się dodać delegacji.'); }
+  };
+
+  const handleDeleteDelegation = async (delegationId: number) => {
+    if (!selectedItem) return;
+    try { 
+      await delegationService.remove(selectedItem.id, delegationId); 
+      setItemDelegations(await delegationService.getAll(selectedItem.id));
+      setSuccessMessage('Delegacja została usunięta.'); 
+    }
+    catch (err) { setError(err instanceof Error ? err.message : 'Nie udało się usunąć delegacji.'); }
   };
 
   const handleLocationChange = async (locationId: number) => {
@@ -157,9 +213,13 @@ export default function ItemsPage() {
           </tbody>
         </table>
         <div className="table-pagination"><span>Strona {currentPage} z {totalPages} · Wyniki: {filteredItems.length}</span><div className="td-actions"><button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">Poprzednia</button><button className="btn btn-secondary" disabled={currentPage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">Następna</button></div></div>
-        {selectedItem && (<><LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} canEdit={canEditSelected} /><ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} /></>)}
+        {selectedItem && (<>
+          <LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} canEdit={canManageLocation} onEdit={openEdit} />
+          <ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} />
+          <ItemDelegationsPanel item={selectedItem} delegations={itemDelegations} canManage={canManageLocation} onCreate={handleCreateDelegation} onDelete={handleDeleteDelegation} />
+        </>)}
       </>)}
-      {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>Nowy przedmiot</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}<CreateForm categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} /></div></div>)}
+      {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" ref={modalRef} onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>{modal.mode === 'create' ? 'Nowy przedmiot' : 'Edytuj przedmiot'}</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}{modal.mode === 'create' ? <CreateForm categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} currentUser={user} /> : <EditForm item={selectedItem} categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleEdit} loading={formLoading} />}</div></div>)}
     </div>
   );
 }
@@ -168,7 +228,7 @@ function ItemsFilters({ categories, filters, locations, onChange, owners, status
   return (<section className="filters-panel" aria-label="Filtry przedmiotów">
     <label className="form-label" htmlFor="item-filter-query">Szukaj (nazwa, opis, model, seryjny, inwentarzowy)</label><input className="form-input" id="item-filter-query" onChange={(event) => onChange({ query: event.target.value })} placeholder="np. oscyloskop" value={filters.query} />
     <label className="form-label" htmlFor="item-filter-manufacturer">Producent</label><input className="form-input" id="item-filter-manufacturer" onChange={(event) => onChange({ manufacturer: event.target.value })} placeholder="np. Tektronix" value={filters.manufacturer} />
-    <label className="form-label" htmlFor="item-filter-category">Kategoria</label><select className="form-input" id="item-filter-category" onChange={(event) => onChange({ categoryId: event.target.value })} value={filters.categoryId}><option value="">Wszystkie</option>{categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}</select>
+    <label className="form-label" htmlFor="item-filter-category">Kategoria</label><CategoryDropdown categories={categories} value={filters.categoryId ? Number(filters.categoryId) : ''} onChange={(val) => onChange({ categoryId: val === '' ? '' : String(val) })} allowEmpty emptyLabel="Wszystkie" />
     <label className="form-label" htmlFor="item-filter-status">Status</label><select className="form-input" id="item-filter-status" onChange={(event) => onChange({ statusId: event.target.value })} value={filters.statusId}><option value="">Wszystkie</option>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
     <label className="form-label" htmlFor="item-filter-location">Lokalizacja</label><select className="form-input" id="item-filter-location" onChange={(event) => onChange({ locationId: event.target.value })} value={filters.locationId}><option value="">Wszystkie</option>{locations.map((location) => (<option key={location.id} value={location.id}>{location.name}</option>))}</select>
     <label className="form-label" htmlFor="item-filter-owner">Właściciel / opiekun</label><select className="form-input" id="item-filter-owner" onChange={(event) => onChange({ ownerId: event.target.value })} value={filters.ownerId}><option value="">Wszyscy</option>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
@@ -190,12 +250,16 @@ function sortValue(item: Item, key: SortKey, helpers: { getCategoryName: (id: nu
   return item[key] ?? '';
 }
 
-function LocationMapPanel({ item, location, locations, onCreateLocation, onLocationChange, ownerName, statusName, canEdit }: { item: Item; location: Location | undefined; locations: Location[]; onCreateLocation: (p: CreateLocationPayload) => void; onLocationChange: (locationId: number) => void; ownerName: string; statusName: string; canEdit: boolean }) {
+function LocationMapPanel({ item, location, locations, onCreateLocation, onLocationChange, ownerName, statusName, canEdit, onEdit }: { item: Item; location: Location | undefined; locations: Location[]; onCreateLocation: (p: CreateLocationPayload) => void; onLocationChange: (locationId: number) => void; ownerName: string; statusName: string; canEdit: boolean; onEdit: () => void }) {
   const [newLocation, setNewLocation] = useState({ name: '', kind: 'internal' as 'internal' | 'external', building: '', room: '', cabinet: '', shelf: '', mapX: '', mapY: '' });
   const [previewCoords, setPreviewCoords] = useState<{x: number, y: number} | null>(null);
-  
   return (<section className="location-panel" aria-label="Mapa lokalizacji przedmiotu">
-    <div className="location-panel__summary"><p className="location-panel__label">Lokalizacja przedmiotu</p><h2>{item.name}</h2><dl>
+    <div className="location-panel__summary">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div><p className="location-panel__label">Szczegóły przedmiotu</p><h2>{item.name}</h2></div>
+        <button className="btn btn-secondary" onClick={onEdit}>Edytuj przedmiot</button>
+      </div>
+      <dl>
       <div><dt>Producent</dt><dd>{item.manufacturer}</dd></div>
       {item.model && <div><dt>Model</dt><dd>{item.model}</dd></div>}
       {item.serial && <div><dt>Nr seryjny</dt><dd>{item.serial}</dd></div>}
@@ -206,17 +270,19 @@ function LocationMapPanel({ item, location, locations, onCreateLocation, onLocat
       <div><dt>Punkt</dt><dd>{location?.name ?? 'Brak przypisanej lokalizacji'}</dd></div>
       <div><dt>Szczegóły</dt><dd>{formatLocationDetails(location)}</dd></div>
     </dl></div>
-    <div className="location-map-container" style={{ marginBottom: '1rem' }}>
-      <LeafletMap 
-        mapX={location?.mapX} 
-        mapY={location?.mapY} 
-        previewX={previewCoords?.x}
-        previewY={previewCoords?.y}
-        onLocationSelect={canEdit ? ((x, y) => {
-          setPreviewCoords({x, y});
-          setNewLocation(current => ({ ...current, mapX: x.toFixed(6), mapY: y.toFixed(6) }));
-        }) : undefined}
-      />
+    <div className="location-map-container" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: '400px' }}>
+        <LeafletMap 
+          mapX={location?.mapX} 
+          mapY={location?.mapY} 
+          previewX={previewCoords?.x}
+          previewY={previewCoords?.y}
+          onLocationSelect={canEdit ? ((x, y) => {
+            setPreviewCoords({x, y});
+            setNewLocation(current => ({ ...current, mapX: x.toFixed(6), mapY: y.toFixed(6) }));
+          }) : undefined}
+        />
+      </div>
     </div>
     {canEdit ? (
       <div className="location-controls">
@@ -239,7 +305,9 @@ function LocationMapPanel({ item, location, locations, onCreateLocation, onLocat
         }} type="button">Dodaj punkt i przypisz</button></div>
       </div>
     ) : (
-      <div className="alert alert-info" style={{ marginTop: '1rem' }}>Nie masz uprawnień do zmiany lokalizacji tego przedmiotu.</div>
+      <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="alert alert-info">Nie masz uprawnień do zmiany lokalizacji tego przedmiotu.</div>
+      </div>
     )}
   </section>);
 }
@@ -250,12 +318,132 @@ function ItemPhotosPanel({ item, photos: itemPhotos, error: photosError, loading
   return (<section className="photos-panel"><div><p className="location-panel__label">Dokumentacja zdjęciowa</p><h2>{item.name}</h2></div><label className="btn btn-secondary photos-upload">Dodaj zdjęcie<input accept="image/*" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) onUpload(file); event.target.value = ''; }} /></label>{photosError ? <div className="alert alert-error">{photosError}</div> : null}{photosLoading ? (<div className="loading-state"><div className="spinner" />Ładowanie zdjęć...</div>) : (<table className="table photos-table"><thead><tr><th>Plik</th><th>Typ</th><th>Dodano</th><th>Użytkownik</th></tr></thead><tbody>{itemPhotos.map((photo) => (<tr key={photo.id}><td>{photo.originalFilename}</td><td>{photo.contentType}</td><td>{new Date(photo.addedAt).toLocaleString('pl-PL')}</td><td>{photo.uploadedById}</td></tr>))}</tbody></table>)}</section>);
 }
 
-function CreateForm({ categories, groups, locations, owners, statuses, onSubmit, loading }: { categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: CreateItemPayload) => void; loading: boolean }) {
+function ItemDelegationsPanel({ item, delegations, canManage, onCreate, onDelete }: { item: Item; delegations: Delegation[]; canManage: boolean; onCreate: (payload: CreateDelegationPayload) => void; onDelete: (id: number) => void }) {
+  const [showForm, setShowForm] = useState(false);
+  
+  return (
+    <section className="photos-panel">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p className="location-panel__label">Delegacje i uprawnienia</p>
+          <h2>Kto ma dostęp do: {item.name}?</h2>
+        </div>
+        {canManage && (
+          <button className="btn btn-secondary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Anuluj' : 'Dodaj delegata'}
+          </button>
+        )}
+      </div>
+      
+      {showForm && canManage && (
+        <div style={{ padding: '16px', background: 'var(--surface-2)', borderRadius: 'var(--radius)', margin: '16px 0', border: '1px solid var(--border)' }}>
+          <CreateDelegationForm onSubmit={(p) => { onCreate(p); setShowForm(false); }} />
+        </div>
+      )}
+
+      {delegations.length === 0 ? (
+        <div className="alert alert-info" style={{ marginTop: '1rem' }}>Brak dodatkowych delegacji dla tego przedmiotu.</div>
+      ) : (
+        <table className="table photos-table" style={{ marginTop: '1rem' }}>
+          <thead>
+            <tr>
+              <th>Użytkownik</th>
+              <th>Grupa</th>
+              <th>Uprawnienie</th>
+              {canManage && <th>Akcje</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {delegations.map((d) => (
+              <tr key={d.id}>
+                <td>{d.user_email ?? '—'}</td>
+                <td>{d.group_name ?? '—'}</td>
+                <td>
+                  <span className={`badge badge-${d.permission}`}>
+                    {d.permission === 'manage' ? 'Zarządzanie' : 'Edycja'}
+                  </span>
+                </td>
+                {canManage && (
+                  <td>
+                    <button className="btn btn-sm btn-danger" onClick={() => {
+                      if(confirm(`Usunąć delegację dla: ${d.user_email ?? d.group_name}?`)) onDelete(d.id);
+                    }}>
+                      Usuń
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+function CreateDelegationForm({ onSubmit }: { onSubmit: (p: CreateDelegationPayload) => void }) {
+  const [selectedUser, setSelectedUser] = useState<AutocompleteOption | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<AutocompleteOption | null>(null);
+  const [permission, setPermission] = useState<PermissionLevel>('edit');
+
+  const submit = () => {
+    if (!selectedUser && !selectedGroup) return;
+    onSubmit({
+      user_id: selectedUser?.value,
+      group_id: selectedGroup?.value,
+      permission,
+    });
+  };
+
+  return (
+    <div className="form">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div>
+          <label className="form-label">Użytkownik (email)</label>
+          <Autocomplete
+            placeholder="Wpisz email..."
+            onSearch={(q) => delegationService.searchUsers(q)}
+            onSelect={(opt) => { setSelectedUser(opt); setSelectedGroup(null); }}
+            onClear={() => setSelectedUser(null)}
+          />
+        </div>
+        <div>
+          <label className="form-label">Lub grupa (nazwa)</label>
+          <Autocomplete
+            placeholder="Wpisz nazwę grupy..."
+            onSearch={(q) => delegationService.searchGroups(q)}
+            onSelect={(opt) => { setSelectedGroup(opt); setSelectedUser(null); }}
+            onClear={() => setSelectedGroup(null)}
+          />
+        </div>
+      </div>
+
+      <label className="form-label" style={{ marginTop: '16px' }}>Poziom uprawnień</label>
+      <select
+        className="form-input"
+        value={permission}
+        onChange={(e) => setPermission(e.target.value as PermissionLevel)}
+      >
+        <option value="edit">Edycja (tylko szczegóły)</option>
+        <option value="manage">Zarządzanie (szczegóły + lokalizacja)</option>
+      </select>
+
+      <div style={{ marginTop: '16px' }}>
+        <button className="btn btn-primary" onClick={submit} disabled={!selectedUser && !selectedGroup}>
+          Zapisz delegację
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CreateForm({ categories, groups, locations, owners, statuses, onSubmit, loading, currentUser }: { categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: CreateItemPayload) => void; loading: boolean; currentUser: AuthUser | null }) {
+  const defaultOwnerId = useMemo(() => { if (currentUser && owners.some(o => o.id === currentUser.id)) return currentUser.id; return owners[0]?.id ?? ''; }, [currentUser, owners]);
   const [name, setName] = useState(''); const [manufacturer, setManufacturer] = useState(''); const [model, setModel] = useState(''); const [serial, setSerial] = useState(''); const [inventoryNumber, setInventoryNumber] = useState(''); const [description, setDescription] = useState(''); const [purchaseDate, setPurchaseDate] = useState(''); 
   const [categoryId, setCategoryId] = useState<number | ''>(categories[0]?.id ?? ''); 
   const [statusId, setStatusId] = useState<number | ''>(statuses[0]?.id ?? ''); 
   const [locationId, setLocationId] = useState<number | ''>(locations[0]?.id ?? ''); 
-  const [ownerId, setOwnerId] = useState<number | ''>(owners[0]?.id ?? ''); 
+  const [ownerId, setOwnerId] = useState<number | ''>(defaultOwnerId); 
   const [ownerGroupId, setOwnerGroupId] = useState('');
   
   const submit = () => { 
@@ -275,7 +463,6 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
       ownerGroupId: ownerGroupId ? Number(ownerGroupId) : undefined 
     }); 
   };
-  
   return (<div className="form">
     <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="np. Oscyloskop Tektronix" />
     <label className="form-label">Producent</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="np. Tektronix" />
@@ -284,11 +471,35 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
     <label className="form-label">Nr inwentarzowy</label><input className="form-input" value={inventoryNumber} onChange={(e) => setInventoryNumber(e.target.value)} placeholder="np. W7/262" />
     <label className="form-label">Opis</label><textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcjonalny opis" />
     <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
-    <label className="form-label">Kategoria</label><select className="form-input" value={categoryId} onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}</select>
+    <label className="form-label">Kategoria</label><CategoryDropdown categories={categories} value={categoryId} onChange={(val) => setCategoryId(val)} allowEmpty emptyLabel="Brak" />
     <label className="form-label">Status</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
     <label className="form-label">Lokalizacja</label><select className="form-input" value={locationId} onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{locations.map((location) => (<option key={location.id} value={location.id}>{location.name}</option>))}</select>
     <label className="form-label">Właściciel / opiekun</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(e.target.value ? Number(e.target.value) : '')}><option value="">Brak</option>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
     <label className="form-label">Grupa opiekunów</label><select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}><option value="">Brak grupy</option>{groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}</select>
     <div className="form-actions"><button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim()}>{loading ? 'Zapisywanie…' : 'Utwórz'}</button></div>
+  </div>);
+}
+
+function EditForm({ item, categories, groups, locations, owners, statuses, onSubmit, loading }: { item: Item; categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: Partial<CreateItemPayload>) => void; loading: boolean }) {
+  const [name, setName] = useState(item.name); const [manufacturer, setManufacturer] = useState(item.manufacturer); const [model, setModel] = useState(item.model ?? ''); const [serial, setSerial] = useState(item.serial ?? ''); const [inventoryNumber, setInventoryNumber] = useState(item.inventoryNumber ?? ''); const [description, setDescription] = useState(item.description ?? ''); const [purchaseDate, setPurchaseDate] = useState(item.purchaseDate ?? ''); const [categoryId, setCategoryId] = useState(item.categoryId ?? categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(item.statusId ?? statuses[0]?.id ?? 1); const [ownerId, setOwnerId] = useState(item.ownerId ?? owners[0]?.id ?? 1); const [ownerGroupId, setOwnerGroupId] = useState(item.ownerGroupId ? String(item.ownerGroupId) : '');
+  
+  useEffect(() => {
+    setName(item.name); setManufacturer(item.manufacturer); setModel(item.model ?? ''); setSerial(item.serial ?? ''); setInventoryNumber(item.inventoryNumber ?? ''); setDescription(item.description ?? ''); setPurchaseDate(item.purchaseDate ?? ''); setCategoryId(item.categoryId ?? categories[0]?.id ?? 1); setStatusId(item.statusId ?? statuses[0]?.id ?? 1); setOwnerId(item.ownerId ?? owners[0]?.id ?? 1); setOwnerGroupId(item.ownerGroupId ? String(item.ownerGroupId) : '');
+  }, [item, categories, owners, statuses]);
+
+  const submit = () => { if (!name.trim()) return; onSubmit({ name: name.trim(), manufacturer: manufacturer.trim() || undefined, model: model.trim() || undefined, serial: serial.trim() || undefined, inventoryNumber: inventoryNumber.trim() || undefined, description: description.trim() || undefined, purchaseDate: purchaseDate || undefined, categoryId, statusId, ownerId, ownerGroupId: ownerGroupId ? Number(ownerGroupId) : undefined }); };
+  return (<div className="form">
+    <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
+    <label className="form-label">Producent</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} />
+    <label className="form-label">Model</label><input className="form-input" value={model} onChange={(e) => setModel(e.target.value)} />
+    <label className="form-label">Nr seryjny</label><input className="form-input" value={serial} onChange={(e) => setSerial(e.target.value)} />
+    <label className="form-label">Nr inwentarzowy</label><input className="form-input" value={inventoryNumber} onChange={(e) => setInventoryNumber(e.target.value)} />
+    <label className="form-label">Opis</label><textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} />
+    <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
+    <label className="form-label">Kategoria *</label><CategoryDropdown categories={categories} value={categoryId} onChange={(val) => setCategoryId(val === '' ? (categories[0]?.id || 1) : val)} allowEmpty={false} />
+    <label className="form-label">Status *</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
+    <label className="form-label">Właściciel / opiekun *</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
+    <label className="form-label">Grupa opiekunów</label><select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}><option value="">Brak grupy</option>{groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}</select>
+    <div className="form-actions"><button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim()}>{loading ? 'Zapisywanie…' : 'Zapisz zmiany'}</button></div>
   </div>);
 }

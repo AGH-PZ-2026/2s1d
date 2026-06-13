@@ -48,6 +48,11 @@ export const itemService = {
     const r = await fetch('/api/v1/items/', { method: 'POST', headers: jsonAuthHeaders(), body: JSON.stringify(payload) });
     await ensureOk(r); return mapItem(await r.json());
   },
+  async update(itemId: number, payload: Partial<CreateItemPayload>): Promise<void> {
+    if (USE_MOCKS) { await delay(500); mockItems = mockItems.map(i => i.id === itemId ? { ...i, ...payload } : i); return; }
+    const r = await fetch(`/api/v1/items/${itemId}`, { method: 'PATCH', headers: jsonAuthHeaders(), body: JSON.stringify(payload) });
+    await ensureOk(r);
+  },
   async getCategories(): Promise<Category[]> {
     if (USE_MOCKS) { await delay(100); return [...mockCategories]; }
     const r = await fetch('/api/v1/categories/', { headers: authHeaders() }); await ensureOk(r);
