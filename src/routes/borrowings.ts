@@ -73,9 +73,9 @@ router.post("/", zValidator("json", createSchema), async (c) => {
     borrowerId: body.borrowerId ?? null,
     externalBorrower: body.externalBorrower ?? null,
     mode: body.mode,
-    status: body.mode === "trusted" ? "borrowed" : "pending",
-    approvedAt: body.mode === "trusted" ? sql`NOW()` : null,
-    handedOverAt: body.mode === "trusted" ? sql`NOW()` : null,
+    status: "pending",
+    approvedAt: null,
+    handedOverAt: null,
   };
   if (body.plannedReturnAt) values.plannedReturnAt = new Date(body.plannedReturnAt);
   const result = await db.insert(borrowings).values(values as typeof borrowings.$inferInsert);
