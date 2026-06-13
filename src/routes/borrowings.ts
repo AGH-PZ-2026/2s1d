@@ -70,7 +70,7 @@ router.post("/", zValidator("json", createSchema), async (c) => {
   if (active.length > 0) badRequest("Item is already borrowed");
   const values: Record<string, unknown> = {
     itemId: body.itemId,
-    borrowerId: body.borrowerId ?? null,
+    borrowerId: body.borrowerId ?? c.get("userId"),
     externalBorrower: body.externalBorrower ?? null,
     mode: body.mode,
     status: "pending",
@@ -131,8 +131,13 @@ router.patch("/:id/handover", async (c) => {
     .innerJoin(borrowings, eq(borrowings.itemId, items.id))
     .where(eq(borrowings.id, id)).limit(1);
 
-  if (c.get("userRole") !== "admin" && item[0]?.ownerId !== userId) {
-    forbidden("Only admins or item owners can hand over borrowings");
+  const isAdmin = c.get("userRole") === "admin";
+  const isOwner = item[0]?.ownerId === userId;
+  const isBorrower = existing[0].borrowerId === userId;
+  const isAsynchronous = existing[0].mode === "asynchronous";
+
+  if (!isAdmin && !isOwner && !(isAsynchronous && isBorrower)) {
+    forbidden("Only admins, item owners, or borrowers in asynchronous mode can hand over borrowings");
   }
 
   await db.update(borrowings).set({ status: "borrowed", handedOverAt: sql`NOW()` }).where(eq(borrowings.id, id));
@@ -146,6 +151,23 @@ router.patch("/:id/return", zValidator("json", returnSchema), async (c) => {
   const existing = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
   if (existing.length === 0) notFound("Borrowing not found");
   if (existing[0].status !== "borrowed") badRequest("Only borrowed items can be returned");
+
+  const userId = c.get("userId");
+  const isAdmin = c.get("userRole") === "admin";
+  const isBorrower = existing[0].borrowerId === userId;
+  const isClassic = existing[0].mode === "classic";
+
+  const item = await db.select({ ownerId: items.ownerId }).from(items)
+    .where(eq(items.id, existing[0].itemId)).limit(1);
+  const isOwner = item[0]?.ownerId === userId;
+
+  if (isClassic && !isAdmin && !isOwner) {
+    forbidden("In classic mode only admins or item owners can confirm return");
+  }
+  if (!isClassic && !isAdmin && !isOwner && !isBorrower) {
+    forbidden("Only admins, item owners or borrowers can return borrowings");
+  }
+
   await db.update(borrowings).set({ status: "returned", returnedAt: sql`NOW()`, returnComment: c.req.valid("json").returnComment ?? null }).where(eq(borrowings.id, id));
   const updated = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
   return c.json(toResponse(updated[0]));
