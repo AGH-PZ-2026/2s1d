@@ -100,10 +100,27 @@ export default function ItemsPage() {
   const filteredItems = useMemo(() => {
     const query = filters.query.trim().toLowerCase();
     const manufacturer = filters.manufacturer.trim().toLowerCase();
+    
+    let targetCategoryIds = new Set<number>();
+    if (filters.categoryId) {
+      const selectedId = Number(filters.categoryId);
+      targetCategoryIds.add(selectedId);
+      let queue = [selectedId];
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        for (const cat of categories) {
+          if (cat.parentId === currentId && !targetCategoryIds.has(cat.id)) {
+            targetCategoryIds.add(cat.id);
+            queue.push(cat.id);
+          }
+        }
+      }
+    }
+
     const visible = items.filter((item) => {
       const matchesQuery = !query || item.name.toLowerCase().includes(query) || item.description?.toLowerCase().includes(query) || item.serial?.toLowerCase().includes(query) || item.inventoryNumber?.toLowerCase().includes(query) || item.model?.toLowerCase().includes(query);
       const matchesManufacturer = !manufacturer || item.manufacturer.toLowerCase().includes(manufacturer);
-      const matchesCategory = !filters.categoryId || item.categoryId === Number(filters.categoryId);
+      const matchesCategory = !filters.categoryId || targetCategoryIds.has(item.categoryId);
       const matchesStatus = !filters.statusId || item.statusId === Number(filters.statusId);
       const matchesLocation = !filters.locationId || item.locationId === Number(filters.locationId);
       const matchesOwner = !filters.ownerId || item.ownerId === Number(filters.ownerId);

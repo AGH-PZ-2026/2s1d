@@ -795,7 +795,7 @@ select.form-input {
   align-self: end;
   grid-row: 1;
 }
-.filters-panel .form-input {
+.filters-panel .form-input, .filters-panel .category-dropdown {
   grid-row: 2;
 }
 

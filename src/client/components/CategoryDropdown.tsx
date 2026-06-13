@@ -62,7 +62,7 @@ export default function CategoryDropdown({ categories, value, onChange, placehol
   const displayValue = selectedCategoryObj ? selectedCategoryObj.name : (allowEmpty ? emptyLabel : placeholder);
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
+    <div ref={wrapperRef} className="category-dropdown" style={{ position: 'relative', width: '100%' }}>
       <button 
         type="button" 
         className="form-input" 
