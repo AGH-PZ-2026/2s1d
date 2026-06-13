@@ -52,7 +52,7 @@ src/
 ├── client/                   # React SPA (Vite)
 │   ├── main.tsx / App.tsx / router.tsx
 │   ├── components/           # Layout, AuthGate, Autocomplete, CategoryTree, itd.
-│   ├── pages/                # Wszystkie strony (Items, Categories, Borrowings, itd.)
+│   ├── pages/                # Wszystkie strony (Items, QrScanner, BatchQr, Borrowings, itd.)
 │   ├── services/             # Klienckie serwisy API (z mockami dla MODE=test)
 │   ├── types/                # TypeScript typy
 │   └── hooks/                # useAuth
@@ -132,6 +132,7 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 | 1    | US-02 Dodawanie przedmiotów                                         | ✅     |
 | 1    | US-03 Identyfikacja (QR, systemId)                                  | ✅     |
 | 1    | US-04 Szybkie akcje po QR                                           | ✅     |
+| 1    | US-05: Dokumentacja zdjęciowa                                       | ✅     |
 | 1    | Lokalizacja US-01 Przypisanie/aktualizacja                           | ✅     |
 | 1    | Lokalizacja US-02 Podgląd na mapie                                   | ✅     |
 | 1    | Role US-01 Opiekun/grupa                                            | ✅     |
@@ -149,7 +150,7 @@ pnpm test                          # Oba powyższe (bez vitest-pool-workers)
 | 3    | Wypożyczenia US-04 (external)                                       | ✅     |
 | 3    | Narzędzia US-03 Powiadomienia                                       | ✅ (struktura, brak faktycznego wysyłania) |
 | 3    | Narzędzia US-04 Migracja z poprzedniego systemu                     | ⚠️ (do doprecyzowania) |
-| 3    | Narzędzia US-05 Drukowanie etykiet                                  | ✅ (batch QR, PDF stub) |
+| 3    | Narzędzia US-05 Drukowanie etykiet                                  | ✅ (batch QR, jsPDF + qrcode) |
 
 ## Znane problemy / ograniczenia
 
