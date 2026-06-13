@@ -1,6 +1,6 @@
 import { authHeaders } from './authHeaders';
 
-export interface ItemPhoto { id: number; itemId: number; uploadedById: number; originalFilename: string; contentType: string; storagePath: string; addedAt: string; }
+export interface ItemPhoto { id: number; itemId: number; uploadedById: number; uploadedByName?: string; originalFilename: string; contentType: string; storagePath: string; addedAt: string; }
 
 export const itemPhotoService = {
   async list(itemId: number): Promise<ItemPhoto[]> {

@@ -123,11 +123,12 @@ export const authMiddleware = createMiddleware<{
   Bindings: Env;
 }>(async (c, next) => {
     const header = c.req.header("Authorization");
-    if (!header?.startsWith("Bearer ")) {
+    const queryToken = c.req.query("token");
+    if (!header?.startsWith("Bearer ") && !queryToken) {
       unauthorized("Missing or invalid authorization header");
     }
 
-    const token = header.slice(7);
+    const token = header?.startsWith("Bearer ") ? header.slice(7) : queryToken!;
     const secret = c.env.JWT_SECRET;
     if (!secret) {
       console.error(JSON.stringify({ message: "JWT_SECRET not configured" }));
