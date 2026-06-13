@@ -77,7 +77,7 @@ router.post("/", zValidator("json", createSchema), async (c) => {
     approvedAt: body.mode === "trusted" ? sql`NOW()` : null,
     handedOverAt: body.mode === "trusted" ? sql`NOW()` : null,
   };
-  if (body.plannedReturnAt) values.plannedReturnAt = body.plannedReturnAt;
+  if (body.plannedReturnAt) values.plannedReturnAt = new Date(body.plannedReturnAt);
   const result = await db.insert(borrowings).values(values as typeof borrowings.$inferInsert);
   const created = await db.select().from(borrowings).where(eq(borrowings.id, result[0].insertId)).limit(1);
   return c.json(toResponse(created[0]), 201);
@@ -85,22 +85,57 @@ router.post("/", zValidator("json", createSchema), async (c) => {
 
 router.patch("/:id/approve", async (c) => {
   const db = c.get("db"); const id = Number(c.req.param("id"));
-  if (c.get("userRole") !== "admin") forbidden("Only admins can approve borrowings");
+  const userId = c.get("userId");
+  const item = await db.select({ ownerId: items.ownerId }).from(items)
+    .innerJoin(borrowings, eq(borrowings.itemId, items.id))
+    .where(eq(borrowings.id, id)).limit(1);
+
+  if (c.get("userRole") !== "admin" && item[0]?.ownerId !== userId) {
+    forbidden("Only admins or item owners can approve borrowings");
+  }
+  
   const existing = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
   if (existing.length === 0) notFound("Borrowing not found");
   if (existing[0].status !== "pending") badRequest("Borrowing is not pending");
-  await db.update(borrowings).set({ status: "borrowed", approvedAt: sql`NOW()`, handedOverAt: sql`NOW()` }).where(eq(borrowings.id, id));
+  await db.update(borrowings).set({ status: "reserved", approvedAt: sql`NOW()` }).where(eq(borrowings.id, id));
   const updated = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
   return c.json(toResponse(updated[0]));
 });
 
 router.patch("/:id/reject", async (c) => {
   const db = c.get("db"); const id = Number(c.req.param("id"));
-  if (c.get("userRole") !== "admin") forbidden("Only admins can reject borrowings");
+  const userId = c.get("userId");
+  const item = await db.select({ ownerId: items.ownerId }).from(items)
+    .innerJoin(borrowings, eq(borrowings.itemId, items.id))
+    .where(eq(borrowings.id, id)).limit(1);
+
+  if (c.get("userRole") !== "admin" && item[0]?.ownerId !== userId) {
+    forbidden("Only admins or item owners can reject borrowings");
+  }
   const existing = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
   if (existing.length === 0) notFound("Borrowing not found");
   if (existing[0].status !== "pending") badRequest("Borrowing is not pending");
   await db.update(borrowings).set({ status: "rejected" }).where(eq(borrowings.id, id));
+  const updated = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
+  return c.json(toResponse(updated[0]));
+});
+
+router.patch("/:id/handover", async (c) => {
+  const db = c.get("db"); const id = Number(c.req.param("id"));
+  const existing = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
+  if (existing.length === 0) notFound("Borrowing not found");
+  if (existing[0].status !== "reserved") badRequest("Borrowing is not reserved");
+
+  const userId = c.get("userId");
+  const item = await db.select({ ownerId: items.ownerId }).from(items)
+    .innerJoin(borrowings, eq(borrowings.itemId, items.id))
+    .where(eq(borrowings.id, id)).limit(1);
+
+  if (c.get("userRole") !== "admin" && item[0]?.ownerId !== userId) {
+    forbidden("Only admins or item owners can hand over borrowings");
+  }
+
+  await db.update(borrowings).set({ status: "borrowed", handedOverAt: sql`NOW()` }).where(eq(borrowings.id, id));
   const updated = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
   return c.json(toResponse(updated[0]));
 });

@@ -127,7 +127,7 @@ export const borrowingService = {
   },
 
   async handover(id: number): Promise<Borrowing> {
-    return patchStatus(id, 'approve');
+    return patchStatus(id, 'handover');
   },
 
   async returnBorrowing(
@@ -159,7 +159,7 @@ function validateInternalBorrowing(
   if (!itemId) throw new Error('Wybierz przedmiot.');
 }
 
-async function patchStatus(id: number, action: 'approve' | 'reject'): Promise<Borrowing> {
+async function patchStatus(id: number, action: 'approve' | 'reject' | 'handover'): Promise<Borrowing> {
   if (USE_MOCKS) {
     await delay(300);
     const now = new Date().toISOString();
