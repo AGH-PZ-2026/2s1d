@@ -7,6 +7,7 @@ import { borrowings, items, users } from "../db/schema";
 import type { Borrowing } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { notFound, badRequest, forbidden } from "../lib/errors";
+import { createAuditLog } from "../lib/audit";
 
 type Variables = { db: MySql2Database<Record<string, never>>; userId: number; userRole: "admin" | "user"; isAuthenticated: boolean };
 
@@ -152,6 +153,24 @@ router.post("/", zValidator("json", createSchema), async (c) => {
   if (body.plannedReturnAt) values.plannedReturnAt = new Date(body.plannedReturnAt);
   const result = await db.insert(borrowings).values(values as typeof borrowings.$inferInsert);
   const created = await db.select().from(borrowings).where(eq(borrowings.id, result[0].insertId)).limit(1);
+  
+  await createAuditLog(db, {
+  userId: c.get("userId"),
+  itemId: created[0].itemId,
+  action:
+    body.mode === "external"
+      ? "ITEM_BORROWED"
+      : "BORROWING_REQUESTED",
+  newValue: {
+    borrowingId: created[0].id,
+    borrowerId: created[0].borrowerId,
+    externalBorrower: created[0].externalBorrower,
+    mode: created[0].mode,
+    status: created[0].status,
+    plannedReturnAt: created[0].plannedReturnAt,
+  },
+  });
+  
   return c.json(toResponse(created[0]), 201);
 });
 
@@ -171,6 +190,20 @@ router.patch("/:id/approve", async (c) => {
   if (existing[0].status !== "pending") badRequest("Borrowing is not pending");
   await db.update(borrowings).set({ status: "reserved", approvedAt: sql`NOW()` }).where(eq(borrowings.id, id));
   const updated = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
+
+  await createAuditLog(db, {
+  userId: c.get("userId"),
+  itemId: updated[0].itemId,
+  action: "BORROWING_APPROVED",
+  oldValue: {
+    status: existing[0].status,
+  },
+  newValue: {
+    status: updated[0].status,
+    approvedAt: updated[0].approvedAt,
+  },
+  });
+
   return c.json(toResponse(updated[0]));
 });
 
@@ -214,6 +247,20 @@ router.patch("/:id/handover", async (c) => {
 
   await db.update(borrowings).set({ status: "borrowed", handedOverAt: sql`NOW()` }).where(eq(borrowings.id, id));
   const updated = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
+  
+  await createAuditLog(db, {
+  userId: c.get("userId"),
+  itemId: updated[0].itemId,
+  action: "ITEM_BORROWED",
+  oldValue: {
+    status: existing[0].status,
+  },
+  newValue: {
+    status: updated[0].status,
+    handedOverAt: updated[0].handedOverAt,
+  },
+});
+
   return c.json(toResponse(updated[0]));
 });
 
@@ -242,6 +289,21 @@ router.patch("/:id/return", zValidator("json", returnSchema), async (c) => {
 
   await db.update(borrowings).set({ status: "returned", returnedAt: sql`NOW()`, returnComment: c.req.valid("json").returnComment ?? null }).where(eq(borrowings.id, id));
   const updated = await db.select().from(borrowings).where(eq(borrowings.id, id)).limit(1);
+  
+  await createAuditLog(db, {
+  userId: c.get("userId"),
+  itemId: updated[0].itemId,
+  action: "BORROWING_RETURNED",
+  oldValue: {
+    status: existing[0].status,
+  },
+  newValue: {
+    status: updated[0].status,
+    returnedAt: updated[0].returnedAt,
+    returnComment: updated[0].returnComment,
+  },
+  });
+
   return c.json(toResponse(updated[0]));
 });
 

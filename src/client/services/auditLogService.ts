@@ -11,7 +11,9 @@ export type AuditLogAction =
   | 'BORROWING_RETURNED'
   | 'PHOTO_ADDED'
   | 'OWNER_CHANGED'
-  | 'DELEGATES_CHANGED';
+  | 'DELEGATES_CHANGED'
+  | 'DELEGATE_REMOVED'
+  | 'BORROWING_REJECTED';
 
 export interface AuditLogEntry {
   id: number;

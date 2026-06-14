@@ -3,9 +3,10 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, desc, inArray } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
-import { delegations, users, groups } from "../db/schema";
+import { delegations, users, groups, auditLogs } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { notFound, badRequest } from "../lib/errors";
+import { createAuditLog } from "../lib/audit";
 
 type Variables = { db: MySql2Database<Record<string, never>>; userId: number; userRole: "admin" | "user"; isAuthenticated: boolean };
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
@@ -84,6 +85,20 @@ router.post("/:itemId/delegations", zValidator("json", createSchema), async (c) 
     if (g.length > 0) groupName = g[0].name;
   }
 
+  await createAuditLog(db, {
+  userId: c.get("userId"),
+  itemId,
+  action: "DELEGATE_ADDED",
+  newValue: {
+    delegateId: created[0].id,
+    userId: created[0].userId,
+    userEmail,
+    groupId: created[0].groupId,
+    groupName,
+    permission: created[0].permission,
+    },
+  });
+
   return c.json({
     id: created[0].id,
     item_id: created[0].itemId,
@@ -98,6 +113,56 @@ router.post("/:itemId/delegations", zValidator("json", createSchema), async (c) 
 router.delete("/:itemId/delegations/:id", async (c) => {
   const db = c.get("db");
   const id = Number(c.req.param("id"));
+
+  const existing = await db
+    .select()
+    .from(delegations)
+    .where(eq(delegations.id, id))
+    .limit(1);
+
+  if (existing.length === 0) {
+    notFound("Delegation not found");
+  }
+
+  let userEmail: string | null = null;
+let groupName: string | null = null;
+
+if (existing[0].userId) {
+  const u = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, existing[0].userId))
+    .limit(1);
+
+  if (u.length > 0) userEmail = u[0].email;
+}
+
+if (existing[0].groupId) {
+  const g = await db
+    .select({ name: groups.name })
+    .from(groups)
+    .where(eq(groups.id, existing[0].groupId))
+    .limit(1);
+
+  if (g.length > 0) groupName = g[0].name;
+}
+
+await createAuditLog(db, {
+  userId: c.get("userId"),
+  itemId: existing[0].itemId,
+  action: "DELEGATE_REMOVED",
+  oldValue: {
+    delegateId: existing[0].id,
+    userId: existing[0].userId,
+    userEmail,
+    groupId: existing[0].groupId,
+    groupName,
+    permission: existing[0].permission,
+  },
+  newValue: null,
+});
+
+
   await db.delete(delegations).where(eq(delegations.id, id));
   return c.body(null, 204);
 });

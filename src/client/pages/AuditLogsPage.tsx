@@ -15,6 +15,8 @@ const actionLabels: Record<AuditLogEntry['action'], string> = {
   BORROWING_RETURNED: 'Zwrot przedmiotu',
   PHOTO_ADDED: 'Dodanie zdjęcia',
   OWNER_CHANGED: 'Zmiana opiekuna',
+  DELEGATE_ADDED: 'Dodanie delegata',
+  DELEGATE_REMOVED: 'Usunięcie delegata',
   DELEGATES_CHANGED: 'Zmiana delegatów',
 };
 

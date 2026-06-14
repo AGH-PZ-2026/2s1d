@@ -4,6 +4,7 @@ import type { MySql2Database } from "drizzle-orm/mysql2";
 import { itemPhotos, type ItemPhoto, users } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { notFound, badRequest } from "../lib/errors";
+import { createAuditLog } from "../lib/audit";
 
 type Variables = { db: MySql2Database<Record<string, never>>; userId: number; userRole: "admin" | "user"; isAuthenticated: boolean };
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
@@ -47,6 +48,20 @@ router.post("/:itemId/photos", async (c) => {
   }).from(itemPhotos)
   .leftJoin(users, eq(itemPhotos.uploadedById, users.id))
   .where(eq(itemPhotos.id, result[0].insertId)).limit(1);
+
+  await createAuditLog(db, {
+  userId,
+  itemId,
+  action: "PHOTO_ADDED",
+  newValue: {
+    photoId: created[0].id,
+    filename: created[0].originalFilename,
+    contentType: created[0].contentType,
+    uploadedBy: created[0].uploadedByName,
+    addedAt: created[0].addedAt,
+  },
+});
+
   return c.json(toResponse(created[0]), 201);
 });
 
