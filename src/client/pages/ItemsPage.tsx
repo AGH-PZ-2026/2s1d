@@ -18,7 +18,7 @@ import type { Delegation, CreateDelegationPayload, PermissionLevel } from '../ty
 
 interface ModalState { mode: 'create' | 'edit'; itemId?: number; }
 
-type SortKey = 'name' | 'manufacturer' | 'model' | 'serial' | 'category' | 'status' | 'location';
+type SortKey = 'name' | 'manufacturer' | 'model' | 'serial' | 'category' | 'status' | 'location' | 'owner';
 type SortDirection = 'asc' | 'desc';
 
 const PAGE_SIZE = 5;
@@ -127,8 +127,8 @@ export default function ItemsPage() {
       return matchesQuery && matchesManufacturer && matchesCategory && matchesStatus && matchesLocation && matchesOwner;
     });
     return [...visible].sort((a, b) => {
-      const aValue = sortValue(a, sort.key, { getCategoryName, getStatusName, getLocationName });
-      const bValue = sortValue(b, sort.key, { getCategoryName, getStatusName, getLocationName });
+      const aValue = sortValue(a, sort.key, { getCategoryName, getStatusName, getLocationName, getOwnerName });
+      const bValue = sortValue(b, sort.key, { getCategoryName, getStatusName, getLocationName, getOwnerName });
       const result = aValue.localeCompare(bValue, 'pl');
       return sort.direction === 'asc' ? result : -result;
     });
@@ -218,12 +218,12 @@ export default function ItemsPage() {
           <thead><tr>
             <th><SortButton active={sort.key === 'name'} direction={sort.direction} label="Nazwa" onClick={() => setSort(nextSort(sort, 'name'))} /></th>
             <th><SortButton active={sort.key === 'manufacturer'} direction={sort.direction} label="Producent" onClick={() => setSort(nextSort(sort, 'manufacturer'))} /></th>
-            <th>Model</th>
-            <th>Nr seryjny</th>
+            <th><SortButton active={sort.key === 'model'} direction={sort.direction} label="Model" onClick={() => setSort(nextSort(sort, 'model'))} /></th>
+            <th><SortButton active={sort.key === 'serial'} direction={sort.direction} label="Nr seryjny" onClick={() => setSort(nextSort(sort, 'serial'))} /></th>
             <th><SortButton active={sort.key === 'category'} direction={sort.direction} label="Kategoria" onClick={() => setSort(nextSort(sort, 'category'))} /></th>
             <th><SortButton active={sort.key === 'status'} direction={sort.direction} label="Status" onClick={() => setSort(nextSort(sort, 'status'))} /></th>
             <th><SortButton active={sort.key === 'location'} direction={sort.direction} label="Lokalizacja" onClick={() => setSort(nextSort(sort, 'location'))} /></th>
-            <th>Właściciel / opiekun</th>
+            <th>  <SortButton active={sort.key === 'owner'} direction={sort.direction} label="Właściciel / opiekun" onClick={() => setSort(nextSort(sort, 'owner'))}/></th>
           </tr></thead>
           <tbody>
             {paginatedItems.length === 0 ? (<tr><td colSpan={9}>Brak przedmiotów spełniających filtry.</td></tr>) : paginatedItems.map((item) => (<tr key={item.id} className={item.id === selectedItem?.id ? 'row-selected' : ''} onClick={() => setSelectedItemId(item.id)}><td className="td-name">{item.name}</td><td>{item.manufacturer}</td><td>{item.model ?? '—'}</td><td>{item.serial ?? '—'}</td><td>{getCategoryName(item.categoryId)}</td><td>{getStatusName(item.statusId)}</td><td>{getLocationName(item.locationId)}</td><td>{getOwnerName(item)}</td></tr>))}
@@ -258,12 +258,13 @@ function SortButton({ active, direction, label, onClick }: { active: boolean; di
 
 function nextSort(current: { key: SortKey; direction: SortDirection }, key: SortKey): { key: SortKey; direction: SortDirection } { return { key, direction: (current.key === key && current.direction === 'asc' ? 'desc' : 'asc') as SortDirection }; }
 
-function sortValue(item: Item, key: SortKey, helpers: { getCategoryName: (id: number) => string; getStatusName: (id: number) => string; getLocationName: (id: number) => string }): string {
+function sortValue(item: Item, key: SortKey, helpers: { getCategoryName: (id: number) => string; getStatusName: (id: number) => string; getLocationName: (id: number) => string; getOwnerName: (item: Item) => string }): string {
   if (key === 'category') return helpers.getCategoryName(item.categoryId);
   if (key === 'status') return helpers.getStatusName(item.statusId);
   if (key === 'location') return helpers.getLocationName(item.locationId);
   if (key === 'model') return item.model ?? '';
   if (key === 'serial') return item.serial ?? '';
+  if (key === 'owner') return helpers.getOwnerName(item);
   return item[key] ?? '';
 }
 
