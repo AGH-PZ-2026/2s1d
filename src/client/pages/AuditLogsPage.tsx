@@ -78,18 +78,20 @@ export default function AuditLogsPage() {
               logs.map((log) => (
                 <tr key={log.id}>
                   <td>{new Date(log.timestamp).toLocaleString('pl-PL')}</td>
-                  <td>Użytkownik #{log.user_id}</td>
-                  <td>Przedmiot #{log.item_id}</td>
+                  <td>{log.userEmail ?? `Użytkownik #${log.userId}`}</td>
+                  <td>
+                  {log.itemName ? `${log.itemName}${log.itemSerial ? ` (${log.itemSerial})` : ''}`: `Przedmiot #${log.itemId}`}
+                  </td>
                   <td>
                     <span className="badge badge-custom">
                       {actionLabels[log.action] ?? log.action}
                     </span>
                   </td>
                   <td>
-                    <code className="slug">{formatValue(log.old_value)}</code>
+                    <code className="slug">{formatValue(log.oldValue)}</code>
                   </td>
                   <td>
-                    <code className="slug">{formatValue(log.new_value)}</code>
+                    <code className="slug">{formatValue(log.newValue)}</code>
                   </td>
                 </tr>
               ))

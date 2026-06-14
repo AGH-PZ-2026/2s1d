@@ -15,12 +15,17 @@ export type AuditLogAction =
 
 export interface AuditLogEntry {
   id: number;
-  user_id: number;
-  action: AuditLogAction;
-  item_id: number;
-  old_value: Record<string, unknown> | null;
-  new_value: Record<string, unknown> | null;
+  userId: number;
+  action: string;
+  itemId: number;
+  oldValue: Record<string, unknown> | null;
+  newValue: Record<string, unknown> | null;
   timestamp: string;
+
+  userEmail: string | null;
+  itemName: string | null;
+  itemSerial: string | null;
+  itemSystemId: string | null;
 }
 
 export const auditLogService = {

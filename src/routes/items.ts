@@ -7,6 +7,7 @@ import { items, type Item } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { notFound, badRequest, forbidden } from "../lib/errors";
 import { getItemPermissionLevel } from "../lib/permissions";
+import { createAuditLog } from "../lib/audit";
 
 type Variables = {
   db: MySql2Database<Record<string, never>>;
@@ -120,6 +121,14 @@ router.post("/", zValidator("json", createSchema), async (c) => {
   }
 
   const created = await db.select().from(items).where(eq(items.id, insertedId)).limit(1);
+  
+  await createAuditLog(db, {
+    userId: c.get("userId"),
+    itemId: insertedId,
+    action: "ITEM_CREATED",
+    newValue: created[0],
+  });
+
   return c.json(toResponse(created[0]), 201);
 });
 
@@ -162,6 +171,14 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
 
   await db.update(items).set(updateData).where(eq(items.id, id));
   const updated = await db.select().from(items).where(eq(items.id, id)).limit(1);
+
+  await createAuditLog(db, {
+    userId: c.get("userId"),
+    itemId: id,
+    action: "ITEM_UPDATED",
+    oldValue: item,
+    newValue: updated[0],
+  });
   return c.json(toResponse(updated[0]));
 });
 
@@ -171,6 +188,14 @@ router.delete("/:id", async (c) => {
   if (c.get("userRole") !== "admin") forbidden("Only admins can delete items");
   const existing = await db.select().from(items).where(eq(items.id, id)).limit(1);
   if (existing.length === 0) notFound("Item not found");
+
+  await createAuditLog(db, {
+  userId: c.get("userId"),
+  itemId: id,
+  action: "ITEM_DELETED",
+  oldValue: existing[0],
+});
+
   await db.delete(items).where(eq(items.id, id));
   return c.body(null, 204);
 });
