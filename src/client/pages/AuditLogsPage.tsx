@@ -18,6 +18,7 @@ const actionLabels: Record<AuditLogEntry['action'], string> = {
   DELEGATE_ADDED: 'Dodanie delegata',
   DELEGATE_REMOVED: 'Usunięcie delegata',
   DELEGATES_CHANGED: 'Zmiana delegatów',
+  ITEM_IMPORTED: 'Import przedmiotu z pliku',
 };
 
 export default function AuditLogsPage() {

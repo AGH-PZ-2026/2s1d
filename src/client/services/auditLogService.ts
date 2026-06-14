@@ -13,7 +13,8 @@ export type AuditLogAction =
   | 'OWNER_CHANGED'
   | 'DELEGATES_CHANGED'
   | 'DELEGATE_REMOVED'
-  | 'BORROWING_REJECTED';
+  | 'BORROWING_REJECTED'
+  | 'ITEM_IMPORTED';
 
 export interface AuditLogEntry {
   id: number;
