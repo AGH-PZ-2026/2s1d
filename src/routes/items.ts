@@ -144,29 +144,53 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
 
   const body = c.req.valid("json");
 
-  if (permission === "edit") {
-    const allowedKeys = ["statusId", "description"];
-    const requestedKeys = Object.keys(body).filter((k) => (body as any)[k] !== undefined);
-    const hasForbiddenKeys = requestedKeys.some((k) => !allowedKeys.includes(k));
-    if (hasForbiddenKeys) {
-      forbidden("Delegat z uprawnieniami do edycji może zmienić tylko status i opis");
+  // Determine which fields the user is allowed to update
+  const allowedFields = new Set<string>();
+
+  if (permission === "admin" || permission === "owner") {
+    // Admin and owner can update everything
+    allowedFields.add("name");
+    allowedFields.add("manufacturer");
+    allowedFields.add("model");
+    allowedFields.add("serial");
+    allowedFields.add("inventoryNumber");
+    allowedFields.add("description");
+    allowedFields.add("purchaseDate");
+    allowedFields.add("systemId");
+    allowedFields.add("categoryId");
+    allowedFields.add("statusId");
+    allowedFields.add("locationId");
+    allowedFields.add("ownerId");
+    allowedFields.add("ownerGroupId");
+  } else if (permission === "manage") {
+    // Manage can update everything except ownerId and ownerGroupId
+    allowedFields.add("name");
+    allowedFields.add("manufacturer");
+    allowedFields.add("model");
+    allowedFields.add("serial");
+    allowedFields.add("inventoryNumber");
+    allowedFields.add("description");
+    allowedFields.add("purchaseDate");
+    allowedFields.add("systemId");
+    allowedFields.add("categoryId");
+    allowedFields.add("statusId");
+    allowedFields.add("locationId");
+    // ownerId and ownerGroupId are NOT allowed
+  } else if (permission === "edit") {
+    // Edit can only update statusId and description
+    allowedFields.add("statusId");
+    allowedFields.add("description");
+  }
+
+  // Build updateData only from allowed fields
+  const updateData: Record<string, unknown> = {};
+  for (const key of Object.keys(body) as (keyof typeof body)[]) {
+    if (allowedFields.has(key) && (body as any)[key] !== undefined) {
+      updateData[key] = (body as any)[key];
     }
   }
 
-  const updateData: Record<string, unknown> = {};
-  if (body.name !== undefined) updateData.name = body.name;
-  if (body.manufacturer !== undefined) updateData.manufacturer = body.manufacturer || null;
-  if (body.model !== undefined) updateData.model = body.model ?? null;
-  if (body.serial !== undefined) updateData.serial = body.serial ?? null;
-  if (body.inventoryNumber !== undefined) updateData.inventoryNumber = body.inventoryNumber ?? null;
-  if (body.description !== undefined) updateData.description = body.description ?? null;
-  if (body.purchaseDate !== undefined) updateData.purchaseDate = body.purchaseDate ?? null;
-  if (body.systemId !== undefined) updateData.systemId = body.systemId ?? null;
-  if (body.categoryId !== undefined) updateData.categoryId = body.categoryId ?? null;
-  if (body.statusId !== undefined) updateData.statusId = body.statusId ?? null;
-  if (body.locationId !== undefined) updateData.locationId = body.locationId ?? null;
-  if (body.ownerId !== undefined) updateData.ownerId = body.ownerId ?? null;
-  if (body.ownerGroupId !== undefined) updateData.ownerGroupId = body.ownerGroupId ?? null;
+  // If no fields to update, return error
   if (Object.keys(updateData).length === 0) badRequest("No fields to update");
 
   await db.update(items).set(updateData).where(eq(items.id, id));
