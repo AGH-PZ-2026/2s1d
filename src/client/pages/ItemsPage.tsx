@@ -74,17 +74,15 @@ export default function ItemsPage() {
     finally { setFormLoading(false); }
   };
 
-  const handleEdit = async (payload: Partial<CreateItemPayload>) => {
-    if (!selectedItemId) return;
+  const handleEdit = async (itemId: number, payload: Partial<CreateItemPayload>) => {
     setFormLoading(true); setFormError(null);
-    try { await itemService.update(selectedItemId, payload); await fetchItems(); setSuccessMessage('Przedmiot został zaktualizowany.'); setModal(null); }
+    try { await itemService.update(itemId, payload); await fetchItems(); setSuccessMessage('Przedmiot został zaktualizowany.'); setModal(null); }
     catch (e: unknown) { setFormError(e instanceof Error ? e.message : 'Wystąpił błąd podczas aktualizacji.'); }
     finally { setFormLoading(false); }
   };
 
   const openCreate = () => { setFormError(null); setModal({ mode: 'create' }); };
   const openEdit = () => { 
-    // Always open the modal – the backend will reject if the user has no permission
     setFormError(null); 
     setModal({ mode: 'edit', itemId: selectedItemId ?? undefined }); 
   };
@@ -237,7 +235,7 @@ export default function ItemsPage() {
           <ItemDelegationsPanel item={selectedItem} delegations={itemDelegations} canManage={canManageLocation} onCreate={handleCreateDelegation} onUpdate={handleUpdateDelegation} onDelete={handleDeleteDelegation} />
         </>)}
       </>)}
-      {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" ref={modalRef} onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>{modal.mode === 'create' ? 'Nowy przedmiot' : 'Edytuj przedmiot'}</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}{modal.mode === 'create' ? <CreateForm categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} currentUser={user} /> : <EditForm item={selectedItem} categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleEdit} loading={formLoading} currentUser={user} />}</div></div>)}
+      {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" ref={modalRef} onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>{modal.mode === 'create' ? 'Nowy przedmiot' : 'Edytuj przedmiot'}</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}{modal.mode === 'create' ? <CreateForm categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} currentUser={user} /> : <EditForm item={selectedItem} categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={(itemId, payload) => handleEdit(itemId, payload)} loading={formLoading} currentUser={user} />}</div></div>)}
     </div>
   );
 }
@@ -623,10 +621,9 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
   </div>);
 }
 
-function EditForm({ item, categories, groups, locations, owners, statuses, onSubmit, loading, currentUser }: { item: Item; categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: Partial<CreateItemPayload>) => void; loading: boolean; currentUser: AuthUser | null }) {
+function EditForm({ item, categories, groups, locations, owners, statuses, onSubmit, loading, currentUser }: { item: Item; categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (itemId: number, payload: Partial<CreateItemPayload>) => void; loading: boolean; currentUser: AuthUser | null }) {
   const [name, setName] = useState(item.name); const [manufacturer, setManufacturer] = useState(item.manufacturer); const [model, setModel] = useState(item.model ?? ''); const [serial, setSerial] = useState(item.serial ?? ''); const [inventoryNumber, setInventoryNumber] = useState(item.inventoryNumber ?? ''); const [description, setDescription] = useState(item.description ?? ''); const [purchaseDate, setPurchaseDate] = useState(item.purchaseDate ?? ''); const [categoryId, setCategoryId] = useState(item.categoryId ?? categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(item.statusId ?? statuses[0]?.id ?? 1);
 
-  // Determine initial owner type – an item must always have either ownerId or ownerGroupId
   const initialOwnerType = useMemo<'person' | 'group'>(() => {
     if (item.ownerGroupId) return 'group';
     return 'person';
@@ -655,8 +652,7 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
     }
   };
 
-  const submit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const submit = () => {
     if (!name.trim()) return; 
     const payload: Partial<CreateItemPayload> = { 
       name: name.trim(), 
@@ -676,7 +672,7 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
       payload.ownerGroupId = ownerGroupId ? Number(ownerGroupId) : null;
       payload.ownerId = null;
     }
-    onSubmit(payload); 
+    onSubmit(item.id, payload); 
   };
 
   return (
