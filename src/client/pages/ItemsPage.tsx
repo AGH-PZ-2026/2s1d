@@ -569,11 +569,11 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
       serial: serial.trim() || undefined, 
       inventoryNumber: inventoryNumber.trim() || undefined, 
       description: description.trim() || undefined, 
-      purchaseDate: purchaseDate || undefined, 
-      categoryId: categoryId !== '' ? categoryId : undefined, 
-      statusId: statusId !== '' ? statusId : undefined, 
-      locationId: locationId !== '' ? locationId : undefined,
+      purchaseDate: purchaseDate || undefined,
     };
+    if (categoryId !== '' && categoryId > 0) payload.categoryId = categoryId;
+    if (statusId !== '' && statusId > 0) payload.statusId = statusId;
+    if (locationId !== '' && locationId > 0) payload.locationId = locationId;
     if (ownerType === 'person') {
       payload.ownerId = ownerId !== '' ? ownerId : undefined;
     } else if (ownerType === 'group') {
@@ -662,9 +662,9 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
       inventoryNumber: inventoryNumber.trim() || undefined, 
       description: description.trim() || undefined, 
       purchaseDate: purchaseDate || undefined, 
-      categoryId, 
-      statusId, 
     };
+    if (categoryId && categoryId > 0) payload.categoryId = categoryId;
+    if (statusId && statusId > 0) payload.statusId = statusId;
     if (ownerType === 'person') {
       payload.ownerId = ownerId;
       payload.ownerGroupId = null;
