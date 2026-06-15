@@ -10,6 +10,7 @@ import BorrowingsPage from './pages/BorrowingsPage';
 import AuditLogsPage from './pages/AuditLogsPage';
 import ExcelImportPage from './pages/ExcelImportPage';
 import ItemsPage from './pages/ItemsPage';
+import UsersPage from './pages/UsersPage';
 import LoginPage from './pages/LoginPage';
 import NotificationsPage from './pages/NotificationsPage';
 import OverdueReportsPage from './pages/OverdueReportsPage';
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
       { path: '/categories', element: <AuthGate><CategoriesPage /></AuthGate> },
       { path: '/delegations', element: <AuthGate><DelegationsPage /></AuthGate> },
       { path: '/borrowings', element: <AuthGate><BorrowingsPage /></AuthGate> },
+      { path: '/users', element: <AuthGate requireAdmin><UsersPage /></AuthGate> },
       { path: '/audit-logs', element: <AuthGate requireAdmin><AuditLogsPage /></AuthGate> },
       { path: '/items', element: <AuthGate><ItemsPage /></AuthGate> },
       { path: '/qr', element: <AuthGate><QrScannerPage /></AuthGate> },
