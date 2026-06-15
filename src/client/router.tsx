@@ -16,6 +16,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import OverdueReportsPage from './pages/OverdueReportsPage';
 import QrScannerPage from './pages/QrScannerPage';
 import BatchQrPage from './pages/BatchQrPage';
+import GroupsPage from './pages/GroupsPage';
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
       { path: '/reports/overdue', element: <AuthGate><OverdueReportsPage /></AuthGate> },
       { path: '/batch-qr', element: <AuthGate><BatchQrPage /></AuthGate> },
       { path: '/notifications', element: <AuthGate><NotificationsPage /></AuthGate> },
+      { path: '/groups', element: <AuthGate requireAdmin><GroupsPage /></AuthGate> },
       { path: '/login', element: <LoginPage /> },
     ],
   },
