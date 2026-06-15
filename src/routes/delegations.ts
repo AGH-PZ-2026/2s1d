@@ -3,9 +3,10 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, desc, inArray, and } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
-import { delegations, users, groups, auditLogs } from "../db/schema";
+
+import { delegations, users, groups, items } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
-import { notFound, badRequest } from "../lib/errors";
+import { notFound, badRequest, forbidden } from "../lib/errors";
 import { createAuditLog } from "../lib/audit";
 
 type Variables = { db: MySql2Database<Record<string, never>>; userId: number; userRole: "admin" | "user"; isAuthenticated: boolean };
@@ -32,6 +33,19 @@ async function resolveGroupNames(db: MySql2Database<Record<string, never>>, ids:
   const rows = await db.select({ id: groups.id, name: groups.name }).from(groups).where(inArray(groups.id, ids));
   for (const r of rows) map.set(r.id, r.name);
   return map;
+}
+
+// Helper to verify caller can manage delegations for this item
+async function assertCanManageDelegations(
+  db: MySql2Database<Record<string, never>>,
+  itemId: number,
+  userId: number,
+  userRole: "admin" | "user"
+) {
+  if (userRole === "admin") return;
+  const item = await db.select({ ownerId: items.ownerId }).from(items).where(eq(items.id, itemId)).limit(1);
+  if (item.length === 0) notFound("Item not found");
+  if (item[0].ownerId !== userId) forbidden("Tylko właściciel może zarządzać delegacjami");
 }
 
 router.get("/:itemId/delegations", async (c) => {
@@ -64,7 +78,12 @@ router.post("/:itemId/delegations", zValidator("json", createSchema), async (c) 
   const db = c.get("db");
   const itemId = Number(c.req.param("itemId"));
   const body = c.req.valid("json");
-  
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  // Only owner or admin can add delegations
+  await assertCanManageDelegations(db, itemId, userId, userRole);
+
   // Prevent duplicates
   const existing = await db.select().from(delegations).where(
     and(
@@ -115,9 +134,19 @@ router.post("/:itemId/delegations", zValidator("json", createSchema), async (c) 
 
 router.put("/:itemId/delegations/:id", zValidator("json", createSchema), async (c) => {
   const db = c.get("db");
+  const itemId = Number(c.req.param("itemId"));
   const id = Number(c.req.param("id"));
   const body = c.req.valid("json");
-  
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  // Only owner or admin can modify delegations
+  await assertCanManageDelegations(db, itemId, userId, userRole);
+
+  // Verify delegation exists and belongs to this item
+  const existing = await db.select().from(delegations).where(and(eq(delegations.id, id), eq(delegations.itemId, itemId))).limit(1);
+  if (existing.length === 0) notFound("Delegation not found");
+
   await db.update(delegations).set({
     userId: body.user_id ?? null,
     groupId: body.group_id ?? null,
@@ -144,7 +173,9 @@ router.put("/:itemId/delegations/:id", zValidator("json", createSchema), async (
 
 router.delete("/:itemId/delegations/:id", async (c) => {
   const db = c.get("db");
+  const itemId = Number(c.req.param("itemId"));
   const id = Number(c.req.param("id"));
+<<<<<<< HEAD
 
   const existing = await db
     .select()
@@ -194,6 +225,17 @@ await createAuditLog(db, {
   newValue: null,
 });
 
+=======
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  // Only owner or admin can delete delegations
+  await assertCanManageDelegations(db, itemId, userId, userRole);
+
+  // Verify delegation exists and belongs to this item
+  const existing = await db.select().from(delegations).where(and(eq(delegations.id, id), eq(delegations.itemId, itemId))).limit(1);
+  if (existing.length === 0) notFound("Delegation not found");
+>>>>>>> bc51a82 (fix: enforce owner-only delegation management permissions)
 
   await db.delete(delegations).where(eq(delegations.id, id));
   return c.body(null, 204);
