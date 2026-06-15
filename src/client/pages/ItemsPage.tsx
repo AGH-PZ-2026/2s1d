@@ -589,14 +589,7 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
 function EditForm({ item, categories, groups, locations, owners, statuses, onSubmit, loading, currentUser }: { item: Item; categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: Partial<CreateItemPayload>) => void; loading: boolean; currentUser: AuthUser | null }) {
   const [name, setName] = useState(item.name); const [manufacturer, setManufacturer] = useState(item.manufacturer); const [model, setModel] = useState(item.model ?? ''); const [serial, setSerial] = useState(item.serial ?? ''); const [inventoryNumber, setInventoryNumber] = useState(item.inventoryNumber ?? ''); const [description, setDescription] = useState(item.description ?? ''); const [purchaseDate, setPurchaseDate] = useState(item.purchaseDate ?? ''); const [categoryId, setCategoryId] = useState(item.categoryId ?? categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(item.statusId ?? statuses[0]?.id ?? 1); const [ownerId, setOwnerId] = useState(item.ownerId ?? owners[0]?.id ?? 1); const [ownerGroupId, setOwnerGroupId] = useState(item.ownerGroupId ? String(item.ownerGroupId) : '');
   
-  // Determine if the current user can change the owner/group fields
-  const canChangeOwner = useMemo(() => {
-    if (!currentUser) return false;
-    if (currentUser.role === 'admin') return true;
-    if (item.ownerId === currentUser.id) return true;
-    return false;
-  }, [currentUser, item.ownerId]);
-
+  // No longer restrict owner/group fields – any user with edit permission can change them
   useEffect(() => {
     setName(item.name); setManufacturer(item.manufacturer); setModel(item.model ?? ''); setSerial(item.serial ?? ''); setInventoryNumber(item.inventoryNumber ?? ''); setDescription(item.description ?? ''); setPurchaseDate(item.purchaseDate ?? ''); setCategoryId(item.categoryId ?? categories[0]?.id ?? 1); setStatusId(item.statusId ?? statuses[0]?.id ?? 1); setOwnerId(item.ownerId ?? owners[0]?.id ?? 1); setOwnerGroupId(item.ownerGroupId ? String(item.ownerGroupId) : '');
   }, [item, categories, owners, statuses]);
@@ -612,8 +605,8 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
     <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
     <label className="form-label">Kategoria *</label><CategoryDropdown categories={categories} value={categoryId} onChange={(val) => setCategoryId(val === '' ? (categories[0]?.id || 1) : val)} allowEmpty={false} />
     <label className="form-label">Status *</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
-    <label className="form-label">Właściciel / opiekun *</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))} disabled={!canChangeOwner}>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
-    <label className="form-label">Grupa opiekunów</label><select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)} disabled={!canChangeOwner}><option value="">Brak grupy</option>{groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}</select>
+    <label className="form-label">Właściciel / opiekun *</label><select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>{owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}</select>
+    <label className="form-label">Grupa opiekunów</label><select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}><option value="">Brak grupy</option>{groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}</select>
     <div className="form-actions"><button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim()}>{loading ? 'Zapisywanie…' : 'Zapisz zmiany'}</button></div>
   </div>);
 }

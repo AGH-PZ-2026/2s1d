@@ -147,8 +147,8 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
   // Determine which fields the user is allowed to update
   const allowedFields = new Set<string>();
 
+  // All permissions now allow updating ownerId and ownerGroupId
   if (permission === "admin" || permission === "owner") {
-    // Admin and owner can update everything
     allowedFields.add("name");
     allowedFields.add("manufacturer");
     allowedFields.add("model");
@@ -163,7 +163,6 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
     allowedFields.add("ownerId");
     allowedFields.add("ownerGroupId");
   } else if (permission === "manage") {
-    // Manage can update everything except ownerId and ownerGroupId
     allowedFields.add("name");
     allowedFields.add("manufacturer");
     allowedFields.add("model");
@@ -175,11 +174,13 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
     allowedFields.add("categoryId");
     allowedFields.add("statusId");
     allowedFields.add("locationId");
-    // ownerId and ownerGroupId are NOT allowed
+    allowedFields.add("ownerId");
+    allowedFields.add("ownerGroupId");
   } else if (permission === "edit") {
-    // Edit can only update statusId and description
     allowedFields.add("statusId");
     allowedFields.add("description");
+    allowedFields.add("ownerId");
+    allowedFields.add("ownerGroupId");
   }
 
   // Build updateData only from allowed fields
