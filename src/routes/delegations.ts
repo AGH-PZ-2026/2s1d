@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, and } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import { delegations, users, groups, auditLogs } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
@@ -64,8 +64,17 @@ router.post("/:itemId/delegations", zValidator("json", createSchema), async (c) 
   const db = c.get("db");
   const itemId = Number(c.req.param("itemId"));
   const body = c.req.valid("json");
-  if (!body.user_id && !body.group_id) badRequest("Podaj użytkownika lub grupę.");
-
+  
+  // Prevent duplicates
+  const existing = await db.select().from(delegations).where(
+    and(
+      eq(delegations.itemId, itemId),
+      body.user_id ? eq(delegations.userId, body.user_id) : eq(delegations.groupId, body.group_id!)
+    )
+  ).limit(1);
+  
+  if (existing.length > 0) badRequest("Ta osoba lub grupa jest już przypisana do tego przedmiotu.");
+  
   const result = await db.insert(delegations).values({
     itemId,
     userId: body.user_id ?? null,
@@ -74,16 +83,10 @@ router.post("/:itemId/delegations", zValidator("json", createSchema), async (c) 
   });
   const created = await db.select().from(delegations).where(eq(delegations.id, result[0].insertId)).limit(1);
 
-  let userEmail: string | null = null;
-  let groupName: string | null = null;
-  if (body.user_id) {
-    const u = await db.select({ email: users.email }).from(users).where(eq(users.id, body.user_id)).limit(1);
-    if (u.length > 0) userEmail = u[0].email;
-  }
-  if (body.group_id) {
-    const g = await db.select({ name: groups.name }).from(groups).where(eq(groups.id, body.group_id)).limit(1);
-    if (g.length > 0) groupName = g[0].name;
-  }
+  const [userEmail, groupName] = await Promise.all([
+    body.user_id ? db.select({ email: users.email }).from(users).where(eq(users.id, body.user_id)).limit(1).then(r => r[0]?.email || null) : Promise.resolve(null),
+    body.group_id ? db.select({ name: groups.name }).from(groups).where(eq(groups.id, body.group_id)).limit(1).then(r => r[0]?.name || null) : Promise.resolve(null)
+  ]);
 
   await createAuditLog(db, {
   userId: c.get("userId"),
@@ -108,6 +111,35 @@ router.post("/:itemId/delegations", zValidator("json", createSchema), async (c) 
     user_email: userEmail,
     group_name: groupName,
   }, 201);
+});
+
+router.put("/:itemId/delegations/:id", zValidator("json", createSchema), async (c) => {
+  const db = c.get("db");
+  const id = Number(c.req.param("id"));
+  const body = c.req.valid("json");
+  
+  await db.update(delegations).set({
+    userId: body.user_id ?? null,
+    groupId: body.group_id ?? null,
+    permission: body.permission,
+  }).where(eq(delegations.id, id));
+  
+  const updated = await db.select().from(delegations).where(eq(delegations.id, id)).limit(1);
+  
+  const [userEmail, groupName] = await Promise.all([
+    updated[0].userId ? db.select({ email: users.email }).from(users).where(eq(users.id, updated[0].userId)).limit(1).then(r => r[0]?.email || null) : Promise.resolve(null),
+    updated[0].groupId ? db.select({ name: groups.name }).from(groups).where(eq(groups.id, updated[0].groupId)).limit(1).then(r => r[0]?.name || null) : Promise.resolve(null)
+  ]);
+
+  return c.json({
+    id: updated[0].id,
+    item_id: updated[0].itemId,
+    user_id: updated[0].userId,
+    group_id: updated[0].groupId,
+    permission: updated[0].permission,
+    user_email: userEmail,
+    group_name: groupName,
+  });
 });
 
 router.delete("/:itemId/delegations/:id", async (c) => {
