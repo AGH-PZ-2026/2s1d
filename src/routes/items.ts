@@ -31,8 +31,8 @@ const createSchema = z.object({
   categoryId: z.number().int().positive().optional(),
   statusId: z.number().int().positive().optional(),
   locationId: z.number().int().positive().optional(),
-  ownerId: z.number().int().positive().optional(),
-  ownerGroupId: z.number().int().positive().optional(),
+  ownerId: z.number().int().positive().optional().nullable(),
+  ownerGroupId: z.number().int().positive().optional().nullable(),
 });
 
 const updateSchema = createSchema.partial();
@@ -96,8 +96,13 @@ router.post("/", zValidator("json", createSchema), async (c) => {
   if (!body.name.trim()) badRequest("Nazwa przedmiotu jest wymagana.");
 
   // Mutual exclusivity of ownerId and ownerGroupId
-  if (body.ownerId !== undefined && body.ownerGroupId !== undefined) {
+  if (body.ownerId != null && body.ownerGroupId != null) {
     badRequest("Można przypisać tylko osobę lub grupę jako opiekuna, nie oba jednocześnie.");
+  }
+
+  // At least one of ownerId or ownerGroupId must be provided (non-null)
+  if (body.ownerId == null && body.ownerGroupId == null) {
+    badRequest("Przedmiot musi mieć przypisanego opiekuna (osobę lub grupę).");
   }
 
   const insertValues: Record<string, unknown> = {
@@ -150,14 +155,13 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
   const body = c.req.valid("json");
 
   // Mutual exclusivity
-  if (body.ownerId !== undefined && body.ownerGroupId !== undefined) {
+  if (body.ownerId != null && body.ownerGroupId != null) {
     badRequest("Można przypisać tylko osobę lub grupę jako opiekuna, nie oba jednocześnie.");
   }
 
   // Determine which fields the user is allowed to update
   const allowedFields = new Set<string>();
 
-  // All permissions now allow updating ownerId and ownerGroupId
   if (permission === "admin" || permission === "owner") {
     allowedFields.add("name");
     allowedFields.add("manufacturer");
@@ -201,7 +205,13 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
     }
   }
 
-  // If no fields to update, return error
+  // Ensure the final state still has an owner (not both null)
+  const newOwnerId = body.ownerId !== undefined ? body.ownerId : item.ownerId;
+  const newOwnerGroupId = body.ownerGroupId !== undefined ? body.ownerGroupId : item.ownerGroupId;
+  if (newOwnerId == null && newOwnerGroupId == null) {
+    badRequest("Przedmiot musi mieć przypisanego opiekuna (osobę lub grupę).");
+  }
+
   if (Object.keys(updateData).length === 0) badRequest("No fields to update");
 
   await db.update(items).set(updateData).where(eq(items.id, id));

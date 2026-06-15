@@ -671,10 +671,10 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
     };
     if (ownerType === 'person') {
       payload.ownerId = ownerId;
-      payload.ownerGroupId = undefined;
+      payload.ownerGroupId = null;
     } else if (ownerType === 'group') {
-      payload.ownerGroupId = ownerGroupId ? Number(ownerGroupId) : undefined;
-      payload.ownerId = undefined;
+      payload.ownerGroupId = ownerGroupId ? Number(ownerGroupId) : null;
+      payload.ownerId = null;
     }
     onSubmit(payload); 
   };
