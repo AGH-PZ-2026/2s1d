@@ -13,6 +13,7 @@ import {
   FileWarning,
   Bell,
   History,
+  Users,
   Menu,
   LogIn,
   LogOut,
@@ -26,6 +27,7 @@ interface NavItem {
   icon: ElementType;
   section?: string;
   requiresAuth?: boolean;
+  requiresAdmin?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -72,10 +74,17 @@ const navItems: NavItem[] = [
     requiresAuth: true,
   },
   {
+    to: '/users',
+    label: 'Użytkownicy',
+    icon: Users,
+    section: 'System',
+    requiresAuth: true,
+    requiresAdmin: true,
+  },
+  {
     to: '/notifications',
     label: 'Powiadomienia',
     icon: Bell,
-    section: 'System',
     requiresAuth: true,
   },
   {
@@ -83,6 +92,7 @@ const navItems: NavItem[] = [
     label: 'Logi audytu',
     icon: History,
     requiresAuth: true,
+    requiresAdmin: true,
   },
 ];
 
@@ -135,7 +145,11 @@ export const Layout = () => {
 
         <nav style={{ flex: 1, padding: '8px 0' }}>
           {navItems
-            .filter((item) => !item.requiresAuth || user)
+            .filter((item) => {
+              if (item.requiresAuth && !user) return false;
+              if (item.requiresAdmin && user?.role !== 'admin') return false;
+              return true;
+            })
             .map((item) => {
               const isActive =
                 item.to === '/'
