@@ -162,6 +162,17 @@ export default function ItemsPage() {
     return false;
   }, [selectedItem, user, itemDelegations]);
 
+  const permissionLevel = useMemo<'admin' | 'owner' | 'manage' | 'edit' | null>(() => {
+    if (!selectedItem || !user) return null;
+    if (user.role === 'admin') return 'admin';
+    if (selectedItem.ownerId === user.id) return 'owner';
+    const hasManageDelegation = itemDelegations.some(d => d.user_id === user.id && d.permission === 'manage');
+    if (hasManageDelegation) return 'manage';
+    const hasEditDelegation = itemDelegations.some(d => d.user_id === user.id && d.permission === 'edit');
+    if (hasEditDelegation) return 'edit';
+    return null;
+  }, [selectedItem, user, itemDelegations]);
+
   const handlePhotoUpload = async (file: File) => {
     if (!selectedItem) return;
     setPhotoError(null); setPhotoLoading(true);
@@ -235,7 +246,7 @@ export default function ItemsPage() {
           <ItemDelegationsPanel item={selectedItem} delegations={itemDelegations} canManage={canManageLocation} onCreate={handleCreateDelegation} onUpdate={handleUpdateDelegation} onDelete={handleDeleteDelegation} />
         </>)}
       </>)}
-      {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" ref={modalRef} onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>{modal.mode === 'create' ? 'Nowy przedmiot' : 'Edytuj przedmiot'}</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}{modal.mode === 'create' ? <CreateForm categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} currentUser={user} /> : <EditForm item={selectedItem} categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={(itemId, payload) => handleEdit(itemId, payload)} loading={formLoading} currentUser={user} />}</div></div>)}
+      {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" ref={modalRef} onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>{modal.mode === 'create' ? 'Nowy przedmiot' : 'Edytuj przedmiot'}</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}{modal.mode === 'create' ? <CreateForm categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} currentUser={user} /> : <EditForm item={selectedItem} categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={(itemId, payload) => handleEdit(itemId, payload)} loading={formLoading} currentUser={user} permissionLevel={permissionLevel} />}</div></div>)}
     </div>
   );
 }
@@ -621,7 +632,7 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
   </div>);
 }
 
-function EditForm({ item, categories, groups, locations, owners, statuses, onSubmit, loading, currentUser }: { item: Item; categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (itemId: number, payload: Partial<CreateItemPayload>) => void; loading: boolean; currentUser: AuthUser | null }) {
+function EditForm({ item, categories, groups, locations, owners, statuses, onSubmit, loading, currentUser, permissionLevel }: { item: Item; categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (itemId: number, payload: Partial<CreateItemPayload>) => void; loading: boolean; currentUser: AuthUser | null; permissionLevel: 'admin' | 'owner' | 'manage' | 'edit' | null }) {
   const [name, setName] = useState(item.name); const [manufacturer, setManufacturer] = useState(item.manufacturer); const [model, setModel] = useState(item.model ?? ''); const [serial, setSerial] = useState(item.serial ?? ''); const [inventoryNumber, setInventoryNumber] = useState(item.inventoryNumber ?? ''); const [description, setDescription] = useState(item.description ?? ''); const [purchaseDate, setPurchaseDate] = useState(item.purchaseDate ?? ''); const [categoryId, setCategoryId] = useState(item.categoryId ?? categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(item.statusId ?? statuses[0]?.id ?? 1);
 
   const initialOwnerType = useMemo<'person' | 'group'>(() => {
@@ -641,6 +652,9 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
     setOwnerType(ot);
   }, [item, categories, owners, statuses]);
 
+  const showAllFields = permissionLevel === 'admin' || permissionLevel === 'owner' || permissionLevel === 'manage';
+  const canEditOwner = permissionLevel === 'admin' || permissionLevel === 'owner';
+
   const handleOwnerTypeChange = (newType: 'person' | 'group') => {
     setOwnerType(newType);
     if (newType === 'person') {
@@ -654,59 +668,75 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
 
   const submit = () => {
     if (!name.trim()) return; 
-    const payload: Partial<CreateItemPayload> = { 
-      name: name.trim(), 
-      manufacturer: manufacturer.trim() || undefined, 
-      model: model.trim() || undefined, 
-      serial: serial.trim() || undefined, 
-      inventoryNumber: inventoryNumber.trim() || undefined, 
-      description: description.trim() || undefined, 
-      purchaseDate: purchaseDate || undefined, 
-    };
-    if (categoryId && categoryId > 0) payload.categoryId = categoryId;
-    if (statusId && statusId > 0) payload.statusId = statusId;
-    if (ownerType === 'person') {
-      payload.ownerId = ownerId;
-      payload.ownerGroupId = null;
-    } else if (ownerType === 'group') {
-      payload.ownerGroupId = ownerGroupId ? Number(ownerGroupId) : null;
-      payload.ownerId = null;
+    const payload: Partial<CreateItemPayload> = {};
+    // Always include description, as edit allows it
+    payload.description = description.trim() || undefined;
+    if (showAllFields) {
+      payload.name = name.trim();
+      payload.manufacturer = manufacturer.trim() || undefined;
+      payload.model = model.trim() || undefined;
+      payload.serial = serial.trim() || undefined;
+      payload.inventoryNumber = inventoryNumber.trim() || undefined;
+      payload.purchaseDate = purchaseDate || undefined;
+      if (categoryId && categoryId > 0) payload.categoryId = categoryId;
+      if (statusId && statusId > 0) payload.statusId = statusId;
+    }
+    if (canEditOwner) {
+      if (ownerType === 'person') {
+        payload.ownerId = ownerId;
+        payload.ownerGroupId = null;
+      } else if (ownerType === 'group') {
+        payload.ownerGroupId = ownerGroupId ? Number(ownerGroupId) : null;
+        payload.ownerId = null;
+      }
     }
     onSubmit(item.id, payload); 
   };
 
   return (
     <div className="form">
-      <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
-      <label className="form-label">Producent</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} />
-      <label className="form-label">Model</label><input className="form-input" value={model} onChange={(e) => setModel(e.target.value)} />
-      <label className="form-label">Nr seryjny</label><input className="form-input" value={serial} onChange={(e) => setSerial(e.target.value)} />
-      <label className="form-label">Nr inwentarzowy</label><input className="form-input" value={inventoryNumber} onChange={(e) => setInventoryNumber(e.target.value)} />
-      <label className="form-label">Opis</label><textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} />
-      <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
-      <label className="form-label">Kategoria *</label><CategoryDropdown categories={categories} value={categoryId} onChange={(val) => setCategoryId(val === '' ? (categories[0]?.id || 1) : val)} allowEmpty={false} />
-      <label className="form-label">Status *</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
-
-      <label className="form-label">Typ opiekuna</label>
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-        <label><input type="radio" name="editOwnerType" value="person" checked={ownerType === 'person'} onChange={() => handleOwnerTypeChange('person')} /> Osoba</label>
-        <label><input type="radio" name="editOwnerType" value="group" checked={ownerType === 'group'} onChange={() => handleOwnerTypeChange('group')} /> Grupa</label>
-      </div>
-
-      {ownerType === 'person' && (
+      {permissionLevel === 'edit' && (
         <>
-          <label className="form-label">Opiekun</label>
-          <select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>
-            {owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}
-          </select>
+          <label className="form-label">Opis</label>
+          <textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} />
         </>
       )}
-      {ownerType === 'group' && (
+      {showAllFields && (
         <>
-          <label className="form-label">Grupa opiekunów</label>
-          <select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}>
-            {groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}
-          </select>
+          <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
+          <label className="form-label">Producent</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} />
+          <label className="form-label">Model</label><input className="form-input" value={model} onChange={(e) => setModel(e.target.value)} />
+          <label className="form-label">Nr seryjny</label><input className="form-input" value={serial} onChange={(e) => setSerial(e.target.value)} />
+          <label className="form-label">Nr inwentarzowy</label><input className="form-input" value={inventoryNumber} onChange={(e) => setInventoryNumber(e.target.value)} />
+          <label className="form-label">Opis</label><textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
+          <label className="form-label">Kategoria *</label><CategoryDropdown categories={categories} value={categoryId} onChange={(val) => setCategoryId(val === '' ? (categories[0]?.id || 1) : val)} allowEmpty={false} />
+          <label className="form-label">Status *</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
+        </>
+      )}
+      {canEditOwner && (
+        <>
+          <label className="form-label">Typ opiekuna</label>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+            <label><input type="radio" name="editOwnerType" value="person" checked={ownerType === 'person'} onChange={() => handleOwnerTypeChange('person')} /> Osoba</label>
+            <label><input type="radio" name="editOwnerType" value="group" checked={ownerType === 'group'} onChange={() => handleOwnerTypeChange('group')} /> Grupa</label>
+          </div>
+          {ownerType === 'person' && (
+            <>
+              <label className="form-label">Opiekun</label>
+              <select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>
+                {owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}
+              </select>
+            </>
+          )}
+          {ownerType === 'group' && (
+            <>
+              <label className="form-label">Grupa opiekunów</label>
+              <select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}>
+                {groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}
+              </select>
+            </>
+          )}
         </>
       )}
 
