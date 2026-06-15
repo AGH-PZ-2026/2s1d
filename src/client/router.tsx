@@ -30,7 +30,7 @@ export const router = createBrowserRouter([
       { path: '/audit-logs', element: <AuthGate requireAdmin><AuditLogsPage /></AuthGate> },
       { path: '/items', element: <AuthGate><ItemsPage /></AuthGate> },
       { path: '/qr', element: <AuthGate><QrScannerPage /></AuthGate> },
-      { path: '/import', element: <AuthGate><ExcelImportPage /></AuthGate> },
+      { path: '/import', element: <AuthGate requireAdmin> <ExcelImportPage /></AuthGate> },
       { path: '/reports/overdue', element: <AuthGate><OverdueReportsPage /></AuthGate> },
       { path: '/batch-qr', element: <AuthGate><BatchQrPage /></AuthGate> },
       { path: '/notifications', element: <AuthGate><NotificationsPage /></AuthGate> },

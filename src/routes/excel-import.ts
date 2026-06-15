@@ -3,7 +3,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import { items, auditLogs } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
-import { badRequest } from "../lib/errors";
+import { badRequest, forbidden } from "../lib/errors";
 import * as XLSX from "xlsx";
 import { createAuditLog } from "../lib/audit";
 
@@ -22,10 +22,17 @@ function excelDateToDate(serial: number): string {
 
 // POST /api/v1/excel/upload — frontend sends multipart FormData with "file"
 router.post("/upload", async (c) => {
+    if (c.get("userRole") !== "admin") {
+    forbidden("Only admins can import data");
+  }
   const db = c.get("db");
   const formData = await c.req.formData();
   const file = formData.get("file") as File | null;
   if (!file) badRequest("No file uploaded");
+
+  const mappingRaw = formData.get("column_mapping");
+
+  const columnMapping: Record<string, string> = mappingRaw ? JSON.parse(String(mappingRaw)) : {};
   
   let rows: Record<string, string>[] = [];
 
@@ -80,13 +87,29 @@ router.post("/upload", async (c) => {
 
   const errors: { row_number: number; error_message: string }[] = [];
   let successful = 0;
-  const total = rows.length - 1;
+  const total = rows.length ;
 
 
   for (let i = 0; i < rows.length; i++) {
-  const row = rows[i];
+  const rawRow = rows[i];
 
-  const name = row.name?.trim();
+  const row: Record<string, unknown> = {};
+
+  for (const [field, columnName] of Object.entries(
+    columnMapping
+  )) {
+    row[field] =
+      rawRow[
+        columnName as keyof typeof rawRow
+      ];
+  }
+  console.log("mapping", columnMapping);
+console.log("rawRow", rawRow);
+console.log("mapped", row);
+
+  const name = String(
+    row.name ?? ""
+  ).trim();
 
   if (!name) {
     errors.push({
