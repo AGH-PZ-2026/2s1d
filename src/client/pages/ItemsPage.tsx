@@ -546,7 +546,7 @@ function CreateDelegationForm({ initial, onSubmit }: { initial?: Delegation; onS
 function CreateForm({ categories, groups, locations, owners, statuses, onSubmit, loading, currentUser }: { categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: CreateItemPayload) => void; loading: boolean; currentUser: AuthUser | null }) {
   const defaultOwnerId = useMemo(() => { if (currentUser && owners.some(o => o.id === currentUser.id)) return currentUser.id; return owners[0]?.id ?? ''; }, [currentUser, owners]);
   
-  const [ownerType, setOwnerType] = useState<'none' | 'person' | 'group'>('person');
+  const [ownerType, setOwnerType] = useState<'person' | 'group'>('person');
   
   const [name, setName] = useState(''); const [manufacturer, setManufacturer] = useState(''); const [model, setModel] = useState(''); const [serial, setSerial] = useState(''); const [inventoryNumber, setInventoryNumber] = useState(''); const [description, setDescription] = useState(''); const [purchaseDate, setPurchaseDate] = useState(''); 
   const [categoryId, setCategoryId] = useState<number | ''>(categories[0]?.id ?? ''); 
@@ -555,12 +555,9 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
   const [ownerId, setOwnerId] = useState<number | ''>(defaultOwnerId); 
   const [ownerGroupId, setOwnerGroupId] = useState('');
 
-  const handleOwnerTypeChange = (newType: 'none' | 'person' | 'group') => {
+  const handleOwnerTypeChange = (newType: 'person' | 'group') => {
     setOwnerType(newType);
-    if (newType === 'none') {
-      setOwnerId('');
-      setOwnerGroupId('');
-    } else if (newType === 'person') {
+    if (newType === 'person') {
       setOwnerGroupId('');
       if (ownerId === '') setOwnerId(defaultOwnerId);
     } else if (newType === 'group') {
@@ -588,7 +585,6 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
     } else if (ownerType === 'group') {
       payload.ownerGroupId = ownerGroupId ? Number(ownerGroupId) : undefined;
     }
-    // ownerType 'none' leaves both undefined
     onSubmit(payload); 
   };
 
@@ -606,7 +602,6 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
 
     <label className="form-label">Typ opiekuna</label>
     <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-      <label><input type="radio" name="ownerType" value="none" checked={ownerType === 'none'} onChange={() => handleOwnerTypeChange('none')} /> Brak</label>
       <label><input type="radio" name="ownerType" value="person" checked={ownerType === 'person'} onChange={() => handleOwnerTypeChange('person')} /> Osoba</label>
       <label><input type="radio" name="ownerType" value="group" checked={ownerType === 'group'} onChange={() => handleOwnerTypeChange('group')} /> Grupa</label>
     </div>
@@ -635,14 +630,13 @@ function CreateForm({ categories, groups, locations, owners, statuses, onSubmit,
 function EditForm({ item, categories, groups, locations, owners, statuses, onSubmit, loading, currentUser }: { item: Item; categories: Category[]; groups: Group[]; locations: Location[]; owners: Owner[]; statuses: Status[]; onSubmit: (p: Partial<CreateItemPayload>) => void; loading: boolean; currentUser: AuthUser | null }) {
   const [name, setName] = useState(item.name); const [manufacturer, setManufacturer] = useState(item.manufacturer); const [model, setModel] = useState(item.model ?? ''); const [serial, setSerial] = useState(item.serial ?? ''); const [inventoryNumber, setInventoryNumber] = useState(item.inventoryNumber ?? ''); const [description, setDescription] = useState(item.description ?? ''); const [purchaseDate, setPurchaseDate] = useState(item.purchaseDate ?? ''); const [categoryId, setCategoryId] = useState(item.categoryId ?? categories[0]?.id ?? 1); const [statusId, setStatusId] = useState(item.statusId ?? statuses[0]?.id ?? 1);
 
-  // Determine initial owner type
-  const initialOwnerType = useMemo<'none' | 'person' | 'group'>(() => {
+  // Determine initial owner type – an item must always have either ownerId or ownerGroupId
+  const initialOwnerType = useMemo<'person' | 'group'>(() => {
     if (item.ownerGroupId) return 'group';
-    if (item.ownerId) return 'person';
-    return 'none';
+    return 'person';
   }, [item.ownerId, item.ownerGroupId]);
 
-  const [ownerType, setOwnerType] = useState<'none' | 'person' | 'group'>(initialOwnerType);
+  const [ownerType, setOwnerType] = useState<'person' | 'group'>(initialOwnerType);
   const [ownerId, setOwnerId] = useState<number>(item.ownerId ?? owners[0]?.id ?? 1);
   const [ownerGroupId, setOwnerGroupId] = useState(item.ownerGroupId ? String(item.ownerGroupId) : '');
 
@@ -650,16 +644,13 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
     setName(item.name); setManufacturer(item.manufacturer); setModel(item.model ?? ''); setSerial(item.serial ?? ''); setInventoryNumber(item.inventoryNumber ?? ''); setDescription(item.description ?? ''); setPurchaseDate(item.purchaseDate ?? ''); setCategoryId(item.categoryId ?? categories[0]?.id ?? 1); setStatusId(item.statusId ?? statuses[0]?.id ?? 1);
     setOwnerId(item.ownerId ?? owners[0]?.id ?? 1);
     setOwnerGroupId(item.ownerGroupId ? String(item.ownerGroupId) : '');
-    const ot = item.ownerGroupId ? 'group' : (item.ownerId ? 'person' : 'none');
+    const ot = item.ownerGroupId ? 'group' : 'person';
     setOwnerType(ot);
   }, [item, categories, owners, statuses]);
 
-  const handleOwnerTypeChange = (newType: 'none' | 'person' | 'group') => {
+  const handleOwnerTypeChange = (newType: 'person' | 'group') => {
     setOwnerType(newType);
-    if (newType === 'none') {
-      setOwnerId(0);
-      setOwnerGroupId('');
-    } else if (newType === 'person') {
+    if (newType === 'person') {
       setOwnerGroupId('');
       if (!ownerId) setOwnerId(owners[0]?.id ?? 1);
     } else if (newType === 'group') {
@@ -687,9 +678,6 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
     } else if (ownerType === 'group') {
       payload.ownerGroupId = ownerGroupId ? Number(ownerGroupId) : undefined;
       payload.ownerId = undefined;
-    } else {
-      payload.ownerId = undefined;
-      payload.ownerGroupId = undefined;
     }
     onSubmit(payload); 
   };
@@ -707,7 +695,6 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
 
     <label className="form-label">Typ opiekuna</label>
     <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-      <label><input type="radio" name="editOwnerType" value="none" checked={ownerType === 'none'} onChange={() => handleOwnerTypeChange('none')} /> Brak</label>
       <label><input type="radio" name="editOwnerType" value="person" checked={ownerType === 'person'} onChange={() => handleOwnerTypeChange('person')} /> Osoba</label>
       <label><input type="radio" name="editOwnerType" value="group" checked={ownerType === 'group'} onChange={() => handleOwnerTypeChange('group')} /> Grupa</label>
     </div>
@@ -724,7 +711,6 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
       <>
         <label className="form-label">Grupa opiekunów</label>
         <select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}>
-          <option value="">Brak grupy</option>
           {groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}
         </select>
       </>
