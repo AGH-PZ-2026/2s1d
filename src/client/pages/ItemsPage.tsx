@@ -84,11 +84,7 @@ export default function ItemsPage() {
 
   const openCreate = () => { setFormError(null); setModal({ mode: 'create' }); };
   const openEdit = () => { 
-    if (!canEditSelected) {
-      setError('Nie masz uprawnień do edycji tego przedmiotu.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
+    // Always open the modal – the backend will reject if the user has no permission
     setFormError(null); 
     setModal({ mode: 'edit', itemId: selectedItemId ?? undefined }); 
   };
