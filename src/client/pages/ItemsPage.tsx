@@ -293,6 +293,7 @@ function LocationMapPanel({ item, location, locations, onCreateLocation, onLocat
       {item.serial && <div><dt>Nr seryjny</dt><dd>{item.serial}</dd></div>}
       {item.inventoryNumber && <div><dt>Nr inwentarzowy</dt><dd>{item.inventoryNumber}</dd></div>}
       {item.systemId && <div><dt>System ID</dt><dd>{item.systemId}</dd></div>}
+      {item.description && <div><dt>Opis</dt><dd>{item.description}</dd></div>}
       <div><dt>Status</dt><dd>{statusName}</dd></div>
       <div><dt>Opiekun</dt><dd>{ownerName}</dd></div>
       <div><dt>Punkt</dt><dd>{location?.name ?? 'Brak przypisanej lokalizacji'}</dd></div>
@@ -669,8 +670,9 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
   const submit = () => {
     if (!name.trim()) return; 
     const payload: Partial<CreateItemPayload> = {};
-    // Always include description, as edit allows it
+    // Always include description and status, as edit allows them
     payload.description = description.trim() || undefined;
+    if (statusId && statusId > 0) payload.statusId = statusId;
     if (showAllFields) {
       payload.name = name.trim();
       payload.manufacturer = manufacturer.trim() || undefined;
@@ -679,7 +681,6 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
       payload.inventoryNumber = inventoryNumber.trim() || undefined;
       payload.purchaseDate = purchaseDate || undefined;
       if (categoryId && categoryId > 0) payload.categoryId = categoryId;
-      if (statusId && statusId > 0) payload.statusId = statusId;
     }
     if (canEditOwner) {
       if (ownerType === 'person') {
@@ -699,6 +700,10 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
         <>
           <label className="form-label">Opis</label>
           <textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <label className="form-label">Status *</label>
+          <select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>
+            {statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}
+          </select>
         </>
       )}
       {showAllFields && (
