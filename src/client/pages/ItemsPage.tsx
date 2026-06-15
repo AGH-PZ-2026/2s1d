@@ -655,8 +655,8 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
     }
   };
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!name.trim()) return; 
     const payload: Partial<CreateItemPayload> = { 
       name: name.trim(), 
@@ -680,7 +680,7 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
   };
 
   return (
-    <form onSubmit={submit} className="form">
+    <div className="form">
       <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
       <label className="form-label">Producent</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} />
       <label className="form-label">Model</label><input className="form-input" value={model} onChange={(e) => setModel(e.target.value)} />
@@ -715,10 +715,10 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
       )}
 
       <div className="form-actions">
-        <button className="btn btn-primary" type="submit" disabled={loading || !name.trim()}>
+        <button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim()}>
           {loading ? 'Zapisywanie…' : 'Zapisz zmiany'}
         </button>
       </div>
-    </form>
+    </div>
   );
 }
