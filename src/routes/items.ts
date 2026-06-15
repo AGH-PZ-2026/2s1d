@@ -95,6 +95,11 @@ router.post("/", zValidator("json", createSchema), async (c) => {
   const body = c.req.valid("json");
   if (!body.name.trim()) badRequest("Nazwa przedmiotu jest wymagana.");
 
+  // Mutual exclusivity of ownerId and ownerGroupId
+  if (body.ownerId !== undefined && body.ownerGroupId !== undefined) {
+    badRequest("Można przypisać tylko osobę lub grupę jako opiekuna, nie oba jednocześnie.");
+  }
+
   const insertValues: Record<string, unknown> = {
     name: body.name,
     manufacturer: body.manufacturer || null,
@@ -143,6 +148,11 @@ router.patch("/:id", zValidator("json", updateSchema), async (c) => {
   if (!permission) forbidden("Brak uprawnień do edycji tego przedmiotu");
 
   const body = c.req.valid("json");
+
+  // Mutual exclusivity
+  if (body.ownerId !== undefined && body.ownerGroupId !== undefined) {
+    badRequest("Można przypisać tylko osobę lub grupę jako opiekuna, nie oba jednocześnie.");
+  }
 
   // Determine which fields the user is allowed to update
   const allowedFields = new Set<string>();
