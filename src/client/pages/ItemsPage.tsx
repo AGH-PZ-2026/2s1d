@@ -15,6 +15,7 @@ import type { Location } from '../types/location';
 import type { Owner } from '../types/owner';
 import type { Status } from '../types/status';
 import type { Delegation, CreateDelegationPayload, PermissionLevel } from '../types/delegation';
+import { jsonAuthHeaders } from '../services/authHeaders';
 
 interface ModalState { mode: 'create' | 'edit'; itemId?: number; }
 
@@ -177,12 +178,16 @@ export default function ItemsPage() {
 
   const handleCreateDelegation = async (payload: CreateDelegationPayload) => {
     if (!selectedItem) return;
-    try { 
-      await delegationService.create(selectedItem.id, payload); 
-      setItemDelegations(await delegationService.getAll(selectedItem.id));
-      setSuccessMessage('Delegacja została dodana.'); 
-    }
-    catch (err) { setError(err instanceof Error ? err.message : 'Nie udało się dodać delegacji.'); }
+    await delegationService.create(selectedItem.id, payload); 
+    setItemDelegations(await delegationService.getAll(selectedItem.id));
+    setSuccessMessage('Delegacja została dodana.'); 
+  };
+  
+  const handleUpdateDelegation = async (id: number, payload: CreateDelegationPayload) => {
+    if (!selectedItem) return;
+    await delegationService.update(selectedItem.id, id, payload);
+    setItemDelegations(await delegationService.getAll(selectedItem.id));
+    setSuccessMessage('Delegacja została zaktualizowana.');
   };
 
   const handleDeleteDelegation = async (delegationId: number) => {
@@ -233,7 +238,7 @@ export default function ItemsPage() {
         {selectedItem && (<>
           <LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} canEdit={canManageLocation} onEdit={openEdit} />
           <ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} />
-          <ItemDelegationsPanel item={selectedItem} delegations={itemDelegations} canManage={canManageLocation} onCreate={handleCreateDelegation} onDelete={handleDeleteDelegation} />
+          <ItemDelegationsPanel item={selectedItem} delegations={itemDelegations} canManage={canManageLocation} onCreate={handleCreateDelegation} onUpdate={handleUpdateDelegation} onDelete={handleDeleteDelegation} />
         </>)}
       </>)}
       {modal && (<div className="modal-overlay" onClick={() => setModal(null)}><div className="modal" ref={modalRef} onClick={(e) => e.stopPropagation()}><div className="modal-header"><h2>{modal.mode === 'create' ? 'Nowy przedmiot' : 'Edytuj przedmiot'}</h2><button className="modal-close" onClick={() => setModal(null)}><X size={18} /></button></div>{formError && <div className="alert alert-error">{formError}</div>}{modal.mode === 'create' ? <CreateForm categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleCreate} loading={formLoading} currentUser={user} /> : <EditForm item={selectedItem} categories={categories} groups={groups} locations={locations} owners={owners} statuses={statuses} onSubmit={handleEdit} loading={formLoading} />}</div></div>)}
@@ -337,9 +342,32 @@ function ItemPhotosPanel({ item, photos: itemPhotos, error: photosError, loading
   return (<section className="photos-panel"><div><p className="location-panel__label">Dokumentacja zdjęciowa</p><h2>{item.name}</h2></div><label className="btn btn-secondary photos-upload">Dodaj zdjęcie<input accept="image/*" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) onUpload(file); event.target.value = ''; }} /></label>{photosError ? <div className="alert alert-error">{photosError}</div> : null}{photosLoading ? (<div className="loading-state"><div className="spinner" />Ładowanie zdjęć...</div>) : (<table className="table photos-table"><thead><tr><th>Plik</th><th>Typ</th><th>Dodano</th><th>Użytkownik</th></tr></thead><tbody>{itemPhotos.map((photo) => (<tr key={photo.id}><td><a href={`/api/v1/items/${item.id}/photos/${photo.id}?token=${token}`} target="_blank" rel="noopener noreferrer">{photo.originalFilename}</a></td><td>{photo.contentType}</td><td>{new Date(photo.addedAt).toLocaleString('pl-PL')}</td><td>{photo.uploadedByName || photo.uploadedById}</td></tr>))}</tbody></table>)}</section>);
 }
 
-function ItemDelegationsPanel({ item, delegations, canManage, onCreate, onDelete }: { item: Item; delegations: Delegation[]; canManage: boolean; onCreate: (payload: CreateDelegationPayload) => void; onDelete: (id: number) => void }) {
+function ItemDelegationsPanel({ item, delegations, canManage, onCreate, onUpdate, onDelete }: { item: Item; delegations: Delegation[]; canManage: boolean; onCreate: (payload: CreateDelegationPayload) => void; onUpdate: (id: number, payload: CreateDelegationPayload) => void; onDelete: (id: number) => void }) {
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [delegationError, setDelegationError] = useState<string | null>(null);
   
+  const handleCreate = async (payload: CreateDelegationPayload) => {
+    setDelegationError(null);
+    try {
+      await onCreate(payload);
+      setShowForm(false);
+    } catch (err) {
+      setDelegationError(err instanceof Error ? err.message : 'Nie udało się dodać delegacji.');
+    }
+  };
+
+  const handleUpdate = async (payload: CreateDelegationPayload) => {
+    if (!editingId) return;
+    setDelegationError(null);
+    try {
+      await onUpdate(editingId, payload);
+      setEditingId(null);
+    } catch (err) {
+      setDelegationError(err instanceof Error ? err.message : 'Nie udało się zaktualizować delegacji.');
+    }
+  };
+
   return (
     <section className="photos-panel">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -348,15 +376,20 @@ function ItemDelegationsPanel({ item, delegations, canManage, onCreate, onDelete
           <h2>Kto ma dostęp do: {item.name}?</h2>
         </div>
         {canManage && (
-          <button className="btn btn-secondary" onClick={() => setShowForm(!showForm)}>
+          <button className="btn btn-secondary" onClick={() => { setShowForm(!showForm); setEditingId(null); }}>
             {showForm ? 'Anuluj' : 'Dodaj delegata'}
           </button>
         )}
       </div>
       
-      {showForm && canManage && (
+      {delegationError && <div className="alert alert-error" style={{ marginTop: '1rem' }}>{delegationError}</div>}
+      
+      {(showForm || editingId) && canManage && (
         <div style={{ padding: '16px', background: 'var(--surface-2)', borderRadius: 'var(--radius)', margin: '16px 0', border: '1px solid var(--border)' }}>
-          <CreateDelegationForm onSubmit={(p) => { onCreate(p); setShowForm(false); }} />
+          <CreateDelegationForm 
+            initial={editingId ? delegations.find(d => d.id === editingId) : undefined}
+            onSubmit={editingId ? handleUpdate : handleCreate} 
+          />
         </div>
       )}
 
@@ -375,8 +408,8 @@ function ItemDelegationsPanel({ item, delegations, canManage, onCreate, onDelete
           <tbody>
             {delegations.map((d) => (
               <tr key={d.id}>
-                <td>{d.user_email ?? '—'}</td>
-                <td>{d.group_name ?? '—'}</td>
+                <td style={{ fontWeight: d.user_email ? 500 : 'normal' }}>{d.user_email ?? '—'}</td>
+                <td style={{ color: d.group_name ? 'var(--accent)' : 'inherit' }}>{d.group_name ?? '—'}</td>
                 <td>
                   <span className={`badge badge-${d.permission}`}>
                     {d.permission === 'manage' ? 'Zarządzanie' : 'Edycja'}
@@ -384,11 +417,14 @@ function ItemDelegationsPanel({ item, delegations, canManage, onCreate, onDelete
                 </td>
                 {canManage && (
                   <td>
-                    <button className="btn btn-sm btn-danger" onClick={() => {
-                      if(confirm(`Usunąć delegację dla: ${d.user_email ?? d.group_name}?`)) onDelete(d.id);
-                    }}>
-                      Usuń
-                    </button>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button className="btn btn-sm btn-secondary" onClick={() => { setEditingId(d.id); setShowForm(false); }}>Edytuj</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => {
+                        if(confirm(`Usunąć delegację dla: ${d.user_email || ''} ${d.group_name || ''}?`)) onDelete(d.id);
+                      }}>
+                        Usuń
+                      </button>
+                    </div>
                   </td>
                 )}
               </tr>
@@ -400,18 +436,59 @@ function ItemDelegationsPanel({ item, delegations, canManage, onCreate, onDelete
   );
 }
 
-function CreateDelegationForm({ onSubmit }: { onSubmit: (p: CreateDelegationPayload) => void }) {
-  const [selectedUser, setSelectedUser] = useState<AutocompleteOption | null>(null);
-  const [selectedGroup, setSelectedGroup] = useState<AutocompleteOption | null>(null);
-  const [permission, setPermission] = useState<PermissionLevel>('edit');
+function CreateDelegationForm({ initial, onSubmit }: { initial?: Delegation; onSubmit: (p: CreateDelegationPayload) => void }) {
+  const [selectedUser, setSelectedUser] = useState<AutocompleteOption | null>(initial?.user_id ? { value: initial.user_id, label: initial.user_email || '' } : null);
+  const [selectedGroup, setSelectedGroup] = useState<AutocompleteOption | null>(initial?.group_id ? { value: initial.group_id, label: initial.group_name || '' } : null);
+  const [customGroupName, setCustomGroupName] = useState(initial?.group_name || '');
+  const [permission, setPermission] = useState<PermissionLevel>(initial?.permission || 'edit');
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  
+  const isExistingGroupSelected = !!selectedGroup;
 
-  const submit = () => {
-    if (!selectedUser && !selectedGroup) return;
-    onSubmit({
-      user_id: selectedUser?.value,
-      group_id: selectedGroup?.value,
-      permission,
-    });
+  const handleGroupSelect = (opt: AutocompleteOption) => {
+    setSelectedGroup(opt);
+    setCustomGroupName(opt.label);
+    if (opt.extra?.defaultPermission) {
+      setPermission(opt.extra.defaultPermission);
+    }
+  };
+
+  const submit = async () => {
+    if (!selectedUser && !selectedGroup && !customGroupName.trim()) return;
+    
+    setIsCreatingGroup(true);
+    try {
+      let groupId = selectedGroup?.value;
+
+      // If typing a new name, create the group with the currently selected permission
+      if (customGroupName.trim() && !groupId) {
+        const group = await delegationService.searchAndCreateGroup(customGroupName.trim(), permission);
+        groupId = group.value;
+      }
+
+      // If both user and group are provided, sync membership
+      if (selectedUser && groupId) {
+        try {
+          await fetch(`/api/v1/groups/${groupId}/members`, {
+            method: 'POST',
+            headers: jsonAuthHeaders(),
+            body: JSON.stringify({ userId: selectedUser.value, permission }),
+          });
+        } catch (e) {
+          console.warn('Membership sync failed, but proceeding.', e);
+        }
+      }
+
+      onSubmit({
+        user_id: selectedUser?.value,
+        group_id: groupId,
+        permission,
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Błąd zapisu delegacji.');
+    } finally {
+      setIsCreatingGroup(false);
+    }
   };
 
   return (
@@ -422,34 +499,44 @@ function CreateDelegationForm({ onSubmit }: { onSubmit: (p: CreateDelegationPayl
           <Autocomplete
             placeholder="Wpisz email..."
             onSearch={(q) => delegationService.searchUsers(q)}
-            onSelect={(opt) => { setSelectedUser(opt); setSelectedGroup(null); }}
+            onSelect={(opt) => setSelectedUser(opt)}
             onClear={() => setSelectedUser(null)}
+            initialValue={initial?.user_email || ''}
+            disabled={!!initial}
           />
         </div>
         <div>
-          <label className="form-label">Lub grupa (nazwa)</label>
+          <label className="form-label">Lub grupa</label>
           <Autocomplete
             placeholder="Wpisz nazwę grupy..."
-            onSearch={(q) => delegationService.searchGroups(q)}
-            onSelect={(opt) => { setSelectedGroup(opt); setSelectedUser(null); }}
-            onClear={() => setSelectedGroup(null)}
+            onSearch={(q) => {
+              setCustomGroupName(q);
+              return delegationService.searchGroups(q);
+            }}
+            onSelect={handleGroupSelect}
+            onClear={() => { setSelectedGroup(null); setCustomGroupName(''); }}
+            initialValue={initial?.group_name || ''}
+            disabled={false}
           />
         </div>
       </div>
 
-      <label className="form-label" style={{ marginTop: '16px' }}>Poziom uprawnień</label>
+      <label className="form-label" style={{ marginTop: '16px' }}>
+        Poziom uprawnień {isExistingGroupSelected && <span style={{fontSize: '0.8em', color: 'gray'}}>(dziedziczone z grupy)</span>}
+      </label>
       <select
         className="form-input"
         value={permission}
         onChange={(e) => setPermission(e.target.value as PermissionLevel)}
+        disabled={isExistingGroupSelected}
       >
         <option value="edit">Edycja (tylko szczegóły)</option>
         <option value="manage">Zarządzanie (szczegóły + lokalizacja)</option>
       </select>
 
       <div style={{ marginTop: '16px' }}>
-        <button className="btn btn-primary" onClick={submit} disabled={!selectedUser && !selectedGroup}>
-          Zapisz delegację
+        <button className="btn btn-primary" onClick={submit} disabled={isCreatingGroup || (!selectedUser && !selectedGroup && !customGroupName.trim())}>
+          {isCreatingGroup ? 'Zapisywanie...' : (initial ? 'Zapisz zmiany' : 'Dodaj delegację')}
         </button>
       </div>
     </div>
