@@ -82,6 +82,13 @@ const navItems: NavItem[] = [
     requiresAdmin: true,
   },
   {
+    to: '/groups',
+    label: 'Grupy',
+    icon: Users,
+    requiresAuth: true,
+    requiresAdmin: true,
+  },
+  {
     to: '/notifications',
     label: 'Powiadomienia',
     icon: Bell,
