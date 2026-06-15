@@ -659,7 +659,8 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
     }
   };
 
-  const submit = () => { 
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!name.trim()) return; 
     const payload: Partial<CreateItemPayload> = { 
       name: name.trim(), 
@@ -682,40 +683,46 @@ function EditForm({ item, categories, groups, locations, owners, statuses, onSub
     onSubmit(payload); 
   };
 
-  return (<div className="form">
-    <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
-    <label className="form-label">Producent</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} />
-    <label className="form-label">Model</label><input className="form-input" value={model} onChange={(e) => setModel(e.target.value)} />
-    <label className="form-label">Nr seryjny</label><input className="form-input" value={serial} onChange={(e) => setSerial(e.target.value)} />
-    <label className="form-label">Nr inwentarzowy</label><input className="form-input" value={inventoryNumber} onChange={(e) => setInventoryNumber(e.target.value)} />
-    <label className="form-label">Opis</label><textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} />
-    <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
-    <label className="form-label">Kategoria *</label><CategoryDropdown categories={categories} value={categoryId} onChange={(val) => setCategoryId(val === '' ? (categories[0]?.id || 1) : val)} allowEmpty={false} />
-    <label className="form-label">Status *</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
+  return (
+    <form onSubmit={submit} className="form">
+      <label className="form-label">Nazwa *</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
+      <label className="form-label">Producent</label><input className="form-input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} />
+      <label className="form-label">Model</label><input className="form-input" value={model} onChange={(e) => setModel(e.target.value)} />
+      <label className="form-label">Nr seryjny</label><input className="form-input" value={serial} onChange={(e) => setSerial(e.target.value)} />
+      <label className="form-label">Nr inwentarzowy</label><input className="form-input" value={inventoryNumber} onChange={(e) => setInventoryNumber(e.target.value)} />
+      <label className="form-label">Opis</label><textarea className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} />
+      <label className="form-label">Data zakupu</label><input type="date" className="form-input" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
+      <label className="form-label">Kategoria *</label><CategoryDropdown categories={categories} value={categoryId} onChange={(val) => setCategoryId(val === '' ? (categories[0]?.id || 1) : val)} allowEmpty={false} />
+      <label className="form-label">Status *</label><select className="form-input" value={statusId} onChange={(e) => setStatusId(Number(e.target.value))}>{statuses.map((status) => (<option key={status.id} value={status.id}>{status.name}</option>))}</select>
 
-    <label className="form-label">Typ opiekuna</label>
-    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-      <label><input type="radio" name="editOwnerType" value="person" checked={ownerType === 'person'} onChange={() => handleOwnerTypeChange('person')} /> Osoba</label>
-      <label><input type="radio" name="editOwnerType" value="group" checked={ownerType === 'group'} onChange={() => handleOwnerTypeChange('group')} /> Grupa</label>
-    </div>
+      <label className="form-label">Typ opiekuna</label>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+        <label><input type="radio" name="editOwnerType" value="person" checked={ownerType === 'person'} onChange={() => handleOwnerTypeChange('person')} /> Osoba</label>
+        <label><input type="radio" name="editOwnerType" value="group" checked={ownerType === 'group'} onChange={() => handleOwnerTypeChange('group')} /> Grupa</label>
+      </div>
 
-    {ownerType === 'person' && (
-      <>
-        <label className="form-label">Opiekun</label>
-        <select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>
-          {owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}
-        </select>
-      </>
-    )}
-    {ownerType === 'group' && (
-      <>
-        <label className="form-label">Grupa opiekunów</label>
-        <select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}>
-          {groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}
-        </select>
-      </>
-    )}
+      {ownerType === 'person' && (
+        <>
+          <label className="form-label">Opiekun</label>
+          <select className="form-input" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value))}>
+            {owners.map((owner) => (<option key={owner.id} value={owner.id}>{owner.fullName}</option>))}
+          </select>
+        </>
+      )}
+      {ownerType === 'group' && (
+        <>
+          <label className="form-label">Grupa opiekunów</label>
+          <select className="form-input" value={ownerGroupId} onChange={(e) => setOwnerGroupId(e.target.value)}>
+            {groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}
+          </select>
+        </>
+      )}
 
-    <div className="form-actions"><button className="btn btn-primary" onClick={submit} disabled={loading || !name.trim()}>{loading ? 'Zapisywanie…' : 'Zapisz zmiany'}</button></div>
-  </div>);
+      <div className="form-actions">
+        <button className="btn btn-primary" type="submit" disabled={loading || !name.trim()}>
+          {loading ? 'Zapisywanie…' : 'Zapisz zmiany'}
+        </button>
+      </div>
+    </form>
+  );
 }
