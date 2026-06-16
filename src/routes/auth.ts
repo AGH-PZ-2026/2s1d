@@ -68,6 +68,9 @@ router.post("/login", zValidator("json", loginSchema), async (c) => {
     unauthorized("Nieprawidłowy e-mail lub hasło");
   }
 
+  if (!user.isActive && !user.isApproved) {
+    unauthorized("Konto zostało odrzucone przez administratora");
+  }
   if (!user.isActive) unauthorized("Konto jest deaktywowane");
   if (!user.isApproved) unauthorized("Konto wymaga zatwierdzenia przez administratora");
 
@@ -207,8 +210,11 @@ router.post("/google-login", zValidator("json", googleLoginSchema), async (c) =>
   }
 
   const user = userRows[0];
-  if (!user.isActive) unauthorized("Account is deactivated");
-  if (!user.isApproved) unauthorized("Account pending admin approval");
+  if (!user.isActive && !user.isApproved) {
+    unauthorized("Konto zostało odrzucone przez administratora");
+  }
+  if (!user.isActive) unauthorized("Konto jest deaktywowane");
+  if (!user.isApproved) unauthorized("Konto wymaga zatwierdzenia przez administratora");
 
   const token = await createAuthToken(user.id, user.role as "admin" | "user", c.env.JWT_SECRET);
 
