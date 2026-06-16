@@ -140,8 +140,22 @@ export const authMiddleware = createMiddleware<{
       unauthorized("Invalid or expired token");
     }
 
-    c.set("userId", payload.userId);
-    c.set("userRole", payload.role);
+    const db = c.get("db");
+    const userRows = await db
+      .select({ id: users.id, role: users.role, isActive: users.isActive, isApproved: users.isApproved })
+      .from(users)
+      .where(eq(users.id, payload.userId))
+      .limit(1);
+    const user = userRows[0];
+    if (!user || !user.isActive) {
+      unauthorized("Account is deactivated");
+    }
+    if (!user.isApproved) {
+      unauthorized("Account pending admin approval");
+    }
+
+    c.set("userId", user.id);
+    c.set("userRole", user.role as "admin" | "user");
     c.set("isAuthenticated", true);
 
     await next();

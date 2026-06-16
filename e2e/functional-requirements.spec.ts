@@ -68,6 +68,30 @@ const owners = [
   { id: 2, email: 'laborant@agh.edu.pl' },
 ];
 
+const managedUsers = [
+  {
+    id: 1,
+    email: 'pracownik@agh.edu.pl',
+    role: 'admin' as const,
+    isActive: true,
+    isApproved: true,
+  },
+  {
+    id: 2,
+    email: 'nowy.pracownik@agh.edu.pl',
+    role: 'user' as const,
+    isActive: true,
+    isApproved: false,
+  },
+  {
+    id: 3,
+    email: 'laborant@agh.edu.pl',
+    role: 'user' as const,
+    isActive: true,
+    isApproved: true,
+  },
+];
+
 const groups = [
   { id: 1, name: 'Laboratorium elektroniki' },
   { id: 2, name: 'Zespół aparatury pomiarowej' },
@@ -209,7 +233,7 @@ test('US role i dostęp: niezalogowany użytkownik nie widzi zasobów, rejestrac
 
   await expect(page.getByText('Wymagane logowanie')).toBeVisible();
   await page.getByRole('link', { name: /Przejdź do logowania/ }).click();
-  await expect(page.getByRole('heading', { name: /Logowanie/ })).toBeVisible();
+  await expect(page.getByText('Logowanie do systemu aparatury pomiarowej')).toBeVisible();
 
   await page.locator('#register-email').fill('nowy.pracownik@agh.edu.pl');
   await page.locator('#register-password').fill('bezpieczne-haslo');
@@ -218,14 +242,34 @@ test('US role i dostęp: niezalogowany użytkownik nie widzi zasobów, rejestrac
     page.getByText('Konto wymaga zatwierdzenia przez administratora')
   ).toBeVisible();
 
-  await page.locator('#mock-email').fill('admin@agh.edu.pl');
-  await page.getByLabel('Rola').selectOption('admin');
-  await page.getByRole('button', { name: 'Zaloguj' }).click();
+  await page.locator('#dev-email').fill('admin@agh.edu.pl');
+  await page.getByRole('button', { name: 'Zaloguj (dev bypass)' }).click();
 
   await expect(
     page.getByRole('main').getByText('admin@agh.edu.pl')
   ).toBeVisible();
   await expect(page.locator('dd', { hasText: 'Administrator' })).toBeVisible();
+});
+
+test('US użytkownicy: administrator zatwierdza i odrzuca konta oczekujące', async ({
+  page,
+}) => {
+  await page.goto('/users');
+
+  await expect(page.getByText('nowy.pracownik@agh.edu.pl')).toBeVisible();
+  await expect(page.getByText('Oczekuje na zatwierdzenie')).toBeVisible();
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page
+    .getByRole('row', { name: /nowy\.pracownik@agh\.edu\.pl/ })
+    .getByRole('button', { name: 'Odrzuć' })
+    .click();
+
+  await expect(
+    page
+      .getByRole('row', { name: /nowy\.pracownik@agh\.edu\.pl/ })
+      .getByText('Odrzucony')
+  ).toBeVisible();
 });
 
 test('US-01 kategorie i statusy: drzewo, CRUD kategorii oraz własne i bazowe statusy', async ({
@@ -262,12 +306,12 @@ test('US-01 kategorie i statusy: drzewo, CRUD kategorii oraz własne i bazowe st
   await expect(page.getByText('W kalibracji')).toBeVisible();
 
   await page.goto('/categories');
-  await page.getByTitle('Edytuj').first().click();
-  await page.locator('#category-name').fill('Urządzenia laboratoryjne');
+  await page.getByRole('button', { name: 'Edytuj' }).first().click();
+  await page.locator('#cat-name').fill('Urządzenia laboratoryjne');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Urządzenia laboratoryjne')).toBeVisible();
 
-  await page.getByTitle('Usuń').first().click();
+  await page.getByRole('button', { name: 'Usuń' }).first().click();
   await page
     .getByRole('button', { name: 'Usuń kategorię i jej podkategorie' })
     .click();
@@ -343,14 +387,11 @@ test('US-02/03/05 przedmioty: dodawanie, identyfikacja, klasyfikacja, mapa lokal
   await page.getByLabel('Status').selectOption('');
 
   await page.getByRole('button', { name: '+ Dodaj przedmiot' }).click();
-  await page.getByPlaceholder('np. Laptop Dell').fill('Generator funkcyjny');
-  await page.getByPlaceholder('np. Dell').fill('Rigol');
-  await page.getByPlaceholder('Opcjonalny opis').fill('Generator do zajęć');
-  await page.locator('.modal select').nth(0).selectOption('3');
-  await page.locator('.modal select').nth(1).selectOption('1');
-  await page.locator('.modal select').nth(2).selectOption('1');
-  await page.locator('.modal select').nth(3).selectOption('1');
-  await page.locator('.modal select').nth(4).selectOption('1');
+  const itemModal = page.locator('.modal');
+  await itemModal.getByPlaceholder('np. Oscyloskop Tektronix').fill('Generator funkcyjny');
+  await itemModal.getByPlaceholder('np. Tektronix').fill('Rigol');
+  await itemModal.getByPlaceholder('Opcjonalny opis').fill('Generator do zajęć');
+  await page.locator('.modal input[name="ownerType"][value="group"]').check();
   await page
     .locator('.modal')
     .getByRole('button', { name: 'Utwórz' })
@@ -361,6 +402,12 @@ test('US-02/03/05 przedmioty: dodawanie, identyfikacja, klasyfikacja, mapa lokal
   ).toBeVisible();
   await expect(page.getByText('Generator funkcyjny')).toBeVisible();
   await expect(page.getByText('Grupa: Laboratorium elektroniki')).toBeVisible();
+
+  await page.getByRole('row', { name: /Generator funkcyjny/ }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Usuń przedmiot' }).click();
+  await expect(page.getByText('Przedmiot został usunięty.')).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Generator funkcyjny' })).toHaveCount(0);
 
   const upload = page.locator('input[type="file"]');
   await upload.setInputFiles({
@@ -384,7 +431,7 @@ test('US-03/04 QR: skan pokazuje szczegóły, lokalizację i szybką zmianę sta
   await expect(page.getByText('Dostępny')).toBeVisible();
 
   await page.getByRole('button', { name: 'Oznacz jako uszkodzony' }).click();
-  await expect(page.getByText('Uszkodzony')).toBeVisible();
+  await expect(page.getByText('Uszkodzony', { exact: true })).toBeVisible();
 
   await page.getByLabel('Kod QR').fill('LEGACY-AGH-42');
   await page.getByRole('button', { name: 'Sprawdź' }).click();
@@ -418,6 +465,7 @@ test('US wypożyczenia: klasyczne, zaufane, asynchroniczne, zewnętrzne i koment
 
   await page.getByRole('button', { name: 'Nowy wniosek' }).click();
   await page.locator('.modal select').nth(1).selectOption('asynchronous');
+  await page.locator('.modal input[type="datetime-local"]').fill('2026-07-01T12:00');
   await page.getByRole('button', { name: 'Utwórz wniosek' }).click();
   await expect(
     page.getByText('Wniosek o wypożyczenie został utworzony.')
@@ -425,6 +473,7 @@ test('US wypożyczenia: klasyczne, zaufane, asynchroniczne, zewnętrzne i koment
 
   await page.getByRole('button', { name: 'Wypożyczenie zewnętrzne' }).click();
   await page.getByPlaceholder('Nazwa osoby lub instytucji').fill('CERN');
+  await page.locator('.modal input[type="datetime-local"]').fill('2026-07-01T12:00');
   await page.getByRole('button', { name: 'Wypożycz', exact: true }).click();
   await expect(
     page.getByText('Wypożyczenie zewnętrzne zostało utworzone.')
@@ -441,25 +490,29 @@ test('US wypożyczenia: klasyczne, zaufane, asynchroniczne, zewnętrzne i koment
 test('US delegacje: właściciel dodaje delegata z poziomem edycji lub zarządzania', async ({
   page,
 }) => {
-  await page.goto('/delegations');
+  await page.goto('/items');
+  await page.getByRole('row', { name: /Oscyloskop Tektronix/ }).click();
 
   // Existing delegation should show email, not just ID
-  await expect(page.getByRole('cell', { name: 'opiekun@agh.edu.pl' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'opiekun@agh.edu.pl' }).first()).toBeVisible();
 
-  await page.getByRole('button', { name: '+ Dodaj delegata' }).click();
+  await page.getByRole('button', { name: 'Dodaj delegata' }).click();
 
   // Type into autocomplete for user email
-  await page.getByPlaceholder('Wpisz email użytkownika…').fill('laborant');
+  await page.getByPlaceholder('Wpisz email...').fill('laborant');
   // Wait for autocomplete dropdown and select the item
-  await expect(page.getByText('laborant@agh.edu.pl')).toBeVisible();
-  await page.getByText('laborant@agh.edu.pl').click();
+  await expect(page.locator('.autocomplete-dropdown').getByText('laborant@agh.edu.pl')).toBeVisible();
+  await page.locator('.autocomplete-dropdown').getByText('laborant@agh.edu.pl').click();
 
   // Select permission
-  await page.locator('.modal select').selectOption('manage');
-  await page.getByRole('button', { name: 'Dodaj', exact: true }).click();
+  await page
+    .locator('section', { hasText: 'Delegacje i uprawnienia' })
+    .locator('select')
+    .selectOption('manage');
+  await page.getByRole('button', { name: 'Dodaj delegację', exact: true }).click();
 
   // Should now show the email in the table
-  await expect(page.getByRole('cell', { name: 'laborant@agh.edu.pl' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'laborant@agh.edu.pl' }).first()).toBeVisible();
   await expect(page.getByText('Zarządzanie')).toBeVisible();
 });
 
@@ -498,10 +551,9 @@ test('US narzędzia: raporty, import, druk QR i powiadomienia', async ({
 }) => {
   await page.goto('/reports/overdue');
   await expect(page.getByText('Multimetr UNI-T UT61E')).toBeVisible();
-  await page
-    .getByLabel('Pokaż wszystkie przedmioty jako administrator')
-    .check();
-  await expect(page.getByText('Oscyloskop Tektronix TBS1102')).toBeVisible();
+  await expect(
+    page.getByText('Wyświetlane są wszystkie przeterminowane wypożyczenia w systemie.')
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Pobierz CSV' }).click();
   await page.getByRole('button', { name: 'Pobierz PDF' }).click();
 
@@ -522,14 +574,8 @@ test('US narzędzia: raporty, import, druk QR i powiadomienia', async ({
   await expect(page.getByText('Brak kategorii w wierszu 3')).toBeVisible();
 
   await page.goto('/batch-qr');
-  await page
-    .getByRole('row', { name: /Oscyloskop/ })
-    .getByRole('checkbox')
-    .check();
-  await page
-    .getByRole('row', { name: /Multimetr/ })
-    .getByRole('checkbox')
-    .check();
+  await page.getByLabel('Zaznacz wszystkie przedmioty').check();
+  await expect(page.getByText('Wybrano: 6 z 6')).toBeVisible();
   await page.getByRole('combobox').selectOption('large');
   await page.getByRole('button', { name: 'Pobierz PDF' }).click();
   await expect(page.getByRole('button', { name: 'Pobierz PDF' })).toBeEnabled();
@@ -549,6 +595,7 @@ async function mockApi(page: Page) {
   let currentCategories = [...categories];
   let currentStatuses = [...statuses];
   let currentItems = [...items];
+  let currentUsers = [...managedUsers];
   let currentLocations = [...locations];
   let currentBorrowings = [...borrowings];
   let currentDelegations: Array<{
@@ -587,6 +634,13 @@ async function mockApi(page: Page) {
         access_token: 'e2e-token',
         token_type: 'bearer',
         user: { ...user, email: body.credential, role: user.role },
+      });
+    }
+
+    if (path === '/api/v1/auth/config' && method === 'GET') {
+      return json(route, {
+        devBypassAuth: true,
+        googleClientId: '',
       });
     }
 
@@ -685,7 +739,7 @@ async function mockApi(page: Page) {
       return json(route, created);
     }
     if (path.match(/\/api\/v1\/items\/\d+$/) && method === 'PATCH') {
-      const itemId = Number(path.split('/').at(-2));
+      const itemId = Number(path.split('/').at(-1));
       const body = request.postDataJSON() as { locationId?: number };
       const locationId = body.locationId ?? 0;
       currentItems = currentItems.map((item) =>
@@ -693,8 +747,42 @@ async function mockApi(page: Page) {
       );
       return json(route, { message: 'Location updated' });
     }
+    if (path.match(/\/api\/v1\/items\/\d+$/) && method === 'DELETE') {
+      const itemId = Number(path.split('/').at(-1));
+      currentItems = currentItems.filter((item) => item.id !== itemId);
+      return route.fulfill({ status: 204 });
+    }
     if (path === '/api/v1/auth/users' && method === 'GET') {
       return json(route, owners);
+    }
+    if (path === '/api/v1/users' && method === 'GET') {
+      return json(route, currentUsers);
+    }
+    if (path.match(/\/api\/v1\/users\/\d+\/approve$/) && method === 'PATCH') {
+      const userId = Number(path.split('/').at(-2));
+      currentUsers = currentUsers.map((managedUser) =>
+        managedUser.id === userId
+          ? { ...managedUser, isActive: true, isApproved: true }
+          : managedUser
+      );
+      return json(route, currentUsers.find((managedUser) => managedUser.id === userId));
+    }
+    if (path.match(/\/api\/v1\/users\/\d+\/reject$/) && method === 'PATCH') {
+      const userId = Number(path.split('/').at(-2));
+      currentUsers = currentUsers.map((managedUser) =>
+        managedUser.id === userId
+          ? { ...managedUser, isActive: false, isApproved: false }
+          : managedUser
+      );
+      return json(route, currentUsers.find((managedUser) => managedUser.id === userId));
+    }
+    if (path.match(/\/api\/v1\/users\/\d+\/role$/) && method === 'PATCH') {
+      const userId = Number(path.split('/').at(-2));
+      const body = request.postDataJSON() as { role: 'admin' | 'user' };
+      currentUsers = currentUsers.map((managedUser) =>
+        managedUser.id === userId ? { ...managedUser, role: body.role } : managedUser
+      );
+      return json(route, currentUsers.find((managedUser) => managedUser.id === userId));
     }
     if (path === '/api/v1/users/search' && method === 'GET') {
       const q = (url.searchParams.get('q') ?? '').toLowerCase();
@@ -710,10 +798,10 @@ async function mockApi(page: Page) {
       return json(route, results);
     }
 
-    if (path.match(/\/api\/v1\/items\/\d+\/photos$/) && method === 'GET') {
+    if (path.match(/\/api\/v1\/items\/\d+\/photos\/?$/) && method === 'GET') {
       return json(route, photos);
     }
-    if (path.match(/\/api\/v1\/items\/\d+\/photos$/) && method === 'POST') {
+    if (path.match(/\/api\/v1\/items\/\d+\/photos\/?$/) && method === 'POST') {
       const created = {
         id: photos.length + 1,
         itemId: 1,
@@ -751,6 +839,7 @@ async function mockApi(page: Page) {
         location: 'D-17 / 101 / Szafa A / Półka 2',
         owner_id: 1,
         status: 'Dostępny',
+        canEdit: true,
       });
     }
     if (path === '/api/v1/quick-actions/2' && method === 'GET') {
@@ -760,6 +849,7 @@ async function mockApi(page: Page) {
         location: 'Delegacja CERN',
         owner_id: 2,
         status: 'Wypożyczony',
+        canEdit: false,
       });
     }
     if (path === '/api/v1/quick-actions/1/mark-damaged') {
@@ -769,6 +859,7 @@ async function mockApi(page: Page) {
         location: 'D-17 / 101 / Szafa A / Półka 2',
         owner_id: 1,
         status: 'Uszkodzony',
+        canEdit: true,
       });
     }
 
@@ -839,10 +930,21 @@ async function mockApi(page: Page) {
     }
 
     // Delegation endpoints
-    if (path === '/api/v1/items/1/delegations' && method === 'GET') {
+    if (path === '/api/v1/delegations/' && method === 'GET') {
+      return json(
+        route,
+        currentDelegations.map((delegation) => ({
+          ...delegation,
+          item_name:
+            currentItems.find((item) => item.id === delegation.item_id)?.name ??
+            `Przedmiot #${delegation.item_id}`,
+        }))
+      );
+    }
+    if (path.match(/\/api\/v1\/items\/1\/delegations\/?$/) && method === 'GET') {
       return json(route, currentDelegations);
     }
-    if (path === '/api/v1/items/1/delegations' && method === 'POST') {
+    if (path.match(/\/api\/v1\/items\/1\/delegations\/?$/) && method === 'POST') {
       const body = request.postDataJSON() as { user_id?: number; group_id?: number; permission: string };
       let userEmail: string | null = null;
       let groupName: string | null = null;
@@ -868,7 +970,6 @@ async function mockApi(page: Page) {
     }
 
     if (path === '/api/v1/borrowings/overdue') {
-      const includeAll = url.searchParams.get('includeAll') === 'true';
       return json(route, [
         {
           borrowingId: 2,
@@ -878,18 +979,15 @@ async function mockApi(page: Page) {
           plannedReturnAt: '2026-05-01T12:00:00.000Z',
           daysOverdue: 39,
         },
-        ...(includeAll
-          ? [
-              {
-                borrowingId: 4,
-                itemName: 'Oscyloskop Tektronix TBS1102',
-                borrowerId: 2,
-                externalBorrower: null,
-                plannedReturnAt: '2026-04-01T12:00:00.000Z',
-                daysOverdue: 69,
-              },
-            ]
-          : []),
+        {
+          borrowingId: 4,
+          itemName: 'Oscyloskop Tektronix TBS1102',
+          borrowerId: 2,
+          borrowerEmail: 'laborant@agh.edu.pl',
+          externalBorrower: null,
+          plannedReturnAt: '2026-04-01T12:00:00.000Z',
+          daysOverdue: 69,
+        },
       ]);
     }
     if (
@@ -916,10 +1014,15 @@ async function mockApi(page: Page) {
     }
 
     if (path === '/api/v1/batch-qr/print' && method === 'POST') {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/pdf',
-        body: Buffer.from('%PDF e2e'),
+      const body = request.postDataJSON() as { item_ids: number[] };
+      return json(route, {
+        items: currentItems
+          .filter((item) => body.item_ids.includes(item.id))
+          .map((item) => ({
+            id: item.id,
+            systemId: item.systemId,
+            name: item.name,
+          })),
       });
     }
 
@@ -958,47 +1061,67 @@ async function mockApi(page: Page) {
       return json(route, [
         {
           id: 1,
-          user_id: 1,
-          item_id: 1,
+          userId: 1,
+          userEmail: null,
+          itemId: 1,
+          itemName: null,
+          itemSerial: null,
+          itemSystemId: null,
           action: 'ITEM_CREATED',
-          old_value: null,
-          new_value: { name: 'Oscyloskop Tektronix TBS1102' },
+          oldValue: null,
+          newValue: { name: 'Oscyloskop Tektronix TBS1102' },
           timestamp: '2026-06-01T08:00:00.000Z',
         },
         {
           id: 2,
-          user_id: 1,
-          item_id: 1,
+          userId: 1,
+          userEmail: null,
+          itemId: 1,
+          itemName: null,
+          itemSerial: null,
+          itemSystemId: null,
           action: 'STATUS_CHANGED',
-          old_value: { status: 'Dostępny' },
-          new_value: { status: 'Uszkodzony' },
+          oldValue: { status: 'Dostępny' },
+          newValue: { status: 'Uszkodzony' },
           timestamp: '2026-06-02T09:00:00.000Z',
         },
         {
           id: 3,
-          user_id: 2,
-          item_id: 1,
+          userId: 2,
+          userEmail: null,
+          itemId: 1,
+          itemName: null,
+          itemSerial: null,
+          itemSystemId: null,
           action: 'PHOTO_ADDED',
-          old_value: null,
-          new_value: { filename: 'stan-techniczny.png' },
+          oldValue: null,
+          newValue: { filename: 'stan-techniczny.png' },
           timestamp: '2026-06-03T10:00:00.000Z',
         },
         {
           id: 4,
-          user_id: 1,
-          item_id: 1,
+          userId: 1,
+          userEmail: null,
+          itemId: 1,
+          itemName: null,
+          itemSerial: null,
+          itemSystemId: null,
           action: 'DELEGATES_CHANGED',
-          old_value: null,
-          new_value: { permission: 'manage' },
+          oldValue: null,
+          newValue: { permission: 'manage' },
           timestamp: '2026-06-04T11:00:00.000Z',
         },
         {
           id: 5,
-          user_id: 1,
-          item_id: 2,
+          userId: 1,
+          userEmail: null,
+          itemId: 2,
+          itemName: null,
+          itemSerial: null,
+          itemSystemId: null,
           action: 'BORROWING_RETURNED',
-          old_value: { status: 'Wypożyczony' },
-          new_value: { status: 'Dostępny' },
+          oldValue: { status: 'Wypożyczony' },
+          newValue: { status: 'Dostępny' },
           timestamp: '2026-06-05T12:00:00.000Z',
         },
       ]);

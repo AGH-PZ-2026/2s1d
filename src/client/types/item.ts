@@ -13,7 +13,7 @@ export interface Item {
   statusId: number;
   locationId: number;
   ownerId: number;
-  ownerGroupId?: number;
+  ownerGroupId?: number | null;
   legacyItemId?: number;
 }
 
@@ -29,6 +29,6 @@ export interface CreateItemPayload {
   categoryId?: number;
   statusId?: number;
   locationId?: number;
-  ownerId?: number;
-  ownerGroupId?: number;
+  ownerId?: number | null;
+  ownerGroupId?: number | null;
 }

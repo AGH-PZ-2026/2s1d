@@ -26,6 +26,15 @@ export const userService = {
     return response.json();
   },
 
+  async reject(id: number): Promise<User> {
+    const response = await fetch(`/api/v1/users/${id}/reject`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+    });
+    await ensureOk(response);
+    return response.json();
+  },
+
   async updateRole(id: number, role: 'admin' | 'user'): Promise<User> {
     const response = await fetch(`/api/v1/users/${id}/role`, {
       method: 'PATCH',

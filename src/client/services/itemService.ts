@@ -49,8 +49,22 @@ export const itemService = {
     await ensureOk(r); return mapItem(await r.json());
   },
   async update(itemId: number, payload: Partial<CreateItemPayload>): Promise<void> {
-    if (USE_MOCKS) { await delay(500); mockItems = mockItems.map(i => i.id === itemId ? { ...i, ...payload } : i); return; }
+    if (USE_MOCKS) {
+      await delay(500);
+      mockItems = mockItems.map(i => i.id === itemId ? {
+        ...i,
+        ...payload,
+        ownerId: payload.ownerId === null ? 0 : payload.ownerId ?? i.ownerId,
+        ownerGroupId: payload.ownerGroupId === null ? undefined : payload.ownerGroupId ?? i.ownerGroupId,
+      } : i);
+      return;
+    }
     const r = await fetch(`/api/v1/items/${itemId}`, { method: 'PATCH', headers: jsonAuthHeaders(), body: JSON.stringify(payload) });
+    await ensureOk(r);
+  },
+  async remove(itemId: number): Promise<void> {
+    if (USE_MOCKS) { await delay(200); mockItems = mockItems.filter(i => i.id !== itemId); return; }
+    const r = await fetch(`/api/v1/items/${itemId}`, { method: 'DELETE', headers: authHeaders() });
     await ensureOk(r);
   },
   async getCategories(): Promise<Category[]> {

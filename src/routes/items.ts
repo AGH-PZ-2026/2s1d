@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, like, or, and, desc, sql } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
-import { items, type Item } from "../db/schema";
+import { borrowings, items, type Item } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { notFound, badRequest, forbidden } from "../lib/errors";
 import { getItemPermissionLevel } from "../lib/permissions";
@@ -233,13 +233,17 @@ router.delete("/:id", async (c) => {
   if (c.get("userRole") !== "admin") forbidden("Only admins can delete items");
   const existing = await db.select().from(items).where(eq(items.id, id)).limit(1);
   if (existing.length === 0) notFound("Item not found");
+  const borrowing = await db.select({ id: borrowings.id }).from(borrowings).where(eq(borrowings.itemId, id)).limit(1);
+  if (borrowing.length > 0) {
+    badRequest("Nie można usunąć przedmiotu z historią wypożyczeń.");
+  }
 
   await createAuditLog(db, {
-  userId: c.get("userId"),
-  itemId: id,
-  action: "ITEM_DELETED",
-  oldValue: existing[0],
-});
+    userId: c.get("userId"),
+    itemId: id,
+    action: "ITEM_DELETED",
+    oldValue: existing[0],
+  });
 
   await db.delete(items).where(eq(items.id, id));
   return c.body(null, 204);

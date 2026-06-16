@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { userService, type User } from '../services/userService';
-import { UserCheck, UserCog, Shield, User as UserIcon, Loader2 } from 'lucide-react';
+import { UserCheck, UserCog, Shield, User as UserIcon, Loader2, UserX } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function UsersPage() {
@@ -30,10 +30,23 @@ export default function UsersPage() {
   const handleApprove = async (id: number) => {
     setActionLoading(id);
     try {
-      await userService.approve(id);
-      setUsers(users.map(u => u.id === id ? { ...u, isApproved: true } : u));
+      const updated = await userService.approve(id);
+      setUsers(users.map(u => u.id === id ? updated : u));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Błąd podczas zatwierdzania użytkownika.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async (id: number, email: string) => {
+    if (!window.confirm(`Odrzucić konto użytkownika ${email}?`)) return;
+    setActionLoading(id);
+    try {
+      const updated = await userService.reject(id);
+      setUsers(users.map(u => u.id === id ? updated : u));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Błąd podczas odrzucania użytkownika.');
     } finally {
       setActionLoading(null);
     }
@@ -113,7 +126,9 @@ export default function UsersPage() {
                       </span>
                     </td>
                     <td>
-                      {u.isApproved ? (
+                      {!u.isActive ? (
+                        <span className="status-indicator status-indicator--danger">Odrzucony</span>
+                      ) : u.isApproved ? (
                         <span className="status-indicator status-indicator--ok">Aktywny</span>
                       ) : (
                         <span className="status-indicator status-indicator--warning">Oczekuje na zatwierdzenie</span>
@@ -122,14 +137,26 @@ export default function UsersPage() {
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                         {!u.isApproved && (
-                          <button
-                            className="btn btn-sm btn-primary"
-                            onClick={() => handleApprove(u.id)}
-                            disabled={actionLoading === u.id}
-                          >
-                            <UserCheck size={14} style={{ marginRight: '4px' }} />
-                            Zatwierdź
-                          </button>
+                          <>
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleApprove(u.id)}
+                              disabled={actionLoading === u.id}
+                            >
+                              <UserCheck size={14} style={{ marginRight: '4px' }} />
+                              Zatwierdź
+                            </button>
+                            {u.isActive && currentUser?.id !== u.id ? (
+                              <button
+                                className="btn btn-sm btn-danger"
+                                onClick={() => handleReject(u.id, u.email)}
+                                disabled={actionLoading === u.id}
+                              >
+                                <UserX size={14} style={{ marginRight: '4px' }} />
+                                Odrzuć
+                              </button>
+                            ) : null}
+                          </>
                         )}
                         {currentUser?.id !== u.id && (
                           <button

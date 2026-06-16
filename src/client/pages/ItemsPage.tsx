@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import LeafletMap from '../components/LeafletMap';
 import { useAuth } from '../hooks/useAuth';
 import type { AuthUser } from '../services/authService';
@@ -38,6 +38,7 @@ export default function ItemsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [photos, setPhotos] = useState<ItemPhoto[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoLoading, setPhotoLoading] = useState(false);
@@ -79,6 +80,24 @@ export default function ItemsPage() {
     try { await itemService.update(itemId, payload); await fetchItems(); setSuccessMessage('Przedmiot został zaktualizowany.'); setModal(null); }
     catch (e: unknown) { setFormError(e instanceof Error ? e.message : 'Wystąpił błąd podczas aktualizacji.'); }
     finally { setFormLoading(false); }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!selectedItem) return;
+    const confirmed = window.confirm(`Usunąć przedmiot "${selectedItem.name}"? Tej operacji nie można cofnąć.`);
+    if (!confirmed) return;
+    setDeleteLoading(true);
+    setError(null);
+    try {
+      await itemService.remove(selectedItem.id);
+      setSelectedItemId(null);
+      await fetchItems();
+      setSuccessMessage('Przedmiot został usunięty.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nie udało się usunąć przedmiotu.');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const openCreate = () => { setFormError(null); setModal({ mode: 'create' }); };
@@ -241,7 +260,7 @@ export default function ItemsPage() {
         </table>
         <div className="table-pagination"><span>Strona {currentPage} z {totalPages} · Wyniki: {filteredItems.length}</span><div className="td-actions"><button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">Poprzednia</button><button className="btn btn-secondary" disabled={currentPage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">Następna</button></div></div>
         {selectedItem && (<>
-          <LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} canEdit={canManageLocation} onEdit={openEdit} />
+          <LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} canEdit={canManageLocation} canDelete={user?.role === 'admin'} deleteLoading={deleteLoading} onDelete={handleDeleteSelected} onEdit={openEdit} />
           <ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} />
           <ItemDelegationsPanel item={selectedItem} delegations={itemDelegations} canManage={canManageLocation} onCreate={handleCreateDelegation} onUpdate={handleUpdateDelegation} onDelete={handleDeleteDelegation} />
         </>)}
@@ -278,14 +297,22 @@ function sortValue(item: Item, key: SortKey, helpers: { getCategoryName: (id: nu
   return item[key] ?? '';
 }
 
-function LocationMapPanel({ item, location, locations, onCreateLocation, onLocationChange, ownerName, statusName, canEdit, onEdit }: { item: Item; location: Location | undefined; locations: Location[]; onCreateLocation: (p: CreateLocationPayload) => void; onLocationChange: (locationId: number) => void; ownerName: string; statusName: string; canEdit: boolean; onEdit: () => void }) {
+function LocationMapPanel({ item, location, locations, onCreateLocation, onLocationChange, ownerName, statusName, canEdit, canDelete, deleteLoading, onDelete, onEdit }: { item: Item; location: Location | undefined; locations: Location[]; onCreateLocation: (p: CreateLocationPayload) => void; onLocationChange: (locationId: number) => void; ownerName: string; statusName: string; canEdit: boolean; canDelete: boolean; deleteLoading: boolean; onDelete: () => void; onEdit: () => void }) {
   const [newLocation, setNewLocation] = useState({ name: '', kind: 'internal' as 'internal' | 'external', building: '', room: '', cabinet: '', shelf: '', mapX: '', mapY: '' });
   const [previewCoords, setPreviewCoords] = useState<{x: number, y: number} | null>(null);
   return (<section className="location-panel" aria-label="Mapa lokalizacji przedmiotu">
     <div className="location-panel__summary">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <div><p className="location-panel__label">Szczegóły przedmiotu</p><h2>{item.name}</h2></div>
-        <button className="btn btn-secondary" onClick={onEdit}>Edytuj przedmiot</button>
+        <div className="td-actions">
+          <button className="btn btn-secondary" onClick={onEdit}>Edytuj przedmiot</button>
+          {canDelete ? (
+            <button className="btn btn-danger" disabled={deleteLoading} onClick={onDelete} type="button">
+              <Trash2 size={16} />
+              {deleteLoading ? 'Usuwanie...' : 'Usuń przedmiot'}
+            </button>
+          ) : null}
+        </div>
       </div>
       <dl>
       <div><dt>Producent</dt><dd>{item.manufacturer}</dd></div>
