@@ -41,6 +41,51 @@ router.post("/register", zValidator("json", registerSchema), async (c) => {
   return c.json({ message: "Konto wymaga zatwierdzenia przez administratora" }, 201);
 });
 
+const loginSchema = z.object({
+  email: z.string().email().transform((v) => v.trim().toLowerCase()),
+  password: z.string().min(1),
+});
+
+router.post("/login", zValidator("json", loginSchema), async (c) => {
+  const db = c.get("db");
+  const body = c.req.valid("json");
+
+  const userRows = await db.select().from(users).where(
+    and(eq(users.email, body.email), eq(users.authProvider, "local"))
+  ).limit(1);
+
+  if (userRows.length === 0) {
+    unauthorized("Nieprawidłowy e-mail lub hasło");
+  }
+
+  const user = userRows[0];
+
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(body.password));
+  const hashedPassword = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  if (user.hashedPassword !== hashedPassword) {
+    unauthorized("Nieprawidłowy e-mail lub hasło");
+  }
+
+  if (!user.isActive) unauthorized("Konto jest deaktywowane");
+  if (!user.isApproved) unauthorized("Konto wymaga zatwierdzenia przez administratora");
+
+  const token = await createAuthToken(user.id, user.role as "admin" | "user", c.env.JWT_SECRET);
+
+  return c.json({
+    access_token: token,
+    token_type: "bearer",
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      is_active: user.isActive,
+      is_approved: user.isApproved,
+    },
+  });
+});
+
 // ─── Google OAuth ───────────────────────────────────────────────────────────
 //
 // Flow:

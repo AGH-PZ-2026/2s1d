@@ -86,6 +86,25 @@ export const authService = {
     await ensureOk(response);
   },
 
+  async login(payload: RegisterPayload): Promise<AuthSession> {
+    const response = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    await ensureOk(response);
+    const data: GoogleLoginResponse = await response.json();
+    const session = {
+      accessToken: data.access_token,
+      tokenType: data.token_type,
+      user: data.user,
+    };
+    window.localStorage.setItem(TOKEN_KEY, session.accessToken);
+    window.localStorage.setItem(USER_KEY, JSON.stringify(session.user));
+    window.dispatchEvent(new Event('auth-session-changed'));
+    return session;
+  },
+
   logout(): void {
     window.localStorage.removeItem(TOKEN_KEY);
     window.localStorage.removeItem(USER_KEY);

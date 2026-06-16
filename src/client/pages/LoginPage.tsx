@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { authService, type AuthUser } from '../services/authService';
 
 // Extend window to declare google type
@@ -32,13 +33,17 @@ declare global {
 }
 
 export default function LoginPage() {
-  const [registerEmail, setRegisterEmail] = useState('');
-  const [registerPassword, setRegisterPassword] = useState('');
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoginMode, setIsLoginMode] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(() => authService.getSessionUser());
-  const [error, setError] = useState<string | null>(null);
-  const [registrationMessage, setRegistrationMessage] = useState<string | null>(null);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+  const [devError, setDevError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRegistering, setIsRegistering] = useState(false);
+  const [isLocalAuthLoading, setIsLocalAuthLoading] = useState(false);
 
   // ── Auth config ──────────────────────────────────────────────────────────
   const [devBypassAuth, setDevBypassAuth] = useState(false);
@@ -55,17 +60,20 @@ export default function LoginPage() {
   // ── Google Sign-In callback ──────────────────────────────────────────────
 
   const handleGoogleCredential = useCallback(async (credential: string) => {
-    setError(null);
+    setGoogleError(null);
+    setDevError(null);
+    setLocalError(null);
     setIsSubmitting(true);
     try {
       const session = await authService.googleLogin(credential);
       setUser(session.user);
+      navigate('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nie udało się zalogować przez Google.');
+      setGoogleError(err instanceof Error ? err.message : 'Nie udało się zalogować przez Google.');
     } finally {
       setIsSubmitting(false);
     }
-  }, []);
+  }, [navigate]);
 
   // Initialize Google Identity Services when client ID is available
   useEffect(() => {
@@ -124,34 +132,48 @@ export default function LoginPage() {
     setUser(null);
   }
 
-  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+  async function handleLocalAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
-    setRegistrationMessage(null);
-    setIsRegistering(true);
+    setLocalError(null);
+    setGoogleError(null);
+    setDevError(null);
+    setSuccessMessage(null);
+    setIsLocalAuthLoading(true);
+    
     try {
-      await authService.register({ email: registerEmail, password: registerPassword });
-      setRegistrationMessage('Konto wymaga zatwierdzenia przez administratora');
-      setRegisterEmail('');
-      setRegisterPassword('');
+      if (isLoginMode) {
+        const session = await authService.login({ email, password });
+        setUser(session.user);
+        setSuccessMessage('Zalogowano pomyślnie');
+        navigate('/');
+      } else {
+        await authService.register({ email, password });
+        setSuccessMessage('Konto wymaga zatwierdzenia przez administratora');
+        setEmail('');
+        setPassword('');
+        setIsLoginMode(true);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nie udało się zarejestrować.');
+      setLocalError(err instanceof Error ? err.message : (isLoginMode ? 'Nie udało się zalogować.' : 'Nie udało się zarejestrować.'));
     } finally {
-      setIsRegistering(false);
+      setIsLocalAuthLoading(false);
     }
   }
 
   async function handleDevBypassSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setDevError(null);
+    setGoogleError(null);
+    setLocalError(null);
     setIsSubmitting(true);
     try {
       // In dev bypass mode, we send the email as credential
       const session = await authService.googleLogin(devEmail);
       setUser(session.user);
       setDevEmail('');
+      navigate('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nie udało się zalogować przez dev bypass.');
+      setDevError(err instanceof Error ? err.message : 'Nie udało się zalogować przez dev bypass.');
     } finally {
       setIsSubmitting(false);
     }
@@ -168,12 +190,6 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {error && (
-        <div className="login-panel" style={{ borderColor: "var(--color-error, #d32f2f)" }}>
-          <div className="alert alert-error" style={{ margin: 0 }}>{error}</div>
-        </div>
-      )}
-
       {/* ── Google Sign-In (production) ─────────────────────────────────── */}
       {!devBypassAuth && googleClientId && (
         <div className="login-panel">
@@ -182,6 +198,7 @@ export default function LoginPage() {
             Kliknij przycisk poniżej, aby zalogować się przez konto Google w
             domenie <strong>@agh.edu.pl</strong>.
           </p>
+          {googleError && <div className="alert alert-error" style={{ marginTop: 16 }}>{googleError}</div>}
           <div
             id="g_id_signin"
             style={{ marginTop: 12, minHeight: 40 }}
@@ -209,6 +226,7 @@ export default function LoginPage() {
               onChange={(event) => setDevEmail(event.target.value)}
               required
             />
+            {devError && <div className="alert alert-error">{devError}</div>}
             <div className="form-actions">
               <button className="btn btn-primary" disabled={isSubmitting} type="submit">
                 {isSubmitting ? 'Logowanie...' : 'Zaloguj (dev bypass)'}
@@ -218,17 +236,34 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* ── Registration ────────────────────────────────────────────────── */}
+      {/* ── Local Auth (Login / Register) ─────────────────────────────── */}
       <div className="login-panel">
-        <form className="form" onSubmit={handleRegister}>
-          <h2>Rejestracja</h2>
-          <label className="form-label" htmlFor="register-email">E-mail</label>
-          <input className="form-input" id="register-email" type="email" value={registerEmail} onChange={(event) => setRegisterEmail(event.target.value)} required />
-          <label className="form-label" htmlFor="register-password">Hasło</label>
-          <input className="form-input" id="register-password" minLength={8} type="password" value={registerPassword} onChange={(event) => setRegisterPassword(event.target.value)} required />
-          {registrationMessage ? <div className="alert alert-success">{registrationMessage}</div> : null}
-          <div className="form-actions">
-            <button className="btn btn-secondary" disabled={isRegistering} type="submit">{isRegistering ? 'Rejestrowanie...' : 'Zarejestruj'}</button>
+        <form className="form" onSubmit={handleLocalAuth}>
+          <h2>{isLoginMode ? 'Logowanie' : 'Rejestracja'}</h2>
+          <label className="form-label" htmlFor="local-email">E-mail</label>
+          <input className="form-input" id="local-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+          <label className="form-label" htmlFor="local-password">Hasło</label>
+          <input className="form-input" id="local-password" minLength={isLoginMode ? 1 : 8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+          {localError && <div className="alert alert-error">{localError}</div>}
+          {successMessage ? <div className="alert alert-success">{successMessage}</div> : null}
+          <div className="form-actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+            <button className="btn btn-secondary" disabled={isLocalAuthLoading} type="submit" style={{ width: '100%' }}>
+              {isLocalAuthLoading ? (isLoginMode ? 'Logowanie...' : 'Rejestrowanie...') : (isLoginMode ? 'Zaloguj się' : 'Zarejestruj')}
+            </button>
+            <button 
+              className="btn btn-tertiary" 
+              type="button" 
+              onClick={() => {
+                setIsLoginMode(!isLoginMode);
+                setLocalError(null);
+                setGoogleError(null);
+                setDevError(null);
+                setSuccessMessage(null);
+              }}
+              style={{ width: '100%', background: 'none', border: 'none', color: 'var(--color-primary, #1976d2)', textDecoration: 'underline', cursor: 'pointer', padding: '0.5rem 0' }}
+            >
+              {isLoginMode ? 'Nie masz konta? Zarejestruj się' : 'Masz już konto? Zaloguj się'}
+            </button>
           </div>
         </form>
       </div>
