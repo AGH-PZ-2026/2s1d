@@ -175,7 +175,13 @@ router.delete("/:itemId/delegations/:id", async (c) => {
   const db = c.get("db");
   const itemId = Number(c.req.param("itemId"));
   const id = Number(c.req.param("id"));
-<<<<<<< HEAD
+
+
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+// Only owner or admin can delete delegations
+  await assertCanManageDelegations(db, itemId, userId, userRole);
+
 
   const existing = await db
     .select()
@@ -225,18 +231,11 @@ await createAuditLog(db, {
   newValue: null,
 });
 
-=======
-  const userId = c.get("userId");
-  const userRole = c.get("userRole");
 
-  // Only owner or admin can delete delegations
-  await assertCanManageDelegations(db, itemId, userId, userRole);
 
+  
   // Verify delegation exists and belongs to this item
-  const existing = await db.select().from(delegations).where(and(eq(delegations.id, id), eq(delegations.itemId, itemId))).limit(1);
-  if (existing.length === 0) notFound("Delegation not found");
->>>>>>> bc51a82 (fix: enforce owner-only delegation management permissions)
-
+  
   await db.delete(delegations).where(eq(delegations.id, id));
   return c.body(null, 204);
 });
