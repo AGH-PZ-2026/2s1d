@@ -22,8 +22,6 @@ interface ModalState { mode: 'create' | 'edit'; itemId?: number; }
 type SortKey = 'name' | 'manufacturer' | 'model' | 'serial' | 'category' | 'status' | 'location' | 'owner';
 type SortDirection = 'asc' | 'desc';
 
-const PAGE_SIZE = 5;
-
 export default function ItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
@@ -45,6 +43,7 @@ export default function ItemsPage() {
   const [filters, setFilters] = useState({ query: '', categoryId: '', statusId: '', locationId: '', ownerId: '', manufacturer: '' });
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'name', direction: 'asc' });
   const [page, setPage] = useState(1);
+  const [pageSizeStr, setPageSizeStr] = useState<string>('10');
   const modalRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -148,9 +147,10 @@ export default function ItemsPage() {
     });
   }, [filters, getCategoryName, getLocationName, getStatusName, items, sort]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const pageSize = pageSizeStr === 'all' ? Math.max(filteredItems.length, 1) : parseInt(pageSizeStr, 10);
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const paginatedItems = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginatedItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const selectedItem = filteredItems.find((item) => item.id === selectedItemId) ?? filteredItems[0] ?? items[0];
   const selectedLocation = selectedItem ? locations.find((location) => location.id === selectedItem.locationId) : undefined;
 
@@ -258,7 +258,23 @@ export default function ItemsPage() {
             {paginatedItems.length === 0 ? (<tr><td colSpan={9}>Brak przedmiotów spełniających filtry.</td></tr>) : paginatedItems.map((item) => (<tr key={item.id} className={item.id === selectedItem?.id ? 'row-selected' : ''} onClick={() => setSelectedItemId(item.id)}><td className="td-name">{item.name}</td><td>{item.manufacturer}</td><td>{item.model ?? '—'}</td><td>{item.serial ?? '—'}</td><td>{getCategoryName(item.categoryId)}</td><td>{getStatusName(item.statusId)}</td><td>{getLocationName(item.locationId)}</td><td>{getOwnerName(item)}</td></tr>))}
           </tbody>
         </table>
-        <div className="table-pagination"><span>Strona {currentPage} z {totalPages} · Wyniki: {filteredItems.length}</span><div className="td-actions"><button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">Poprzednia</button><button className="btn btn-secondary" disabled={currentPage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">Następna</button></div></div>
+        <div className="table-pagination">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span>Strona {currentPage} z {totalPages} · Wyniki: {filteredItems.length}</span>
+            <select className="form-input" style={{ width: 'auto', padding: '4px 28px 4px 8px', minHeight: '0' }} value={pageSizeStr} onChange={(e) => { setPageSizeStr(e.target.value); setPage(1); }}>
+              <option value="5">5 na stronę</option>
+              <option value="10">10 na stronę</option>
+              <option value="25">25 na stronę</option>
+              <option value="50">50 na stronę</option>
+              <option value="100">100 na stronę</option>
+              <option value="all">Wszystkie</option>
+            </select>
+          </div>
+          <div className="td-actions">
+            <button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">Poprzednia</button>
+            <button className="btn btn-secondary" disabled={currentPage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">Następna</button>
+          </div>
+        </div>
         {selectedItem && (<>
           <LocationMapPanel item={selectedItem} location={selectedLocation} locations={locations} onCreateLocation={handleCreateLocation} onLocationChange={handleLocationChange} ownerName={getOwnerName(selectedItem)} statusName={getStatusName(selectedItem.statusId)} canEdit={canManageLocation} canDelete={user?.role === 'admin'} deleteLoading={deleteLoading} onDelete={handleDeleteSelected} onEdit={openEdit} />
           <ItemPhotosPanel item={selectedItem} photos={photos} error={photoError} loading={photoLoading} onUpload={handlePhotoUpload} />
