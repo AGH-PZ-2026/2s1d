@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNull, sql, and, lte } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import { notificationPreferences, notificationEvents, type NotificationPreference } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
@@ -52,8 +52,16 @@ router.put("/preferences", zValidator("json", updatePrefSchema), async (c) => {
 // GET /api/v1/notifications/events
 router.get("/events", async (c) => {
   const db = c.get("db"); const userId = c.get("userId");
-  const rows = await db.select().from(notificationEvents).where(eq(notificationEvents.userId, userId)).orderBy(desc(notificationEvents.createdAt));
-  return c.json(rows);
+  const notifications = await db
+  .select()
+  .from(notificationEvents)
+  .where(
+    and(
+      eq(notificationEvents.userId, userId),
+      lte(notificationEvents.scheduledAt, new Date())
+    )
+  )
+  .orderBy(desc(notificationEvents.scheduledAt));return c.json(notifications);
 });
 
 export { router as notificationsRouter };

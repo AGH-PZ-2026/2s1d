@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, isNull } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
-import { borrowings, items, users, itemStatus } from '../db/schema';
+import { borrowings, items, users, itemStatus, notificationEvents, notificationPreferences } from '../db/schema';
 import type { Borrowing } from '../db/schema';
 import { authMiddleware } from '../middleware/auth';
 import { notFound, badRequest, forbidden } from '../lib/errors';
@@ -325,7 +325,7 @@ router.patch('/:id/approve', async (c) => {
   const id = Number(c.req.param('id'));
   const userId = c.get('userId');
   const item = await db
-    .select({ ownerId: items.ownerId })
+    .select({ ownerId: items.ownerId, itemName: items.name })
     .from(items)
     .innerJoin(borrowings, eq(borrowings.itemId, items.id))
     .where(eq(borrowings.id, id))
@@ -364,6 +364,51 @@ router.patch('/:id/approve', async (c) => {
       .set({ statusId: reservedStatus[0].id })
       .where(eq(items.id, existing[0].itemId));
   }
+  const itemName = item[0]?.itemName ?? "przedmiot";
+
+  await db.insert(notificationEvents).values({
+  userId: existing[0].borrowerId!,
+  borrowingId: existing[0].id,
+  eventType: "borrowing_approved",
+  channel: "push",
+  payload: JSON.stringify({
+    title: "Wypożyczenie zaakceptowane",
+     message: `Prośba o wypożyczenie przedmiotu "${itemName}" została zaakceptowana.`,
+  }),
+  scheduledAt: sql`NOW()`,
+  });
+
+  
+  const prefs = await db
+  .select()
+  .from(notificationPreferences)
+  .where(eq(notificationPreferences.userId, existing[0].borrowerId!))
+  .limit(1);
+
+const hoursBefore =
+  prefs[0]?.returnDueNoticeHours ?? 24;
+
+const plannedReturn =
+  existing[0].plannedReturnAt;
+
+if (plannedReturn) {
+  const scheduledAt = new Date(
+    new Date(plannedReturn).getTime() -
+      hoursBefore * 60 * 60 * 1000
+  );
+
+  await db.insert(notificationEvents).values({
+    userId: existing[0].borrowerId!,
+    borrowingId: existing[0].id,
+    eventType: "return_due",
+    channel: "push",
+    payload: JSON.stringify({
+      title: "Zbliża się termin zwrotu",
+      message: `Przedmiot "${itemName}" należy zwrócić do ${new Date(plannedReturn).toLocaleString("pl-PL")}`,
+    }),
+    scheduledAt,
+  });
+}
 
   await createAuditLog(db, {
     userId: c.get('userId'),
