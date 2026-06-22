@@ -8,7 +8,11 @@ declare interface Hyperdrive {
 }
 
 declare interface R2Bucket {
-  put(key: string, value: ReadableStream | ArrayBuffer | string, options?: R2PutOptions): Promise<R2Object>;
+  put(
+    key: string,
+    value: ReadableStream | ArrayBuffer | string,
+    options?: R2PutOptions
+  ): Promise<R2Object>;
   get(key: string): Promise<R2ObjectBody | null>;
   delete(key: string | string[]): Promise<void>;
   head(key: string): Promise<R2Object | null>;
@@ -64,7 +68,7 @@ declare interface R2ListOptions {
   cursor?: string;
   delimiter?: string;
   startAfter?: string;
-  include?: ("httpMetadata" | "customMetadata")[];
+  include?: ('httpMetadata' | 'customMetadata')[];
 }
 
 declare interface R2Objects {
@@ -80,7 +84,7 @@ declare interface Queue<Body = unknown> {
 }
 
 declare interface QueueSendOptions {
-  contentType?: "text" | "json" | "bytes" | "v8";
+  contentType?: 'text' | 'json' | 'bytes' | 'v8';
   delaySeconds?: number;
 }
 

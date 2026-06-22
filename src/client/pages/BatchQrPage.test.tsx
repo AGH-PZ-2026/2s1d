@@ -55,13 +55,19 @@ describe('BatchQrPage', () => {
     fireEvent.click(screen.getByLabelText('Zaznacz wszystkie przedmioty'));
     expect(screen.getByText('Wybrano: 2 z 2')).toBeInTheDocument();
     expect(
-      within(screen.getByRole('row', { name: /Oscyloskop Tektronix/ })).getByRole('checkbox')
+      within(
+        screen.getByRole('row', { name: /Oscyloskop Tektronix/ })
+      ).getByRole('checkbox')
     ).toBeChecked();
     expect(
-      within(screen.getByRole('row', { name: /Multimetr UNI-T/ })).getByRole('checkbox')
+      within(screen.getByRole('row', { name: /Multimetr UNI-T/ })).getByRole(
+        'checkbox'
+      )
     ).toBeChecked();
 
-    fireEvent.change(screen.getByLabelText('Rozmiar'), { target: { value: 'large' } });
+    fireEvent.change(screen.getByLabelText('Rozmiar'), {
+      target: { value: 'large' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Pobierz PDF' }));
 
     expect(batchQrService.download).toHaveBeenCalledWith([1, 2], 'large');

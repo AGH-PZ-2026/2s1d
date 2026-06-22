@@ -37,7 +37,8 @@ export const auditLogService = {
       headers: authHeaders(),
     });
     await ensureOk(response);
-    return response.json();
+    const data: AuditLogEntry[] = await response.json();
+    return data;
   },
 };
 
@@ -45,7 +46,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data = await response.json() as Record<string, unknown>;
+    const data: { detail?: string } = await response.json();
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {
     // Keep fallback error.

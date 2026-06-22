@@ -17,6 +17,7 @@
     "types": "wrangler types",
     "check": "tsc --noEmit",
     "lint": "eslint .",
+    "format": "prettier --write 'src/**/*.{ts,tsx}' 'tests/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.{ts,tsx}' 'tests/**/*.ts'"
   },
   "dependencies": {

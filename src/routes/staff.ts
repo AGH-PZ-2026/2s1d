@@ -1,16 +1,16 @@
-import { Hono } from "hono";
-import type { Connection } from "mysql2/promise";
-import { authMiddleware } from "../middleware/auth";
-import { notFound } from "../lib/errors";
+import { Hono } from 'hono';
+import type { Connection } from 'mysql2/promise';
+import { authMiddleware } from '../middleware/auth';
+import { notFound } from '../lib/errors';
 
 type Variables = {
   rawDb: Connection;
-  userRole: "admin" | "user";
+  userRole: 'admin' | 'user';
   isAuthenticated: boolean;
 };
 
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
-router.use("/*", authMiddleware);
+router.use('/*', authMiddleware);
 
 interface StaffRow {
   id: number;
@@ -56,11 +56,11 @@ const STAFF_QUERY = `
 `;
 
 // GET /api/v1/staff
-router.get("/", async (c) => {
-  const rawDb = c.get("rawDb");
-  const search = c.req.query("search");
-  const limit = Math.min(Number(c.req.query("limit") || "100"), 500);
-  const offset = Number(c.req.query("offset") || "0");
+router.get('/', async (c) => {
+  const rawDb = c.get('rawDb');
+  const search = c.req.query('search');
+  const limit = Math.min(Number(c.req.query('limit') || '100'), 500);
+  const offset = Number(c.req.query('offset') || '0');
 
   let query = STAFF_QUERY;
   const params: any[] = [];
@@ -79,13 +79,15 @@ router.get("/", async (c) => {
 });
 
 // GET /api/v1/staff/:id
-router.get("/:id", async (c) => {
-  const rawDb = c.get("rawDb");
-  const id = Number(c.req.param("id"));
+router.get('/:id', async (c) => {
+  const rawDb = c.get('rawDb');
+  const id = Number(c.req.param('id'));
 
-  const [rows] = await rawDb.execute(`${STAFF_QUERY} AND p.id = ?`, [String(id)]);
+  const [rows] = await rawDb.execute(`${STAFF_QUERY} AND p.id = ?`, [
+    String(id),
+  ]);
   const arr = rows as StaffRow[];
-  if (arr.length === 0) notFound("Staff member not found");
+  if (arr.length === 0) notFound('Staff member not found');
   return c.json(staffResponse(arr[0]));
 });
 

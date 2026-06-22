@@ -1,5 +1,5 @@
-import { HTTPException } from "hono/http-exception";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { HTTPException } from 'hono/http-exception';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
 export class AppError extends HTTPException {
   constructor(status: ContentfulStatusCode, detail: string) {
@@ -19,6 +19,6 @@ export function forbidden(detail: string): never {
   throw new AppError(403, detail);
 }
 
-export function unauthorized(detail: string = "Unauthorized"): never {
+export function unauthorized(detail: string = 'Unauthorized'): never {
   throw new AppError(401, detail);
 }

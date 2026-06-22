@@ -24,20 +24,119 @@ export const router = createBrowserRouter([
     element: <Layout />,
     errorElement: <ErrorPage />,
     children: [
-      { path: '/', element: <AuthGate><HomePage /></AuthGate> },
-      { path: '/statuses', element: <AuthGate><StatusesPage /></AuthGate> },
-      { path: '/categories', element: <AuthGate><CategoriesPage /></AuthGate> },
-      { path: '/delegations', element: <AuthGate><DelegationsPage /></AuthGate> },
-      { path: '/borrowings', element: <AuthGate><BorrowingsPage /></AuthGate> },
-      { path: '/users', element: <AuthGate requireAdmin><UsersPage /></AuthGate> },
-      { path: '/audit-logs', element: <AuthGate requireAdmin><AuditLogsPage /></AuthGate> },
-      { path: '/items', element: <AuthGate><ItemsPage /></AuthGate> },
-      { path: '/qr', element: <AuthGate><QrScannerPage /></AuthGate> },
-      { path: '/import', element: <AuthGate requireAdmin> <ExcelImportPage /></AuthGate> },
-      { path: '/reports/overdue', element: <AuthGate><OverdueReportsPage /></AuthGate> },
-      { path: '/batch-qr', element: <AuthGate><BatchQrPage /></AuthGate> },
-      { path: '/notifications', element: <AuthGate><NotificationsPage /></AuthGate> },
-      { path: '/groups', element: <AuthGate requireAdmin><GroupsPage /></AuthGate> },
+      {
+        path: '/',
+        element: (
+          <AuthGate>
+            <HomePage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/statuses',
+        element: (
+          <AuthGate>
+            <StatusesPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/categories',
+        element: (
+          <AuthGate>
+            <CategoriesPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/delegations',
+        element: (
+          <AuthGate>
+            <DelegationsPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/borrowings',
+        element: (
+          <AuthGate>
+            <BorrowingsPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/users',
+        element: (
+          <AuthGate requireAdmin>
+            <UsersPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/audit-logs',
+        element: (
+          <AuthGate requireAdmin>
+            <AuditLogsPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/items',
+        element: (
+          <AuthGate>
+            <ItemsPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/qr',
+        element: (
+          <AuthGate>
+            <QrScannerPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/import',
+        element: (
+          <AuthGate requireAdmin>
+            {' '}
+            <ExcelImportPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/reports/overdue',
+        element: (
+          <AuthGate>
+            <OverdueReportsPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/batch-qr',
+        element: (
+          <AuthGate>
+            <BatchQrPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/notifications',
+        element: (
+          <AuthGate>
+            <NotificationsPage />
+          </AuthGate>
+        ),
+      },
+      {
+        path: '/groups',
+        element: (
+          <AuthGate requireAdmin>
+            <GroupsPage />
+          </AuthGate>
+        ),
+      },
       { path: '/login', element: <LoginPage /> },
     ],
   },

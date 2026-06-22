@@ -25,9 +25,8 @@ export const dashboardService = {
 
     return {
       items: items.length,
-      borrowed: items.filter(
-        (item) => borrowedStatusIds.has(item.statusId)
-      ).length,
+      borrowed: items.filter((item) => borrowedStatusIds.has(item.statusId))
+        .length,
       overdue: overdueRows.length,
       categories: categories.length,
     };

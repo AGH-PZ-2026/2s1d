@@ -15,10 +15,14 @@ const redIcon = L.divIcon({
   html: redMarkerHtml,
   iconSize: [25, 41],
   iconAnchor: [12, 41],
-  popupAnchor: [1, -34]
+  popupAnchor: [1, -34],
 });
 
-function MapEvents({ onLocationSelect }: { onLocationSelect?: (x: number, y: number) => void }) {
+function MapEvents({
+  onLocationSelect,
+}: {
+  onLocationSelect?: (x: number, y: number) => void;
+}) {
   useMapEvents({
     click(e) {
       if (onLocationSelect) {
@@ -29,26 +33,64 @@ function MapEvents({ onLocationSelect }: { onLocationSelect?: (x: number, y: num
   return null;
 }
 
-export default function LeafletMap({ mapX, mapY, previewX, previewY, onLocationSelect }: LeafletMapProps) {
+export default function LeafletMap({
+  mapX,
+  mapY,
+  previewX,
+  previewY,
+  onLocationSelect,
+}: LeafletMapProps) {
   const defaultLat = 50.0646;
   const defaultLng = 19.9236;
 
   // Używamy podglądu lub oryginalnych współrzędnych do wycentrowania mapy
-  const centerLat = typeof previewY === 'number' ? previewY : (typeof mapY === 'number' ? mapY : defaultLat);
-  const centerLng = typeof previewX === 'number' ? previewX : (typeof mapX === 'number' ? mapX : defaultLng);
-  
-  const hasOriginalCoordinates = typeof mapX === 'number' && typeof mapY === 'number';
-  const hasPreviewCoordinates = typeof previewX === 'number' && typeof previewY === 'number';
+  let centerLat = defaultLat;
+  if (typeof previewY === 'number') {
+    centerLat = previewY;
+  } else if (typeof mapY === 'number') {
+    centerLat = mapY;
+  }
+
+  let centerLng = defaultLng;
+  if (typeof previewX === 'number') {
+    centerLng = previewX;
+  } else if (typeof mapX === 'number') {
+    centerLng = mapX;
+  }
+
+  const hasOriginalCoordinates =
+    typeof mapX === 'number' && typeof mapY === 'number';
+  const hasPreviewCoordinates =
+    typeof previewX === 'number' && typeof previewY === 'number';
 
   return (
-    <div style={{ height: '300px', width: '100%', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-      <MapContainer center={[centerLat, centerLng]} zoom={16} style={{ height: '100%', width: '100%' }}>
+    <div
+      style={{
+        height: '300px',
+        width: '100%',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        border: '1px solid #e2e8f0',
+      }}
+    >
+      <MapContainer
+        center={[centerLat, centerLng]}
+        zoom={16}
+        style={{ height: '100%', width: '100%' }}
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {hasOriginalCoordinates && <Marker position={[mapY, mapX]} opacity={hasPreviewCoordinates ? 0.5 : 1} />}
-        {hasPreviewCoordinates && <Marker position={[previewY, previewX]} icon={redIcon} />}
+        {hasOriginalCoordinates && (
+          <Marker
+            position={[mapY, mapX]}
+            opacity={hasPreviewCoordinates ? 0.5 : 1}
+          />
+        )}
+        {hasPreviewCoordinates && (
+          <Marker position={[previewY, previewX]} icon={redIcon} />
+        )}
         <MapEvents onLocationSelect={onLocationSelect} />
       </MapContainer>
     </div>

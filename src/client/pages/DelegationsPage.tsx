@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { delegationService, type GlobalDelegation } from '../services/delegationService';
+import {
+  delegationService,
+  type GlobalDelegation,
+} from '../services/delegationService';
 import { useAuth } from '../hooks/useAuth';
 
 export default function DelegationsPage() {
@@ -9,27 +12,37 @@ export default function DelegationsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchDelegations = useCallback(async () => {
-    setLoading(true); setError(null);
-    try { 
+    setLoading(true);
+    setError(null);
+    try {
       const data = await delegationService.getAllGlobal();
-      setDelegations(data); 
-    } catch { 
-      setError('Nie udało się pobrać delegacji.'); 
-    } finally { 
-      setLoading(false); 
+      setDelegations(data);
+    } catch {
+      setError('Nie udało się pobrać delegacji.');
+    } finally {
+      setLoading(false);
     }
   }, []);
-  
-  useEffect(() => { void fetchDelegations(); }, [fetchDelegations]);
+
+  useEffect(() => {
+    void fetchDelegations();
+  }, [fetchDelegations]);
 
   const handleDelete = async (delegation: GlobalDelegation) => {
-    const label = delegation.user_email ?? delegation.group_name ?? `#${delegation.id}`;
-    if (!confirm(`Usunąć delegację na przedmiot "${delegation.item_name}" dla: ${label}?`)) return;
-    try { 
-      await delegationService.removeGlobal(delegation.id); 
-      await fetchDelegations(); 
+    const label =
+      delegation.user_email ?? delegation.group_name ?? `#${delegation.id}`;
+    if (
+      !confirm(
+        `Usunąć delegację na przedmiot "${delegation.item_name}" dla: ${label}?`
+      )
+    )
+      return;
+    try {
+      await delegationService.removeGlobal(delegation.id);
+      await fetchDelegations();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Nie udało się usunąć delegacji.');
     }
-    catch (e: unknown) { alert(e instanceof Error ? e.message : 'Nie udało się usunąć delegacji.'); }
   };
 
   return (
@@ -38,17 +51,20 @@ export default function DelegationsPage() {
         <div>
           <h1 className="page-title">Wszystkie delegacje</h1>
           <p className="page-subtitle">
-            {user?.role === 'admin' 
-              ? 'Przegląd uprawnień do wszystkich przedmiotów w systemie' 
+            {user?.role === 'admin'
+              ? 'Przegląd uprawnień do wszystkich przedmiotów w systemie'
               : 'Przegląd uprawnień do przedmiotów, których jesteś właścicielem'}
           </p>
         </div>
       </div>
-      
+
       {error && <div className="alert alert-error">{error}</div>}
-      
+
       {loading ? (
-        <div className="loading-state"><div className="spinner" /><span>Ładowanie delegacji…</span></div>
+        <div className="loading-state">
+          <div className="spinner" />
+          <span>Ładowanie delegacji…</span>
+        </div>
       ) : (
         <table className="table">
           <thead>
@@ -61,22 +77,26 @@ export default function DelegationsPage() {
           </thead>
           <tbody>
             {delegations.length === 0 ? (
-              <tr><td colSpan={4}>Brak przypisanych delegacji.</td></tr>
+              <tr>
+                <td colSpan={4}>Brak przypisanych delegacji.</td>
+              </tr>
             ) : (
               delegations.map((d) => (
                 <tr key={d.id}>
                   <td>
                     <strong>{d.item_name}</strong>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: {d.item_id}</div>
+                    <div
+                      style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}
+                    >
+                      ID: {d.item_id}
+                    </div>
                   </td>
                   <td>
-                    {d.user_email ? (
-                      <span>👤 {d.user_email}</span>
-                    ) : d.group_name ? (
-                      <span>👥 {d.group_name}</span>
-                    ) : (
-                      '—'
-                    )}
+                    {(() => {
+                      if (d.user_email) return <span>👤 {d.user_email}</span>;
+                      if (d.group_name) return <span>👥 {d.group_name}</span>;
+                      return '—';
+                    })()}
                   </td>
                   <td>
                     <span className={`badge badge-${d.permission}`}>
@@ -84,7 +104,10 @@ export default function DelegationsPage() {
                     </span>
                   </td>
                   <td>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(d)}>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={() => handleDelete(d)}
+                    >
                       Usuń
                     </button>
                   </td>

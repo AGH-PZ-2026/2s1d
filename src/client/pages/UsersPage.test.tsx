@@ -64,7 +64,9 @@ describe('UsersPage', () => {
     const row = await screen.findByRole('row', {
       name: /nowy\.pracownik@agh\.edu\.pl/,
     });
-    expect(within(row).getByText('Oczekuje na zatwierdzenie')).toBeInTheDocument();
+    expect(
+      within(row).getByText('Oczekuje na zatwierdzenie')
+    ).toBeInTheDocument();
 
     fireEvent.click(within(row).getByRole('button', { name: 'Odrzuć' }));
 

@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { userService, type User } from '../services/userService';
-import { UserCheck, UserCog, Shield, User as UserIcon, Loader2, UserX } from 'lucide-react';
+import {
+  UserCheck,
+  UserCog,
+  Shield,
+  User as UserIcon,
+  Loader2,
+  UserX,
+} from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function UsersPage() {
@@ -17,7 +24,11 @@ export default function UsersPage() {
       const data = await userService.getAll();
       setUsers(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nie udało się pobrać listy użytkowników.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Nie udało się pobrać listy użytkowników.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -31,9 +42,13 @@ export default function UsersPage() {
     setActionLoading(id);
     try {
       const updated = await userService.approve(id);
-      setUsers(users.map(u => u.id === id ? updated : u));
+      setUsers(users.map((u) => (u.id === id ? updated : u)));
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Błąd podczas zatwierdzania użytkownika.');
+      alert(
+        err instanceof Error
+          ? err.message
+          : 'Błąd podczas zatwierdzania użytkownika.'
+      );
     } finally {
       setActionLoading(null);
     }
@@ -44,24 +59,31 @@ export default function UsersPage() {
     setActionLoading(id);
     try {
       const updated = await userService.reject(id);
-      setUsers(users.map(u => u.id === id ? updated : u));
+      setUsers(users.map((u) => (u.id === id ? updated : u)));
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Błąd podczas odrzucania użytkownika.');
+      alert(
+        err instanceof Error
+          ? err.message
+          : 'Błąd podczas odrzucania użytkownika.'
+      );
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleChangeRole = async (id: number, currentRole: 'admin' | 'user') => {
+  const handleChangeRole = async (
+    id: number,
+    currentRole: 'admin' | 'user'
+  ) => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     const confirmMsg = `Czy na pewno chcesz zmienić rolę użytkownika na ${newRole === 'admin' ? 'Administrator' : 'Użytkownik'}?`;
-    
+
     if (!window.confirm(confirmMsg)) return;
 
     setActionLoading(id);
     try {
       await userService.updateRole(id, newRole);
-      setUsers(users.map(u => u.id === id ? { ...u, role: newRole } : u));
+      setUsers(users.map((u) => (u.id === id ? { ...u, role: newRole } : u)));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Błąd podczas zmiany roli.');
     } finally {
@@ -75,7 +97,8 @@ export default function UsersPage() {
         <div>
           <h1 className="page-title">Zarządzanie użytkownikami</h1>
           <p className="page-subtitle">
-            Zatwierdzaj nowych pracowników i zarządzaj uprawnieniami administratora.
+            Zatwierdzaj nowych pracowników i zarządzaj uprawnieniami
+            administratora.
           </p>
         </div>
       </div>
@@ -101,7 +124,10 @@ export default function UsersPage() {
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '40px' }}>
+                  <td
+                    colSpan={4}
+                    style={{ textAlign: 'center', padding: '40px' }}
+                  >
                     Brak użytkowników w systemie.
                   </td>
                 </tr>
@@ -109,33 +135,80 @@ export default function UsersPage() {
                 users.map((u) => (
                   <tr key={u.id}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div className="sidebar-user-avatar" style={{ margin: 0 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                        }}
+                      >
+                        <div
+                          className="sidebar-user-avatar"
+                          style={{ margin: 0 }}
+                        >
                           {u.email.charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <div style={{ fontWeight: 500 }}>{u.email}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>ID: {u.id}</div>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              color: 'var(--text-muted)',
+                            }}
+                          >
+                            ID: {u.id}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td>
-                      <span className={`badge ${u.role === 'admin' ? 'badge-accent' : 'badge-custom'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        {u.role === 'admin' ? <Shield size={12} /> : <UserIcon size={12} />}
+                      <span
+                        className={`badge ${u.role === 'admin' ? 'badge-accent' : 'badge-custom'}`}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        {u.role === 'admin' ? (
+                          <Shield size={12} />
+                        ) : (
+                          <UserIcon size={12} />
+                        )}
                         {u.role === 'admin' ? 'Administrator' : 'Pracownik'}
                       </span>
                     </td>
                     <td>
-                      {!u.isActive ? (
-                        <span className="status-indicator status-indicator--danger">Odrzucony</span>
-                      ) : u.isApproved ? (
-                        <span className="status-indicator status-indicator--ok">Aktywny</span>
-                      ) : (
-                        <span className="status-indicator status-indicator--warning">Oczekuje na zatwierdzenie</span>
-                      )}
+                      {(() => {
+                        if (!u.isActive) {
+                          return (
+                            <span className="status-indicator status-indicator--danger">
+                              Odrzucony
+                            </span>
+                          );
+                        }
+                        if (u.isApproved) {
+                          return (
+                            <span className="status-indicator status-indicator--ok">
+                              Aktywny
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="status-indicator status-indicator--warning">
+                            Oczekuje na zatwierdzenie
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'flex-end',
+                          gap: '8px',
+                        }}
+                      >
                         {!u.isApproved && (
                           <>
                             <button
@@ -143,7 +216,10 @@ export default function UsersPage() {
                               onClick={() => handleApprove(u.id)}
                               disabled={actionLoading === u.id}
                             >
-                              <UserCheck size={14} style={{ marginRight: '4px' }} />
+                              <UserCheck
+                                size={14}
+                                style={{ marginRight: '4px' }}
+                              />
                               Zatwierdź
                             </button>
                             {u.isActive && currentUser?.id !== u.id ? (
@@ -152,7 +228,10 @@ export default function UsersPage() {
                                 onClick={() => handleReject(u.id, u.email)}
                                 disabled={actionLoading === u.id}
                               >
-                                <UserX size={14} style={{ marginRight: '4px' }} />
+                                <UserX
+                                  size={14}
+                                  style={{ marginRight: '4px' }}
+                                />
                                 Odrzuć
                               </button>
                             ) : null}
@@ -166,7 +245,9 @@ export default function UsersPage() {
                             title="Zmień rolę"
                           >
                             <UserCog size={14} style={{ marginRight: '4px' }} />
-                            {u.role === 'admin' ? 'Zdejmij admina' : 'Nadaj admina'}
+                            {u.role === 'admin'
+                              ? 'Zdejmij admina'
+                              : 'Nadaj admina'}
                           </button>
                         )}
                       </div>

@@ -55,7 +55,8 @@ export const borrowingService = {
       headers: authHeaders(),
     });
     await ensureOk(response);
-    return response.json();
+    const data: Borrowing[] = await response.json();
+    return data;
   },
 
   async request(payload: BorrowingRequestPayload): Promise<Borrowing> {
@@ -79,7 +80,8 @@ export const borrowingService = {
       body: JSON.stringify(payload),
     });
     await ensureOk(response);
-    return response.json();
+    const data: Borrowing = await response.json();
+    return data;
   },
 
   async createExternal(payload: ExternalBorrowingPayload): Promise<Borrowing> {
@@ -115,7 +117,8 @@ export const borrowingService = {
       }),
     });
     await ensureOk(response);
-    return response.json();
+    const data: Borrowing = await response.json();
+    return data;
   },
 
   async approve(id: number): Promise<Borrowing> {
@@ -149,22 +152,28 @@ export const borrowingService = {
       body: JSON.stringify(payload),
     });
     await ensureOk(response);
-    return response.json();
+    const data: Borrowing = await response.json();
+    return data;
   },
 };
 
-function validateInternalBorrowing(
-  itemId: number,
-): void {
+function validateInternalBorrowing(itemId: number): void {
   if (!itemId) throw new Error('Wybierz przedmiot.');
 }
 
-async function patchStatus(id: number, action: 'approve' | 'reject' | 'handover'): Promise<Borrowing> {
+async function patchStatus(
+  id: number,
+  action: 'approve' | 'reject' | 'handover'
+): Promise<Borrowing> {
   if (USE_MOCKS) {
     await delay(300);
     const now = new Date().toISOString();
     if (action === 'approve') {
-      return updateMockBorrowing(id, { status: 'borrowed', approvedAt: now, handedOverAt: now });
+      return updateMockBorrowing(id, {
+        status: 'borrowed',
+        approvedAt: now,
+        handedOverAt: now,
+      });
     }
     return updateMockBorrowing(id, { status: 'rejected' });
   }
@@ -174,7 +183,8 @@ async function patchStatus(id: number, action: 'approve' | 'reject' | 'handover'
     headers: authHeaders(),
   });
   await ensureOk(response);
-  return response.json();
+  const data: Borrowing = await response.json();
+  return data;
 }
 
 function createMockBorrowing(payload: MockBorrowingPayload): Borrowing {
@@ -208,7 +218,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data = await response.json() as Record<string, unknown>;
+    const data: { detail?: string } = await response.json();
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {
     // Keep fallback error.

@@ -1,6 +1,5 @@
-import { drizzle } from "drizzle-orm/mysql2";
-import type { MySql2Database } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import { drizzle } from 'drizzle-orm/mysql2';
+import mysql from 'mysql2/promise';
 
 export async function createDb(hyperdrive: Hyperdrive) {
   const connection = await mysql.createConnection({
@@ -10,7 +9,7 @@ export async function createDb(hyperdrive: Hyperdrive) {
     database: hyperdrive.database,
     port: hyperdrive.port,
     disableEval: true,
-    charset: "utf8mb4",
+    charset: 'utf8mb4',
   });
   return drizzle(connection);
 }

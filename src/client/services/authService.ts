@@ -34,7 +34,6 @@ export interface RegisterPayload {
 }
 
 export const authService = {
-
   /**
    * Google OAuth login.
    * @param credential Google ID token from GIS (or email string when dev bypass is active)
@@ -64,7 +63,8 @@ export const authService = {
     if (!response.ok) {
       return { devBypassAuth: false, googleClientId: '' };
     }
-    return response.json();
+    const data: AuthConfig = await response.json();
+    return data;
   },
 
   getSessionUser(): AuthUser | null {
@@ -116,7 +116,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data = await response.json() as Record<string, unknown>;
+    const data: { detail?: string } = await response.json();
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {
     // Keep fallback error.

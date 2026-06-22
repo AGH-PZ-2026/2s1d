@@ -1,5 +1,5 @@
-import { auditLogs } from "../db/schema";
-import type { MySql2Database } from "drizzle-orm/mysql2";
+import { auditLogs } from '../db/schema';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
 
 export async function createAuditLog(
   db: MySql2Database<Record<string, never>>,

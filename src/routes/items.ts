@@ -1,27 +1,27 @@
-import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
-import { eq, like, or, and, desc, sql } from "drizzle-orm";
-import type { MySql2Database } from "drizzle-orm/mysql2";
-import { borrowings, items, type Item } from "../db/schema";
-import { authMiddleware } from "../middleware/auth";
-import { notFound, badRequest, forbidden } from "../lib/errors";
-import { getItemPermissionLevel } from "../lib/permissions";
-import { createAuditLog } from "../lib/audit";
+import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
+import { eq, like, or, and, desc, sql } from 'drizzle-orm';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
+import { borrowings, items, type Item } from '../db/schema';
+import { authMiddleware } from '../middleware/auth';
+import { notFound, badRequest, forbidden } from '../lib/errors';
+import { getItemPermissionLevel } from '../lib/permissions';
+import { createAuditLog } from '../lib/audit';
 
 type Variables = {
   db: MySql2Database<Record<string, never>>;
   userId: number;
-  userRole: "admin" | "user";
+  userRole: 'admin' | 'user';
   isAuthenticated: boolean;
 };
 
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
-router.use("/*", authMiddleware);
+router.use('/*', authMiddleware);
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
-  manufacturer: z.string().max(100).optional().default(""),
+  manufacturer: z.string().max(100).optional().default(''),
   model: z.string().max(100).optional(),
   serial: z.string().max(100).optional(),
   inventoryNumber: z.string().max(100).optional(),
@@ -58,11 +58,11 @@ function toResponse(item: Item) {
   };
 }
 
-router.get("/", async (c) => {
-  const db = c.get("db");
-  const search = c.req.query("search");
-  const statusId = c.req.query("statusId");
-  const locationId = c.req.query("locationId");
+router.get('/', async (c) => {
+  const db = c.get('db');
+  const search = c.req.query('search');
+  const statusId = c.req.query('statusId');
+  const locationId = c.req.query('locationId');
   const conditions = [];
   if (search) {
     conditions.push(
@@ -78,31 +78,37 @@ router.get("/", async (c) => {
   }
   if (statusId) conditions.push(eq(items.statusId, Number(statusId)));
   if (locationId) conditions.push(eq(items.locationId, Number(locationId)));
-  const rows = await db.select().from(items).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(desc(items.id));
+  const rows = await db
+    .select()
+    .from(items)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(items.id));
   return c.json(rows.map(toResponse));
 });
 
-router.get("/:id", async (c) => {
-  const db = c.get("db");
-  const id = Number(c.req.param("id"));
+router.get('/:id', async (c) => {
+  const db = c.get('db');
+  const id = Number(c.req.param('id'));
   const rows = await db.select().from(items).where(eq(items.id, id)).limit(1);
-  if (rows.length === 0) notFound("Item not found");
+  if (rows.length === 0) notFound('Item not found');
   return c.json(toResponse(rows[0]));
 });
 
-router.post("/", zValidator("json", createSchema), async (c) => {
-  const db = c.get("db");
-  const body = c.req.valid("json");
-  if (!body.name.trim()) badRequest("Nazwa przedmiotu jest wymagana.");
+router.post('/', zValidator('json', createSchema), async (c) => {
+  const db = c.get('db');
+  const body = c.req.valid('json');
+  if (!body.name.trim()) badRequest('Nazwa przedmiotu jest wymagana.');
 
   // Mutual exclusivity of ownerId and ownerGroupId
   if (body.ownerId != null && body.ownerGroupId != null) {
-    badRequest("Można przypisać tylko osobę lub grupę jako opiekuna, nie oba jednocześnie.");
+    badRequest(
+      'Można przypisać tylko osobę lub grupę jako opiekuna, nie oba jednocześnie.'
+    );
   }
 
   // At least one of ownerId or ownerGroupId must be provided (non-null)
   if (body.ownerId == null && body.ownerGroupId == null) {
-    badRequest("Przedmiot musi mieć przypisanego opiekuna (osobę lub grupę).");
+    badRequest('Przedmiot musi mieć przypisanego opiekuna (osobę lub grupę).');
   }
 
   const insertValues: Record<string, unknown> = {
@@ -122,126 +128,163 @@ router.post("/", zValidator("json", createSchema), async (c) => {
   if (body.systemId) insertValues.systemId = body.systemId;
   if (body.purchaseDate) insertValues.purchaseDate = body.purchaseDate;
 
-  const result = await db.insert(items).values(insertValues as typeof items.$inferInsert);
+  const result = await db
+    .insert(items)
+    .values(insertValues as typeof items.$inferInsert);
   const insertedId = result[0].insertId;
 
   if (!body.systemId) {
     const generatedSystemId = `INV-${String(insertedId).padStart(6, '0')}`;
-    await db.update(items).set({ systemId: generatedSystemId }).where(eq(items.id, insertedId));
+    await db
+      .update(items)
+      .set({ systemId: generatedSystemId })
+      .where(eq(items.id, insertedId));
   }
 
-  const created = await db.select().from(items).where(eq(items.id, insertedId)).limit(1);
-  
+  const created = await db
+    .select()
+    .from(items)
+    .where(eq(items.id, insertedId))
+    .limit(1);
+
   await createAuditLog(db, {
-    userId: c.get("userId"),
+    userId: c.get('userId'),
     itemId: insertedId,
-    action: "ITEM_CREATED",
+    action: 'ITEM_CREATED',
     newValue: created[0],
   });
 
   return c.json(toResponse(created[0]), 201);
 });
 
-router.patch("/:id", zValidator("json", updateSchema), async (c) => {
-  const db = c.get("db");
-  const id = Number(c.req.param("id"));
-  const existing = await db.select().from(items).where(eq(items.id, id)).limit(1);
-  if (existing.length === 0) notFound("Item not found");
-  
-  const item = existing[0];
-  const permission = await getItemPermissionLevel(db, id, c.get("userId"), c.get("userRole"), item.ownerId);
-  if (!permission) forbidden("Brak uprawnień do edycji tego przedmiotu");
+router.patch('/:id', zValidator('json', updateSchema), async (c) => {
+  const db = c.get('db');
+  const id = Number(c.req.param('id'));
+  const existing = await db
+    .select()
+    .from(items)
+    .where(eq(items.id, id))
+    .limit(1);
+  if (existing.length === 0) notFound('Item not found');
 
-  const body = c.req.valid("json");
+  const item = existing[0];
+  const permission = await getItemPermissionLevel(
+    db,
+    id,
+    c.get('userId'),
+    c.get('userRole'),
+    item.ownerId
+  );
+  if (!permission) forbidden('Brak uprawnień do edycji tego przedmiotu');
+
+  const body = c.req.valid('json');
 
   // Mutual exclusivity
   if (body.ownerId != null && body.ownerGroupId != null) {
-    badRequest("Można przypisać tylko osobę lub grupę jako opiekuna, nie oba jednocześnie.");
+    badRequest(
+      'Można przypisać tylko osobę lub grupę jako opiekuna, nie oba jednocześnie.'
+    );
   }
 
   // Determine which fields the user is allowed to update
   const allowedFields = new Set<string>();
 
-  if (permission === "admin" || permission === "owner") {
-    allowedFields.add("name");
-    allowedFields.add("manufacturer");
-    allowedFields.add("model");
-    allowedFields.add("serial");
-    allowedFields.add("inventoryNumber");
-    allowedFields.add("description");
-    allowedFields.add("purchaseDate");
-    allowedFields.add("systemId");
-    allowedFields.add("categoryId");
-    allowedFields.add("statusId");
-    allowedFields.add("locationId");
-    allowedFields.add("ownerId");
-    allowedFields.add("ownerGroupId");
-  } else if (permission === "manage") {
-    allowedFields.add("name");
-    allowedFields.add("manufacturer");
-    allowedFields.add("model");
-    allowedFields.add("serial");
-    allowedFields.add("inventoryNumber");
-    allowedFields.add("description");
-    allowedFields.add("purchaseDate");
-    allowedFields.add("systemId");
-    allowedFields.add("categoryId");
-    allowedFields.add("statusId");
-    allowedFields.add("locationId");
-    allowedFields.add("ownerId");
-    allowedFields.add("ownerGroupId");
-  } else if (permission === "edit") {
-    allowedFields.add("statusId");
-    allowedFields.add("description");
-    allowedFields.add("ownerId");
-    allowedFields.add("ownerGroupId");
+  if (permission === 'admin' || permission === 'owner') {
+    allowedFields.add('name');
+    allowedFields.add('manufacturer');
+    allowedFields.add('model');
+    allowedFields.add('serial');
+    allowedFields.add('inventoryNumber');
+    allowedFields.add('description');
+    allowedFields.add('purchaseDate');
+    allowedFields.add('systemId');
+    allowedFields.add('categoryId');
+    allowedFields.add('statusId');
+    allowedFields.add('locationId');
+    allowedFields.add('ownerId');
+    allowedFields.add('ownerGroupId');
+  } else if (permission === 'manage') {
+    allowedFields.add('name');
+    allowedFields.add('manufacturer');
+    allowedFields.add('model');
+    allowedFields.add('serial');
+    allowedFields.add('inventoryNumber');
+    allowedFields.add('description');
+    allowedFields.add('purchaseDate');
+    allowedFields.add('systemId');
+    allowedFields.add('categoryId');
+    allowedFields.add('statusId');
+    allowedFields.add('locationId');
+    allowedFields.add('ownerId');
+    allowedFields.add('ownerGroupId');
+  } else if (permission === 'edit') {
+    allowedFields.add('statusId');
+    allowedFields.add('description');
+    allowedFields.add('ownerId');
+    allowedFields.add('ownerGroupId');
   }
 
   // Build updateData only from allowed fields
   const updateData: Record<string, unknown> = {};
   for (const key of Object.keys(body) as (keyof typeof body)[]) {
-    if (allowedFields.has(key) && (body as any)[key] !== undefined) {
-      updateData[key] = (body as any)[key];
+    if (
+      allowedFields.has(key) &&
+      (body as Record<string, unknown>)[key] !== undefined
+    ) {
+      updateData[key] = (body as Record<string, unknown>)[key];
     }
   }
 
   // Ensure the final state still has an owner (not both null)
   const newOwnerId = body.ownerId !== undefined ? body.ownerId : item.ownerId;
-  const newOwnerGroupId = body.ownerGroupId !== undefined ? body.ownerGroupId : item.ownerGroupId;
+  const newOwnerGroupId =
+    body.ownerGroupId !== undefined ? body.ownerGroupId : item.ownerGroupId;
   if (newOwnerId == null && newOwnerGroupId == null) {
-    badRequest("Przedmiot musi mieć przypisanego opiekuna (osobę lub grupę).");
+    badRequest('Przedmiot musi mieć przypisanego opiekuna (osobę lub grupę).');
   }
 
-  if (Object.keys(updateData).length === 0) badRequest("No fields to update");
+  if (Object.keys(updateData).length === 0) badRequest('No fields to update');
 
   await db.update(items).set(updateData).where(eq(items.id, id));
-  const updated = await db.select().from(items).where(eq(items.id, id)).limit(1);
+  const updated = await db
+    .select()
+    .from(items)
+    .where(eq(items.id, id))
+    .limit(1);
 
   await createAuditLog(db, {
-    userId: c.get("userId"),
+    userId: c.get('userId'),
     itemId: id,
-    action: "ITEM_UPDATED",
+    action: 'ITEM_UPDATED',
     oldValue: item,
     newValue: updated[0],
   });
   return c.json(toResponse(updated[0]));
 });
 
-router.delete("/:id", async (c) => {
-  const db = c.get("db");
-  const id = Number(c.req.param("id"));
-  if (c.get("userRole") !== "admin") forbidden("Only admins can delete items");
-  const existing = await db.select().from(items).where(eq(items.id, id)).limit(1);
-  if (existing.length === 0) notFound("Item not found");
-  const borrowing = await db.select({ id: borrowings.id }).from(borrowings).where(eq(borrowings.itemId, id)).limit(1);
+router.delete('/:id', async (c) => {
+  const db = c.get('db');
+  const id = Number(c.req.param('id'));
+  if (c.get('userRole') !== 'admin') forbidden('Only admins can delete items');
+  const existing = await db
+    .select()
+    .from(items)
+    .where(eq(items.id, id))
+    .limit(1);
+  if (existing.length === 0) notFound('Item not found');
+  const borrowing = await db
+    .select({ id: borrowings.id })
+    .from(borrowings)
+    .where(eq(borrowings.itemId, id))
+    .limit(1);
   if (borrowing.length > 0) {
-    badRequest("Nie można usunąć przedmiotu z historią wypożyczeń.");
+    badRequest('Nie można usunąć przedmiotu z historią wypożyczeń.');
   }
 
   await createAuditLog(db, {
-    userId: c.get("userId"),
+    userId: c.get('userId'),
     itemId: id,
-    action: "ITEM_DELETED",
+    action: 'ITEM_DELETED',
     oldValue: existing[0],
   });
 

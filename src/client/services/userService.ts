@@ -14,7 +14,8 @@ export const userService = {
       headers: authHeaders(),
     });
     await ensureOk(response);
-    return response.json();
+    const data: User[] = await response.json();
+    return data;
   },
 
   async approve(id: number): Promise<User> {
@@ -23,7 +24,8 @@ export const userService = {
       headers: authHeaders(),
     });
     await ensureOk(response);
-    return response.json();
+    const data: User = await response.json();
+    return data;
   },
 
   async reject(id: number): Promise<User> {
@@ -32,7 +34,8 @@ export const userService = {
       headers: authHeaders(),
     });
     await ensureOk(response);
-    return response.json();
+    const data: User = await response.json();
+    return data;
   },
 
   async updateRole(id: number, role: 'admin' | 'user'): Promise<User> {
@@ -42,7 +45,8 @@ export const userService = {
       body: JSON.stringify({ role }),
     });
     await ensureOk(response);
-    return response.json();
+    const data: User = await response.json();
+    return data;
   },
 };
 
@@ -50,7 +54,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data = await response.json() as Record<string, unknown>;
+    const data: { detail?: string } = await response.json();
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {
     // Fallback

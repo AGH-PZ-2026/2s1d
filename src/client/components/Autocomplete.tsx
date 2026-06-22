@@ -12,7 +12,12 @@ interface Props {
   onClear: () => void;
 }
 
-export default function Autocomplete({ placeholder, onSearch, onSelect, onClear }: Props) {
+export default function Autocomplete({
+  placeholder,
+  onSearch,
+  onSelect,
+  onClear,
+}: Props) {
   const [query, setQuery] = useState('');
   const [options, setOptions] = useState<AutocompleteOption[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -24,7 +29,10 @@ export default function Autocomplete({ placeholder, onSearch, onSelect, onClear 
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
@@ -32,24 +40,27 @@ export default function Autocomplete({ placeholder, onSearch, onSelect, onClear 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const doSearch = useCallback(async (q: string) => {
-    if (q.trim().length === 0) {
-      setOptions([]);
-      setIsOpen(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const results = await onSearch(q.trim());
-      setOptions(results);
-      setIsOpen(results.length > 0);
-      setHighlightIndex(-1);
-    } catch {
-      setOptions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [onSearch]);
+  const doSearch = useCallback(
+    async (q: string) => {
+      if (q.trim().length === 0) {
+        setOptions([]);
+        setIsOpen(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const results = await onSearch(q.trim());
+        setOptions(results);
+        setIsOpen(results.length > 0);
+        setHighlightIndex(-1);
+      } catch {
+        setOptions([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [onSearch]
+  );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -104,12 +115,20 @@ export default function Autocomplete({ placeholder, onSearch, onSelect, onClear 
           style={{ flex: 1 }}
         />
         {query && (
-          <button type="button" className="btn btn-sm btn-secondary" onClick={handleClear}>
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
+            onClick={handleClear}
+          >
             ×
           </button>
         )}
       </div>
-      {loading && <div style={{ padding: '4px 8px', fontSize: 12, color: '#888' }}>Szukanie…</div>}
+      {loading && (
+        <div style={{ padding: '4px 8px', fontSize: 12, color: '#888' }}>
+          Szukanie…
+        </div>
+      )}
       {isOpen && options.length > 0 && (
         <ul
           className="autocomplete-dropdown"
@@ -133,12 +152,16 @@ export default function Autocomplete({ placeholder, onSearch, onSelect, onClear 
           {options.map((opt, i) => (
             <li
               key={opt.value}
-              onMouseDown={(e) => { e.preventDefault(); handleSelect(opt); }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(opt);
+              }}
               onMouseEnter={() => setHighlightIndex(i)}
               style={{
                 padding: '6px 10px',
                 cursor: 'pointer',
-                background: i === highlightIndex ? 'var(--accent-muted)' : 'transparent',
+                background:
+                  i === highlightIndex ? 'var(--accent-muted)' : 'transparent',
                 color: 'var(--text)',
               }}
             >

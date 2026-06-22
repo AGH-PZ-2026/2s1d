@@ -83,7 +83,9 @@ export default function AuditLogsPage() {
                   <td>{new Date(log.timestamp).toLocaleString('pl-PL')}</td>
                   <td>{log.userEmail ?? `Użytkownik #${log.userId}`}</td>
                   <td>
-                  {log.itemName ? `${log.itemName}${log.itemSerial ? ` (${log.itemSerial})` : ''}`: `Przedmiot #${log.itemId}`}
+                    {log.itemName
+                      ? `${log.itemName}${log.itemSerial ? ` (${log.itemSerial})` : ''}`
+                      : `Przedmiot #${log.itemId}`}
                   </td>
                   <td>
                     <span className="badge badge-custom">

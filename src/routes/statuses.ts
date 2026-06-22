@@ -1,20 +1,28 @@
-import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
-import { eq, and, ne } from "drizzle-orm";
-import type { MySql2Database } from "drizzle-orm/mysql2";
-import { itemStatus, type Status } from "../db/schema";
-import { slugify } from "../db/seed";
-import { badRequest, forbidden, notFound } from "../lib/errors";
+import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
+import { eq, and, ne } from 'drizzle-orm';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
+import { itemStatus, type Status } from '../db/schema';
+import { slugify } from '../db/seed';
+import { badRequest, forbidden, notFound } from '../lib/errors';
 
 type Variables = { db: MySql2Database<Record<string, never>> };
 
 const createSchema = z.object({
-  name: z.string().min(1).max(100).transform((v) => v.trim()),
+  name: z
+    .string()
+    .min(1)
+    .max(100)
+    .transform((v) => v.trim()),
 });
 
 const updateSchema = z.object({
-  name: z.string().min(1).max(100).transform((v) => v.trim()),
+  name: z
+    .string()
+    .min(1)
+    .max(100)
+    .transform((v) => v.trim()),
 });
 
 const router = new Hono<{ Variables: Variables }>();
@@ -30,23 +38,27 @@ function toResponse(status: Status) {
 async function checkNameUnique(
   db: MySql2Database<Record<string, never>>,
   name: string,
-  excludeId?: number,
+  excludeId?: number
 ) {
   const conditions = [eq(itemStatus.name, name)];
   if (excludeId !== undefined) conditions.push(ne(itemStatus.id, excludeId));
-  const existing = await db.select().from(itemStatus).where(and(...conditions)).limit(1);
-  if (existing.length > 0) badRequest("Status with this name already exists");
+  const existing = await db
+    .select()
+    .from(itemStatus)
+    .where(and(...conditions))
+    .limit(1);
+  if (existing.length > 0) badRequest('Status with this name already exists');
 }
 
-router.get("/", async (c) => {
-  const db = c.get("db");
+router.get('/', async (c) => {
+  const db = c.get('db');
   const rows = await db.select().from(itemStatus);
   return c.json(rows.map(toResponse));
 });
 
-router.post("/", zValidator("json", createSchema), async (c) => {
-  const db = c.get("db");
-  const body = c.req.valid("json");
+router.post('/', zValidator('json', createSchema), async (c) => {
+  const db = c.get('db');
+  const body = c.req.valid('json');
   await checkNameUnique(db, body.name);
 
   const result = await db.insert(itemStatus).values({
@@ -55,30 +67,49 @@ router.post("/", zValidator("json", createSchema), async (c) => {
     slug: slugify(body.name),
   });
 
-  const created = await db.select().from(itemStatus).where(eq(itemStatus.id, result[0].insertId)).limit(1);
+  const created = await db
+    .select()
+    .from(itemStatus)
+    .where(eq(itemStatus.id, result[0].insertId))
+    .limit(1);
   return c.json(toResponse(created[0]), 201);
 });
 
-router.put("/:id", zValidator("json", updateSchema), async (c) => {
-  const db = c.get("db");
-  const id = Number(c.req.param("id"));
-  const existing = await db.select().from(itemStatus).where(eq(itemStatus.id, id)).limit(1);
-  if (existing.length === 0) notFound("Status not found");
-  if (existing[0].isSystem) forbidden("Cannot modify system status");
+router.put('/:id', zValidator('json', updateSchema), async (c) => {
+  const db = c.get('db');
+  const id = Number(c.req.param('id'));
+  const existing = await db
+    .select()
+    .from(itemStatus)
+    .where(eq(itemStatus.id, id))
+    .limit(1);
+  if (existing.length === 0) notFound('Status not found');
+  if (existing[0].isSystem) forbidden('Cannot modify system status');
 
-  const body = c.req.valid("json");
+  const body = c.req.valid('json');
   await checkNameUnique(db, body.name, id);
-  await db.update(itemStatus).set({ name: body.name, slug: slugify(body.name) }).where(eq(itemStatus.id, id));
-  const updated = await db.select().from(itemStatus).where(eq(itemStatus.id, id)).limit(1);
+  await db
+    .update(itemStatus)
+    .set({ name: body.name, slug: slugify(body.name) })
+    .where(eq(itemStatus.id, id));
+  const updated = await db
+    .select()
+    .from(itemStatus)
+    .where(eq(itemStatus.id, id))
+    .limit(1);
   return c.json(toResponse(updated[0]));
 });
 
-router.delete("/:id", async (c) => {
-  const db = c.get("db");
-  const id = Number(c.req.param("id"));
-  const existing = await db.select().from(itemStatus).where(eq(itemStatus.id, id)).limit(1);
-  if (existing.length === 0) notFound("Status not found");
-  if (existing[0].isSystem) forbidden("Cannot delete system status");
+router.delete('/:id', async (c) => {
+  const db = c.get('db');
+  const id = Number(c.req.param('id'));
+  const existing = await db
+    .select()
+    .from(itemStatus)
+    .where(eq(itemStatus.id, id))
+    .limit(1);
+  if (existing.length === 0) notFound('Status not found');
+  if (existing[0].isSystem) forbidden('Cannot delete system status');
   await db.delete(itemStatus).where(eq(itemStatus.id, id));
   return c.body(null, 204);
 });
