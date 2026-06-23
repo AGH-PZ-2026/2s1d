@@ -10,7 +10,6 @@ vi.mock('../hooks/useAuth', () => ({
       email: 'admin@agh.edu.pl',
       role: 'admin',
       is_active: true,
-      is_approved: true,
     },
   }),
 }));
@@ -18,8 +17,7 @@ vi.mock('../hooks/useAuth', () => ({
 vi.mock('../services/userService', () => ({
   userService: {
     getAll: vi.fn(),
-    approve: vi.fn(),
-    reject: vi.fn(),
+    deactivate: vi.fn(),
     updateRole: vi.fn(),
   },
 }));
@@ -34,22 +32,19 @@ describe('UsersPage', () => {
         email: 'admin@agh.edu.pl',
         role: 'admin',
         isActive: true,
-        isApproved: true,
       },
       {
         id: 2,
         email: 'nowy.pracownik@agh.edu.pl',
         role: 'user',
         isActive: true,
-        isApproved: false,
       },
     ]);
-    vi.mocked(userService.reject).mockResolvedValue({
+    vi.mocked(userService.deactivate).mockResolvedValue({
       id: 2,
       email: 'nowy.pracownik@agh.edu.pl',
       role: 'user',
       isActive: false,
-      isApproved: false,
     });
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
@@ -58,19 +53,17 @@ describe('UsersPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('odrzuca konto oczekujące i pokazuje status odrzucony', async () => {
+  it('dezaktywuje aktywne konto i pokazuje status nieaktywny', async () => {
     render(<UsersPage />);
 
     const row = await screen.findByRole('row', {
       name: /nowy\.pracownik@agh\.edu\.pl/,
     });
-    expect(
-      within(row).getByText('Oczekuje na zatwierdzenie')
-    ).toBeInTheDocument();
+    expect(within(row).getByText('Aktywny')).toBeInTheDocument();
 
-    fireEvent.click(within(row).getByRole('button', { name: 'Odrzuć' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Dezaktywuj' }));
 
-    expect(userService.reject).toHaveBeenCalledWith(2);
-    expect(await screen.findByText('Odrzucony')).toBeInTheDocument();
+    expect(userService.deactivate).toHaveBeenCalledWith(2);
+    expect(await screen.findByText('Nieaktywny')).toBeInTheDocument();
   });
 });

@@ -147,7 +147,6 @@ export const authMiddleware = createMiddleware<{
       id: users.id,
       role: users.role,
       isActive: users.isActive,
-      isApproved: users.isApproved,
     })
     .from(users)
     .where(eq(users.id, payload.userId))
@@ -155,9 +154,6 @@ export const authMiddleware = createMiddleware<{
   const user = userRows[0];
   if (!user || !user.isActive) {
     unauthorized('Account is deactivated');
-  }
-  if (!user.isApproved) {
-    unauthorized('Account pending admin approval');
   }
 
   c.set('userId', user.id);

@@ -47,8 +47,10 @@ export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
 
   // ── Auth config ──────────────────────────────────────────────────────────
+  const [isConfigLoading, setIsConfigLoading] = useState(true);
   const [devBypassAuth, setDevBypassAuth] = useState(false);
   const [googleClientId, setGoogleClientId] = useState('');
+  const [googleError, setGoogleError] = useState<string | null>(null);
   const [devEmail, setDevEmail] = useState('');
 
   useEffect(() => {
@@ -58,7 +60,8 @@ export default function LoginPage() {
         setDevBypassAuth(cfg.devBypassAuth);
         setGoogleClientId(cfg.googleClientId);
       })
-      .catch(() => setError('Nie udało się pobrać konfiguracji logowania.'));
+      .catch(() => setError('Nie udało się pobrać konfiguracji logowania.'))
+      .finally(() => setIsConfigLoading(false));
   }, []);
 
   // ── Google Sign-In callback ──────────────────────────────────────────────
@@ -82,6 +85,8 @@ export default function LoginPage() {
   // Initialize Google Identity Services when client ID is available
   useEffect(() => {
     if (!googleClientId || devBypassAuth) return;
+    let cancelled = false;
+    let retryTimer: number | undefined;
 
     // Load GIS script if not already loaded
     const scriptId = 'google-gis-script';
@@ -94,17 +99,24 @@ export default function LoginPage() {
       script.onload = () => {
         initGoogle();
       };
+      script.onerror = () => {
+        if (!cancelled) {
+          setGoogleError('Nie udało się załadować przycisku logowania Google.');
+        }
+      };
       document.head.appendChild(script);
     } else {
       initGoogle();
     }
 
     function initGoogle() {
+      if (cancelled) return;
       if (!window.google?.accounts) {
         // Retry after a short delay
-        setTimeout(initGoogle, 200);
+        retryTimer = window.setTimeout(initGoogle, 200);
         return;
       }
+      setGoogleError(null);
       window.google.accounts.id.initialize({
         client_id: googleClientId,
         callback: (response) => {
@@ -116,6 +128,7 @@ export default function LoginPage() {
       // Render the Google Sign-In button
       const btnContainer = document.getElementById('g_id_signin');
       if (btnContainer) {
+        btnContainer.replaceChildren();
         window.google.accounts.id.renderButton(btnContainer, {
           type: 'standard',
           theme: 'outline',
@@ -127,6 +140,11 @@ export default function LoginPage() {
         });
       }
     }
+
+    return () => {
+      cancelled = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
   }, [googleClientId, devBypassAuth, handleGoogleCredential]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -141,7 +159,7 @@ export default function LoginPage() {
         email: registerEmail,
         password: registerPassword,
       });
-      setRegistrationMessage('Konto wymaga zatwierdzenia przez administratora');
+      setRegistrationMessage('Konto utworzone. Możesz się zalogować.');
       setRegisterEmail('');
       setRegisterPassword('');
     } catch (err) {
@@ -193,8 +211,7 @@ export default function LoginPage() {
         </p>
         <h1>Wybierz metodę logowania</h1>
         <p className="login-copy">
-          Zaloguj się przez konto Google w domenie @agh.edu.pl lub użyj konta
-          developerskiego.
+          Zaloguj się przez konto Google albo użyj konta developerskiego.
         </p>
       </div>
 
@@ -210,14 +227,32 @@ export default function LoginPage() {
       )}
 
       {/* ── Google Sign-In (production) ─────────────────────────────────── */}
-      {!devBypassAuth && googleClientId && (
+      {!devBypassAuth && (
         <div className="login-panel">
-          <h2>Konto Google AGH</h2>
-          <p className="login-copy">
-            Kliknij przycisk poniżej, aby zalogować się przez konto Google w
-            domenie <strong>@agh.edu.pl</strong>.
-          </p>
-          <div id="g_id_signin" style={{ marginTop: 12, minHeight: 40 }} />
+          <h2>Konto Google</h2>
+          {isConfigLoading ? (
+            <p className="login-copy">Pobieranie konfiguracji logowania...</p>
+          ) : googleClientId ? (
+            <>
+              <p className="login-copy">
+                Kliknij przycisk poniżej, aby zalogować się przez konto Google.
+              </p>
+              <div
+                id="g_id_signin"
+                className="google-signin-slot"
+                aria-busy={isSubmitting}
+              />
+              {googleError ? (
+                <div className="alert alert-error">{googleError}</div>
+              ) : null}
+            </>
+          ) : (
+            <p className="login-copy">
+              Logowanie Google wymaga ustawienia{' '}
+              <strong>GOOGLE_CLIENT_ID</strong>. Skontaktuj się z
+              administratorem albo użyj logowania e-mailem.
+            </p>
+          )}
         </div>
       )}
 
@@ -238,7 +273,7 @@ export default function LoginPage() {
               className="form-input"
               id="dev-email"
               type="email"
-              placeholder="jan.kowalski@agh.edu.pl"
+              placeholder="jan.kowalski@example.com"
               value={devEmail}
               onChange={(event) => setDevEmail(event.target.value)}
               required

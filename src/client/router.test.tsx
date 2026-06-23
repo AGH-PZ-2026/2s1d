@@ -26,7 +26,6 @@ describe('router', () => {
         email: 'admin@agh.edu.pl',
         role: 'admin',
         is_active: true,
-        is_approved: true,
       })
     );
     const { router } = await import('./router');

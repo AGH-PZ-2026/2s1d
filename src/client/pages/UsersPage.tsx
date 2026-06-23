@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { userService, type User } from '../services/userService';
 import {
-  UserCheck,
   UserCog,
   Shield,
   User as UserIcon,
@@ -38,33 +37,17 @@ export default function UsersPage() {
     void loadUsers();
   }, []);
 
-  const handleApprove = async (id: number) => {
+  const handleDeactivate = async (id: number, email: string) => {
+    if (!window.confirm(`Dezaktywować konto użytkownika ${email}?`)) return;
     setActionLoading(id);
     try {
-      const updated = await userService.approve(id);
+      const updated = await userService.deactivate(id);
       setUsers(users.map((u) => (u.id === id ? updated : u)));
     } catch (err) {
       alert(
         err instanceof Error
           ? err.message
-          : 'Błąd podczas zatwierdzania użytkownika.'
-      );
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleReject = async (id: number, email: string) => {
-    if (!window.confirm(`Odrzucić konto użytkownika ${email}?`)) return;
-    setActionLoading(id);
-    try {
-      const updated = await userService.reject(id);
-      setUsers(users.map((u) => (u.id === id ? updated : u)));
-    } catch (err) {
-      alert(
-        err instanceof Error
-          ? err.message
-          : 'Błąd podczas odrzucania użytkownika.'
+          : 'Błąd podczas dezaktywacji użytkownika.'
       );
     } finally {
       setActionLoading(null);
@@ -97,8 +80,7 @@ export default function UsersPage() {
         <div>
           <h1 className="page-title">Zarządzanie użytkownikami</h1>
           <p className="page-subtitle">
-            Zatwierdzaj nowych pracowników i zarządzaj uprawnieniami
-            administratora.
+            Zarządzaj aktywnością kont i uprawnieniami administratora.
           </p>
         </div>
       </div>
@@ -181,15 +163,11 @@ export default function UsersPage() {
                     <td>
                       {!u.isActive ? (
                         <span className="status-indicator status-indicator--danger">
-                          Odrzucony
-                        </span>
-                      ) : u.isApproved ? (
-                        <span className="status-indicator status-indicator--ok">
-                          Aktywny
+                          Nieaktywny
                         </span>
                       ) : (
-                        <span className="status-indicator status-indicator--warning">
-                          Oczekuje na zatwierdzenie
+                        <span className="status-indicator status-indicator--ok">
+                          Aktywny
                         </span>
                       )}
                     </td>
@@ -201,34 +179,16 @@ export default function UsersPage() {
                           gap: '8px',
                         }}
                       >
-                        {!u.isApproved && (
-                          <>
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={() => handleApprove(u.id)}
-                              disabled={actionLoading === u.id}
-                            >
-                              <UserCheck
-                                size={14}
-                                style={{ marginRight: '4px' }}
-                              />
-                              Zatwierdź
-                            </button>
-                            {u.isActive && currentUser?.id !== u.id ? (
-                              <button
-                                className="btn btn-sm btn-danger"
-                                onClick={() => handleReject(u.id, u.email)}
-                                disabled={actionLoading === u.id}
-                              >
-                                <UserX
-                                  size={14}
-                                  style={{ marginRight: '4px' }}
-                                />
-                                Odrzuć
-                              </button>
-                            ) : null}
-                          </>
-                        )}
+                        {u.isActive && currentUser?.id !== u.id ? (
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleDeactivate(u.id, u.email)}
+                            disabled={actionLoading === u.id}
+                          >
+                            <UserX size={14} style={{ marginRight: '4px' }} />
+                            Dezaktywuj
+                          </button>
+                        ) : null}
                         {currentUser?.id !== u.id && (
                           <button
                             className="btn btn-sm btn-secondary"

@@ -5,7 +5,6 @@ export interface AuthUser {
   email: string;
   role: UserRole;
   is_active: boolean;
-  is_approved: boolean;
 }
 
 export interface AuthSession {
@@ -27,7 +26,6 @@ interface GoogleLoginResponse {
 
 const TOKEN_KEY = 'access_token';
 const USER_KEY = 'auth_user';
-
 export interface RegisterPayload {
   email: string;
   password: string;
@@ -66,9 +64,16 @@ export const authService = {
   async getConfig(): Promise<AuthConfig> {
     const response = await fetch('/api/v1/auth/config');
     if (!response.ok) {
-      return { devBypassAuth: false, googleClientId: '' };
+      return {
+        devBypassAuth: false,
+        googleClientId: '',
+      };
     }
-    return response.json();
+    const data = (await response.json()) as Partial<AuthConfig>;
+    return {
+      devBypassAuth: Boolean(data.devBypassAuth),
+      googleClientId: data.googleClientId ?? '',
+    };
   },
 
   getSessionUser(): AuthUser | null {

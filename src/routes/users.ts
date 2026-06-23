@@ -27,7 +27,6 @@ router.get('/me', async (c) => {
       email: users.email,
       role: users.role,
       isActive: users.isActive,
-      isApproved: users.isApproved,
     })
     .from(users)
     .where(eq(users.id, c.get('userId')))
@@ -45,7 +44,6 @@ router.get('/', async (c) => {
       email: users.email,
       role: users.role,
       isActive: users.isActive,
-      isApproved: users.isApproved,
     })
     .from(users);
   return c.json(rows);
@@ -60,7 +58,6 @@ router.get('/search', zValidator('query', searchSchema), async (c) => {
       email: users.email,
       role: users.role,
       isActive: users.isActive,
-      isApproved: users.isApproved,
     })
     .from(users)
     .where(like(users.email, `%${q}%`))
@@ -68,56 +65,25 @@ router.get('/search', zValidator('query', searchSchema), async (c) => {
   return c.json(rows);
 });
 
-router.patch('/:id/approve', async (c) => {
-  if (c.get('userRole') !== 'admin') forbidden('Only admins can approve users');
+router.patch('/:id/deactivate', async (c) => {
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can deactivate users');
   const db = c.get('db');
   const id = Number(c.req.param('id'));
+  if (id === c.get('userId')) badRequest('Cannot deactivate your own account');
   const existing = await db
     .select()
     .from(users)
     .where(eq(users.id, id))
     .limit(1);
   if (existing.length === 0) notFound('User not found');
-  await db
-    .update(users)
-    .set({ isApproved: true, isActive: true })
-    .where(eq(users.id, id));
+  await db.update(users).set({ isActive: false }).where(eq(users.id, id));
   const updated = await db
     .select({
       id: users.id,
       email: users.email,
       role: users.role,
       isActive: users.isActive,
-      isApproved: users.isApproved,
-    })
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1);
-  return c.json(updated[0]);
-});
-
-router.patch('/:id/reject', async (c) => {
-  if (c.get('userRole') !== 'admin') forbidden('Only admins can reject users');
-  const db = c.get('db');
-  const id = Number(c.req.param('id'));
-  if (id === c.get('userId')) badRequest('Cannot reject your own account');
-  const existing = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1);
-  if (existing.length === 0) notFound('User not found');
-  await db
-    .update(users)
-    .set({ isApproved: false, isActive: false })
-    .where(eq(users.id, id));
-  const updated = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      role: users.role,
-      isActive: users.isActive,
-      isApproved: users.isApproved,
     })
     .from(users)
     .where(eq(users.id, id))
@@ -146,7 +112,6 @@ router.patch('/:id/role', zValidator('json', updateRoleSchema), async (c) => {
       email: users.email,
       role: users.role,
       isActive: users.isActive,
-      isApproved: users.isApproved,
     })
     .from(users)
     .where(eq(users.id, id))

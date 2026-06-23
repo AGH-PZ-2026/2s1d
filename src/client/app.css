@@ -872,7 +872,7 @@ select.form-input {
   margin-top: 10px;
   font-size: 28px;
   line-height: 1.15;
-  letter-spacing: -1px;
+  letter-spacing: 0;
 }
 
 .login-eyebrow {
@@ -888,6 +888,14 @@ select.form-input {
   color: var(--text-muted);
   max-width: 520px;
   line-height: 1.7;
+}
+
+.google-signin-slot {
+  align-items: center;
+  display: flex;
+  margin-top: 12px;
+  min-height: 44px;
+  max-width: 360px;
 }
 
 .login-session {

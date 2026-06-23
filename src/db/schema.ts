@@ -57,7 +57,6 @@ export const users = mysqlTable('users', {
     .notNull()
     .default('local'),
   isActive: boolean('is_active').notNull().default(true),
-  isApproved: boolean('is_approved').notNull().default(true),
   role: mysqlEnum('role', ['admin', 'user']).notNull().default('user'),
 });
 

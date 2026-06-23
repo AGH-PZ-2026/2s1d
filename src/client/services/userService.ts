@@ -5,7 +5,6 @@ export interface User {
   email: string;
   role: 'admin' | 'user';
   isActive: boolean;
-  isApproved: boolean;
 }
 
 export const userService = {
@@ -17,17 +16,8 @@ export const userService = {
     return response.json();
   },
 
-  async approve(id: number): Promise<User> {
-    const response = await fetch(`/api/v1/users/${id}/approve`, {
-      method: 'PATCH',
-      headers: authHeaders(),
-    });
-    await ensureOk(response);
-    return response.json();
-  },
-
-  async reject(id: number): Promise<User> {
-    const response = await fetch(`/api/v1/users/${id}/reject`, {
+  async deactivate(id: number): Promise<User> {
+    const response = await fetch(`/api/v1/users/${id}/deactivate`, {
       method: 'PATCH',
       headers: authHeaders(),
     });

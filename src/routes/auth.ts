@@ -72,15 +72,11 @@ router.post('/register', zValidator('json', registerSchema), async (c) => {
   await db.insert(users).values({
     email: body.email,
     hashedPassword,
-    isApproved: false,
     role: 'user',
     authProvider: 'local',
   });
 
-  return c.json(
-    { message: 'Konto wymaga zatwierdzenia przez administratora' },
-    201
-  );
+  return c.json({ message: 'Konto utworzone' }, 201);
 });
 
 const loginSchema = z.object({
@@ -118,7 +114,6 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
     unauthorized('Invalid email or password');
   }
   if (!user.isActive) unauthorized('Account is deactivated');
-  if (!user.isApproved) unauthorized('Account pending admin approval');
 
   return c.json(await authResponse(user, c.env.JWT_SECRET));
 });
@@ -131,7 +126,7 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
 //    because the frontend is a SPA and cannot keep a client secret).
 // 3. Frontend POSTs { credential } (the ID token) to /google-login.
 // 4. Backend verifies the ID token with Google's tokeninfo endpoint,
-//    checks the email domain is @agh.edu.pl, and creates/updates the user.
+//    creates/updates the user.
 // 5. Backend returns a pz-worker JWT.
 
 // Environment variable: DEV_BYPASS_AUTH
@@ -143,7 +138,7 @@ interface GoogleIdToken {
   iss: string; // "https://accounts.google.com" or "accounts.google.com"
   sub: string; // Google user ID
   email: string;
-  email_verified: boolean;
+  email_verified: boolean | string;
   name?: string;
   picture?: string;
   hd?: string; // hosted domain (Google Workspace)
@@ -153,6 +148,12 @@ interface GoogleIdToken {
 const googleLoginSchema = z.object({
   credential: z.string().min(1), // Google ID token (or dev bypass email)
 });
+
+function isGoogleEmailVerified(
+  value: GoogleIdToken['email_verified']
+): boolean {
+  return value === true || value === 'true';
+}
 
 router.post(
   '/google-login',
@@ -215,17 +216,12 @@ router.post(
         }
 
         // Require verified email
-        if (!payload.email_verified) {
+        if (!isGoogleEmailVerified(payload.email_verified)) {
           unauthorized('Email not verified by Google');
         }
 
         email = payload.email.trim().toLowerCase();
         googleId = payload.sub;
-
-        // Restrict to @agh.edu.pl domain
-        if (!email.endsWith('@agh.edu.pl')) {
-          unauthorized('Only @agh.edu.pl Google accounts are allowed');
-        }
       } catch (err) {
         // Re-throw our own AppErrors so the global onError handler can format them
         if (err instanceof HTTPException) throw err;
@@ -269,14 +265,11 @@ router.post(
           .where(eq(users.id, existing.id))
           .limit(1);
       } else {
-        // Create new user — auto-approved for @agh.edu.pl
-        const isAgh = email.endsWith('@agh.edu.pl');
         const result = await db.insert(users).values({
           email,
           googleId,
           authProvider: 'google',
           hashedPassword: null,
-          isApproved: isAgh,
           role: isInitialAdmin(c.env, email) ? 'admin' : 'user',
         });
         const created = await db
@@ -298,15 +291,13 @@ router.post(
       if (existingAdmin.length === 0) {
         await db
           .update(users)
-          .set({ role: 'admin', isApproved: true, isActive: true })
+          .set({ role: 'admin', isActive: true })
           .where(eq(users.id, user.id));
         user.role = 'admin';
-        user.isApproved = true;
         user.isActive = true;
       }
     }
     if (!user.isActive) unauthorized('Account is deactivated');
-    if (!user.isApproved) unauthorized('Account pending admin approval');
 
     return c.json(await authResponse(user, c.env.JWT_SECRET));
   }
@@ -330,7 +321,6 @@ async function authResponse(
       email: user.email,
       role: user.role,
       is_active: user.isActive,
-      is_approved: user.isApproved,
     },
   };
 }
