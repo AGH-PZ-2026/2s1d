@@ -55,8 +55,7 @@ export const borrowingService = {
       headers: authHeaders(),
     });
     await ensureOk(response);
-    const data: Borrowing[] = await response.json();
-    return data;
+    return response.json();
   },
 
   async request(payload: BorrowingRequestPayload): Promise<Borrowing> {
@@ -80,8 +79,7 @@ export const borrowingService = {
       body: JSON.stringify(payload),
     });
     await ensureOk(response);
-    const data: Borrowing = await response.json();
-    return data;
+    return response.json();
   },
 
   async createExternal(payload: ExternalBorrowingPayload): Promise<Borrowing> {
@@ -117,8 +115,7 @@ export const borrowingService = {
       }),
     });
     await ensureOk(response);
-    const data: Borrowing = await response.json();
-    return data;
+    return response.json();
   },
 
   async approve(id: number): Promise<Borrowing> {
@@ -152,8 +149,7 @@ export const borrowingService = {
       body: JSON.stringify(payload),
     });
     await ensureOk(response);
-    const data: Borrowing = await response.json();
-    return data;
+    return response.json();
   },
 };
 
@@ -183,8 +179,7 @@ async function patchStatus(
     headers: authHeaders(),
   });
   await ensureOk(response);
-  const data: Borrowing = await response.json();
-  return data;
+  return response.json();
 }
 
 function createMockBorrowing(payload: MockBorrowingPayload): Borrowing {
@@ -218,7 +213,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data: { detail?: string } = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {
     // Keep fallback error.

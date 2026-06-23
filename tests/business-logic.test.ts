@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { slugify, DEFAULT_LOCATIONS } from '../src/db/seed';
+import { canUpdateItemField } from '../src/lib/permissions';
 
 describe('slugify', () => {
   it('converts to lowercase and replaces spaces with hyphens', () => {
@@ -18,6 +19,21 @@ describe('slugify', () => {
 
   it('trims whitespace', () => {
     expect(slugify('  hello world  ')).toBe('hello-world');
+  });
+});
+
+describe('item update permissions', () => {
+  it('prevents edit delegates from transferring ownership', () => {
+    expect(canUpdateItemField('edit', 'ownerId')).toBe(false);
+    expect(canUpdateItemField('edit', 'ownerGroupId')).toBe(false);
+    expect(canUpdateItemField('edit', 'statusId')).toBe(true);
+    expect(canUpdateItemField('edit', 'description')).toBe(true);
+  });
+
+  it('allows managers and owners to transfer ownership', () => {
+    expect(canUpdateItemField('manage', 'ownerId')).toBe(true);
+    expect(canUpdateItemField('owner', 'ownerGroupId')).toBe(true);
+    expect(canUpdateItemField('admin', 'ownerId')).toBe(true);
   });
 });
 

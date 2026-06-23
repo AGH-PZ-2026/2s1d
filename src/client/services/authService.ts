@@ -33,6 +33,8 @@ export interface RegisterPayload {
   password: string;
 }
 
+export type LoginPayload = RegisterPayload;
+
 export const authService = {
   /**
    * Google OAuth login.
@@ -46,15 +48,18 @@ export const authService = {
     });
     await ensureOk(response);
     const data: GoogleLoginResponse = await response.json();
-    const session = {
-      accessToken: data.access_token,
-      tokenType: data.token_type,
-      user: data.user,
-    };
-    window.localStorage.setItem(TOKEN_KEY, session.accessToken);
-    window.localStorage.setItem(USER_KEY, JSON.stringify(session.user));
-    window.dispatchEvent(new Event('auth-session-changed'));
-    return session;
+    return storeSession(data);
+  },
+
+  async login(payload: LoginPayload): Promise<AuthSession> {
+    const response = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    await ensureOk(response);
+    const data: GoogleLoginResponse = await response.json();
+    return storeSession(data);
   },
 
   /** Fetch auth configuration (dev bypass flag, Google client ID) */
@@ -63,8 +68,7 @@ export const authService = {
     if (!response.ok) {
       return { devBypassAuth: false, googleClientId: '' };
     }
-    const data: AuthConfig = await response.json();
-    return data;
+    return response.json();
   },
 
   getSessionUser(): AuthUser | null {
@@ -86,25 +90,6 @@ export const authService = {
     await ensureOk(response);
   },
 
-  async login(payload: RegisterPayload): Promise<AuthSession> {
-    const response = await fetch('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    await ensureOk(response);
-    const data: GoogleLoginResponse = await response.json();
-    const session = {
-      accessToken: data.access_token,
-      tokenType: data.token_type,
-      user: data.user,
-    };
-    window.localStorage.setItem(TOKEN_KEY, session.accessToken);
-    window.localStorage.setItem(USER_KEY, JSON.stringify(session.user));
-    window.dispatchEvent(new Event('auth-session-changed'));
-    return session;
-  },
-
   logout(): void {
     window.localStorage.removeItem(TOKEN_KEY);
     window.localStorage.removeItem(USER_KEY);
@@ -112,11 +97,23 @@ export const authService = {
   },
 };
 
+function storeSession(data: GoogleLoginResponse): AuthSession {
+  const session = {
+    accessToken: data.access_token,
+    tokenType: data.token_type,
+    user: data.user,
+  };
+  window.localStorage.setItem(TOKEN_KEY, session.accessToken);
+  window.localStorage.setItem(USER_KEY, JSON.stringify(session.user));
+  window.dispatchEvent(new Event('auth-session-changed'));
+  return session;
+}
+
 async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data: { detail?: string } = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {
     // Keep fallback error.

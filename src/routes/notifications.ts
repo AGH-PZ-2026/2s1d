@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { eq, desc, and, lte } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
 import {
   notificationPreferences,
@@ -9,6 +9,7 @@ import {
   type NotificationPreference,
 } from '../db/schema';
 import { authMiddleware } from '../middleware/auth';
+import { badRequest } from '../lib/errors';
 
 type Variables = {
   db: MySql2Database<Record<string, never>>;
@@ -60,6 +61,9 @@ router.put('/preferences', zValidator('json', updatePrefSchema), async (c) => {
   const db = c.get('db');
   const userId = c.get('userId');
   const body = c.req.valid('json');
+  if (body.emailEnabled === true || body.pushEnabled === true) {
+    badRequest('Email and push delivery are not available');
+  }
   const existing = await db
     .select()
     .from(notificationPreferences)
@@ -68,8 +72,8 @@ router.put('/preferences', zValidator('json', updatePrefSchema), async (c) => {
   if (existing.length === 0) {
     const result = await db.insert(notificationPreferences).values({
       userId,
-      emailEnabled: body.emailEnabled ?? true,
-      pushEnabled: body.pushEnabled ?? false,
+      emailEnabled: false,
+      pushEnabled: false,
       returnDueNoticeHours: body.returnDueNoticeHours ?? 24,
     });
     const created = await db
@@ -80,8 +84,8 @@ router.put('/preferences', zValidator('json', updatePrefSchema), async (c) => {
     return c.json(prefToResponse(created[0]));
   }
   const d: Record<string, unknown> = {};
-  if (body.emailEnabled !== undefined) d.emailEnabled = body.emailEnabled;
-  if (body.pushEnabled !== undefined) d.pushEnabled = body.pushEnabled;
+  d.emailEnabled = false;
+  d.pushEnabled = false;
   if (body.returnDueNoticeHours !== undefined)
     d.returnDueNoticeHours = body.returnDueNoticeHours;
   await db
@@ -100,17 +104,12 @@ router.put('/preferences', zValidator('json', updatePrefSchema), async (c) => {
 router.get('/events', async (c) => {
   const db = c.get('db');
   const userId = c.get('userId');
-  const notifications = await db
+  const rows = await db
     .select()
     .from(notificationEvents)
-    .where(
-      and(
-        eq(notificationEvents.userId, userId),
-        lte(notificationEvents.scheduledAt, new Date())
-      )
-    )
-    .orderBy(desc(notificationEvents.scheduledAt));
-  return c.json(notifications);
+    .where(eq(notificationEvents.userId, userId))
+    .orderBy(desc(notificationEvents.createdAt));
+  return c.json(rows);
 });
 
 export { router as notificationsRouter };

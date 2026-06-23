@@ -1,20 +1,32 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  worker:
-    name: Worker
+  app:
+    name: App
     runs-on: ubuntu-latest
 
     services:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_ROOT_PASSWORD: test
-          MYSQL_DATABASE: test_db
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: pz_db
+          MYSQL_USER: pz_user
+          MYSQL_PASSWORD: pz_pass
         ports:
           - 3306:3306
         options: >-
@@ -26,31 +38,99 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
-      - run: npm install --prefix client
+      - run: pnpm install --frozen-lockfile
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: pnpm run check
 
-      - name: Build client
-        run: npm run build
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Build app
+        run: pnpm run build
 
       - name: Run migrations
-        run: npx drizzle-kit migrate
+        run: pnpm run db:wait && pnpm run db:migrate
         env:
           MYSQL_HOST: 127.0.0.1
           MYSQL_PORT: 3306
-          MYSQL_USER: root
-          MYSQL_PASSWORD: test
-          MYSQL_DATABASE: test_db
+          MYSQL_USER: pz_user
+          MYSQL_PASSWORD: pz_pass
+          MYSQL_DATABASE: pz_db
 
       - name: Run tests
-        run: npm test
+        run: pnpm test
 
-      - name: Check formatting
-        run: npx prettier --check . --ignore-path .gitignore || true
+      - name: Run notification job
+        run: pnpm run notifications:run
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: pz_user
+          MYSQL_PASSWORD: pz_pass
+          MYSQL_DATABASE: pz_db
+
+      - name: Validate Docker production environment
+        run: pnpm run validate:docker
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_USER: pz_user
+          MYSQL_PASSWORD: ci-user-password
+          MYSQL_DATABASE: pz_db
+          JWT_SECRET: ci-jwt-secret-value-at-least-32-chars
+          DEV_BYPASS_AUTH: "false"
+          INITIAL_ADMIN_EMAIL: admin@agh.edu.pl
+          NOTIFICATIONS_INTERVAL_MINUTES: 60
+          TRUST_PROXY: "false"
+
+      - name: Start integration server
+        run: |
+          HOST=127.0.0.1 \
+          PORT=8787 \
+          MYSQL_HOST=127.0.0.1 \
+          MYSQL_PORT=3306 \
+          MYSQL_USER=pz_user \
+          MYSQL_PASSWORD=pz_pass \
+          MYSQL_DATABASE=pz_db \
+          JWT_SECRET=integration-test-secret-value-32-chars \
+          DEV_BYPASS_AUTH=false \
+          INITIAL_ADMIN_EMAIL=admin@agh.edu.pl \
+          pnpm run start > /tmp/app.log 2>&1 &
+          echo $! > /tmp/app.pid
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8787/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/app.log
+          exit 1
+
+      - name: Run API smoke checks
+        run: node scripts/smoke-api.mjs
+        env:
+          SMOKE_EXPECT_DEV_BYPASS: "false"
+
+      - name: Stop integration server
+        if: always()
+        run: kill "$(cat /tmp/app.pid)" || true
+
+      - name: Run Docker smoke
+        run: scripts/smoke-docker.sh
+        env:
+          COMPOSE_PROJECT_NAME: pz-ci-smoke
+          APP_PORT: 18787
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: pnpm exec playwright test

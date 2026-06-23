@@ -179,27 +179,19 @@ export default function UsersPage() {
                       </span>
                     </td>
                     <td>
-                      {(() => {
-                        if (!u.isActive) {
-                          return (
-                            <span className="status-indicator status-indicator--danger">
-                              Odrzucony
-                            </span>
-                          );
-                        }
-                        if (u.isApproved) {
-                          return (
-                            <span className="status-indicator status-indicator--ok">
-                              Aktywny
-                            </span>
-                          );
-                        }
-                        return (
-                          <span className="status-indicator status-indicator--warning">
-                            Oczekuje na zatwierdzenie
-                          </span>
-                        );
-                      })()}
+                      {!u.isActive ? (
+                        <span className="status-indicator status-indicator--danger">
+                          Odrzucony
+                        </span>
+                      ) : u.isApproved ? (
+                        <span className="status-indicator status-indicator--ok">
+                          Aktywny
+                        </span>
+                      ) : (
+                        <span className="status-indicator status-indicator--warning">
+                          Oczekuje na zatwierdzenie
+                        </span>
+                      )}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div

@@ -1,33 +1,46 @@
 import { Hono } from 'hono';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
-import { itemPhotos, type ItemPhoto } from '../db/schema';
+import { itemPhotos, items, users } from '../db/schema';
 import { authMiddleware } from '../middleware/auth';
-import { notFound, badRequest } from '../lib/errors';
-import { createObjectStorage, type ObjectStorage } from '../lib/storage';
+import { notFound, badRequest, forbidden } from '../lib/errors';
+import { createAuditLog } from '../lib/audit';
+import { getItemPermissionLevel } from '../lib/permissions';
 
 type Variables = {
   db: MySql2Database<Record<string, never>>;
   userId: number;
   userRole: 'admin' | 'user';
   isAuthenticated: boolean;
-  storage: ObjectStorage;
 };
-
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
 router.use('/*', authMiddleware);
 
-/** Attach the per-request storage adapter. */
-router.use('/*', async (c, next) => {
-  c.set('storage', createObjectStorage(c.env));
-  await next();
-});
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
 
-function toResponse(p: ItemPhoto) {
+interface PhotoResponseRow {
+  id: number;
+  itemId: number;
+  uploadedById: number;
+  uploadedByName: string | null;
+  originalFilename: string;
+  contentType: string;
+  storagePath: string;
+  addedAt: Date;
+}
+
+function toResponse(p: PhotoResponseRow) {
   return {
     id: p.id,
     itemId: p.itemId,
     uploadedById: p.uploadedById,
+    uploadedByName: p.uploadedByName,
     originalFilename: p.originalFilename,
     contentType: p.contentType,
     storagePath: p.storagePath,
@@ -35,106 +48,147 @@ function toResponse(p: ItemPhoto) {
   };
 }
 
-// GET /api/v1/items/:itemId/photos
+// Nested under items: /api/v1/items/:itemId/photos
 router.get('/:itemId/photos', async (c) => {
   const db = c.get('db');
   const itemId = Number(c.req.param('itemId'));
+  if (!Number.isInteger(itemId) || itemId <= 0)
+    badRequest('itemId must be a positive integer');
   const rows = await db
-    .select()
+    .select({
+      id: itemPhotos.id,
+      itemId: itemPhotos.itemId,
+      uploadedById: itemPhotos.uploadedById,
+      originalFilename: itemPhotos.originalFilename,
+      contentType: itemPhotos.contentType,
+      storagePath: itemPhotos.storagePath,
+      addedAt: itemPhotos.addedAt,
+      uploadedByName: users.email,
+    })
     .from(itemPhotos)
+    .leftJoin(users, eq(itemPhotos.uploadedById, users.id))
     .where(eq(itemPhotos.itemId, itemId))
     .orderBy(desc(itemPhotos.addedAt));
-  const storage = c.get('storage');
-  return c.json(
-    rows.map((p) => ({
-      ...toResponse(p),
-      url: storage.publicUrl(p.storagePath),
-    }))
-  );
+  return c.json(rows.map(toResponse));
 });
 
-// POST /api/v1/items/:itemId/photos  (multipart/form-data, field "file")
 router.post('/:itemId/photos', async (c) => {
   const db = c.get('db');
-  const storage = c.get('storage');
+  const bucket = c.env.PHOTOS_BUCKET;
   const itemId = Number(c.req.param('itemId'));
   const userId = c.get('userId');
-  const formData = await c.req.formData();
-  const file = formData.get('file') as File | null;
-  if (!file) badRequest('No file uploaded');
-
-  const ext =
-    (file.name.split('.').pop() || 'bin')
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '') || 'bin';
-  const storagePath = `items/${itemId}/${crypto.randomUUID()}.${ext}`;
-  const contentType = file.type || 'application/octet-stream';
-  await storage.put(
-    storagePath,
-    file.stream() as unknown as ReadableStream<Uint8Array>,
-    { contentType }
-  );
-
-  const result = await db.insert(itemPhotos).values({
+  if (!Number.isInteger(itemId) || itemId <= 0)
+    badRequest('itemId must be a positive integer');
+  const item = await db
+    .select({ ownerId: items.ownerId })
+    .from(items)
+    .where(eq(items.id, itemId))
+    .limit(1);
+  if (item.length === 0) notFound('Item not found');
+  const permission = await getItemPermissionLevel(
+    db,
     itemId,
-    uploadedById: userId,
-    originalFilename: file.name,
-    contentType,
-    storagePath,
+    userId,
+    c.get('userRole'),
+    item[0].ownerId
+  );
+  if (!permission) forbidden('Brak uprawnień do dodania zdjęcia');
+  const formData = await c.req.formData();
+  const candidate = formData.get('file');
+  if (!(candidate instanceof File)) badRequest('No file uploaded');
+  const file = candidate;
+  if (file.size === 0 || file.size > MAX_PHOTO_BYTES)
+    badRequest('Photo must be between 1 byte and 10 MB');
+  if (!ALLOWED_PHOTO_TYPES.has(file.type))
+    badRequest('Only JPEG, PNG, WebP and GIF photos are allowed');
+
+  const extensionByType: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+  };
+  const ext = extensionByType[file.type];
+  const storagePath = `items/${itemId}/${crypto.randomUUID()}.${ext}`;
+  await bucket.put(storagePath, file.stream(), {
+    httpMetadata: { contentType: file.type || 'application/octet-stream' },
   });
+
+  let result;
+  try {
+    result = await db.insert(itemPhotos).values({
+      itemId,
+      uploadedById: userId,
+      originalFilename: file.name.slice(0, 255),
+      contentType: file.type,
+      storagePath,
+    });
+  } catch (error) {
+    await bucket.delete(storagePath);
+    throw error;
+  }
   const created = await db
-    .select()
+    .select({
+      id: itemPhotos.id,
+      itemId: itemPhotos.itemId,
+      uploadedById: itemPhotos.uploadedById,
+      originalFilename: itemPhotos.originalFilename,
+      contentType: itemPhotos.contentType,
+      storagePath: itemPhotos.storagePath,
+      addedAt: itemPhotos.addedAt,
+      uploadedByName: users.email,
+    })
     .from(itemPhotos)
+    .leftJoin(users, eq(itemPhotos.uploadedById, users.id))
     .where(eq(itemPhotos.id, result[0].insertId))
     .limit(1);
-  return c.json(
-    {
-      ...toResponse(created[0]),
-      url: storage.publicUrl(created[0].storagePath),
-    },
-    201
-  );
-});
 
-// GET /api/v1/items/:itemId/photos/:photoId/file  — stream the raw photo bytes
-router.get('/:itemId/photos/:photoId/file', async (c) => {
-  const db = c.get('db');
-  const storage = c.get('storage');
-  const itemId = Number(c.req.param('itemId'));
-  const photoId = Number(c.req.param('photoId'));
-  const rows = await db
-    .select()
-    .from(itemPhotos)
-    .where(and(eq(itemPhotos.id, photoId), eq(itemPhotos.itemId, itemId)))
-    .limit(1);
-  if (rows.length === 0) notFound('Photo not found');
-  const photo = rows[0];
-  const bytes = await storage.getBytes(photo.storagePath);
-  if (!bytes) notFound('Photo file missing in storage');
-  return new Response(bytes.body as unknown as BodyInit, {
-    status: 200,
-    headers: {
-      'Content-Type': bytes.contentType,
-      'Cache-Control': 'private, max-age=3600',
+  await createAuditLog(db, {
+    userId,
+    itemId,
+    action: 'PHOTO_ADDED',
+    newValue: {
+      photoId: created[0].id,
+      filename: created[0].originalFilename,
+      contentType: created[0].contentType,
+      uploadedBy: created[0].uploadedByName,
+      addedAt: created[0].addedAt,
     },
   });
+
+  return c.json(toResponse(created[0]), 201);
 });
 
-// DELETE /api/v1/items/:itemId/photos/:photoId
-router.delete('/:itemId/photos/:photoId', async (c) => {
+router.get('/:itemId/photos/:photoId', async (c) => {
   const db = c.get('db');
-  const storage = c.get('storage');
+  const bucket = c.env.PHOTOS_BUCKET;
   const itemId = Number(c.req.param('itemId'));
   const photoId = Number(c.req.param('photoId'));
+  if (
+    !Number.isInteger(itemId) ||
+    itemId <= 0 ||
+    !Number.isInteger(photoId) ||
+    photoId <= 0
+  )
+    badRequest('Invalid photo identifier');
   const rows = await db
     .select()
     .from(itemPhotos)
-    .where(and(eq(itemPhotos.id, photoId), eq(itemPhotos.itemId, itemId)))
+    .where(eq(itemPhotos.id, photoId))
     .limit(1);
-  if (rows.length === 0) notFound('Photo not found');
-  await db.delete(itemPhotos).where(eq(itemPhotos.id, photoId));
-  await storage.delete(rows[0].storagePath);
-  return c.json({ ok: true });
+  if (rows.length === 0 || rows[0].itemId !== itemId)
+    notFound('Photo not found');
+  const photo = rows[0];
+  const object = await bucket.get(photo.storagePath);
+  if (!object) notFound('Photo file missing in storage');
+  return new Response(object.body as ReadableStream, {
+    headers: {
+      'Content-Type': photo.contentType,
+      'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(photo.originalFilename)}`,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 });
 
 export { router as itemPhotosRouter };

@@ -19,13 +19,27 @@ const SYSTEM_STATUSES = [
   { name: 'Wypożyczony', is_system: true, slug: 'wypozyczony' },
   { name: 'Zarezerwowany', is_system: true, slug: 'zarezerwowany' },
   { name: 'Zarchiwizowany', is_system: true, slug: 'zarchiwizowany' },
-  { name: 'Oczekuje zatwierdzenia', is_system: true, slug: 'oczekuje-zatwierdzenia' },
+  {
+    name: 'Oczekuje zatwierdzenia',
+    is_system: true,
+    slug: 'oczekuje-zatwierdzenia',
+  },
 ];
 
 const DEFAULT_LOCATIONS = [
-  { name: 'Magazyn główny', kind: 'internal', building: 'Budynek A', room: '001' },
+  {
+    name: 'Magazyn główny',
+    kind: 'internal',
+    building: 'Budynek A',
+    room: '001',
+  },
   { name: 'Sala 101', kind: 'internal', building: 'Budynek A', room: '101' },
-  { name: 'Laboratorium', kind: 'internal', building: 'Budynek B', room: '203' },
+  {
+    name: 'Laboratorium',
+    kind: 'internal',
+    building: 'Budynek B',
+    room: '203',
+  },
   { name: 'Biuro', kind: 'internal', building: 'Budynek A', room: '305' },
 ];
 
@@ -85,13 +99,14 @@ async function runAutoMigrate(rawDb: RawDb): Promise<void> {
     "ALTER TABLE `groups` ADD `default_permission` enum('manage','edit') DEFAULT 'edit' NOT NULL"
   );
 
-  // eslint-disable-next-line no-console
   console.log('[auto-migrate] schema created');
   await seedDefaults(rawDb);
 }
 
 async function seedDefaults(rawDb: RawDb): Promise<void> {
-  const [statusRows] = await rawDb.execute('SELECT COUNT(*) AS cnt FROM `item_status`');
+  const [statusRows] = await rawDb.execute(
+    'SELECT COUNT(*) AS cnt FROM `item_status`'
+  );
   if ((statusRows as { cnt: number }[])[0].cnt === 0) {
     for (const s of SYSTEM_STATUSES) {
       await rawDb.execute(
@@ -99,11 +114,13 @@ async function seedDefaults(rawDb: RawDb): Promise<void> {
         [s.name, s.is_system, s.slug]
       );
     }
-    // eslint-disable-next-line no-console
+
     console.log('[auto-migrate] seeded default statuses');
   }
 
-  const [locRows] = await rawDb.execute('SELECT COUNT(*) AS cnt FROM `locations`');
+  const [locRows] = await rawDb.execute(
+    'SELECT COUNT(*) AS cnt FROM `locations`'
+  );
   if ((locRows as { cnt: number }[])[0].cnt === 0) {
     for (const loc of DEFAULT_LOCATIONS) {
       await rawDb.execute(
@@ -111,7 +128,7 @@ async function seedDefaults(rawDb: RawDb): Promise<void> {
         [loc.name, loc.kind, loc.building, loc.room]
       );
     }
-    // eslint-disable-next-line no-console
+
     console.log('[auto-migrate] seeded default locations');
   }
 }
@@ -123,7 +140,10 @@ export const autoMigrateMiddleware = createMiddleware<{
   if (!migrationDone) {
     const raw = c.get('rawDb');
     migrationDone = runAutoMigrate(raw).catch((err) => {
-      console.error('[auto-migrate] failed:', err instanceof Error ? err.message : String(err));
+      console.error(
+        '[auto-migrate] failed:',
+        err instanceof Error ? err.message : String(err)
+      );
       migrationDone = null;
     });
   }

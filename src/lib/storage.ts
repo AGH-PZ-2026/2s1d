@@ -289,7 +289,7 @@ async function toBuffer(body: PutBody): Promise<Buffer> {
   const stream = body as ReadableStream<Uint8Array>;
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
-  // eslint-disable-next-line no-constant-condition
+
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -418,6 +418,17 @@ async function readContentType(path: string): Promise<string> {
 
 // ─── Factory ───────────────────────────────────────────────────────────────
 
+type StorageEnv = Env & {
+  PHOTOS_PUBLIC_URL?: string;
+  PHOTOS_LOCAL_DIR?: string;
+  S3_ENDPOINT?: string;
+  S3_REGION?: string;
+  S3_BUCKET?: string;
+  S3_ACCESS_KEY_ID?: string;
+  S3_SECRET_ACCESS_KEY?: string;
+  S3_PUBLIC_URL?: string;
+};
+
 /**
  * Pick the right storage backend for the runtime:
  *  - PHOTOS_BUCKET (R2 binding)     → R2ObjectStorage
@@ -425,19 +436,27 @@ async function readContentType(path: string): Promise<string> {
  *  - otherwise                      → LocalFsStorage
  */
 export function createObjectStorage(env: Env): ObjectStorage {
-  if (env.PHOTOS_BUCKET) {
-    return new R2ObjectStorage(env.PHOTOS_BUCKET, env.PHOTOS_PUBLIC_URL);
+  const storageEnv = env as StorageEnv;
+  if (storageEnv.PHOTOS_BUCKET) {
+    return new R2ObjectStorage(
+      storageEnv.PHOTOS_BUCKET,
+      storageEnv.PHOTOS_PUBLIC_URL
+    );
   }
-  if (env.S3_BUCKET && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY) {
+  if (
+    storageEnv.S3_BUCKET &&
+    storageEnv.S3_ACCESS_KEY_ID &&
+    storageEnv.S3_SECRET_ACCESS_KEY
+  ) {
     return new S3ObjectStorage({
-      endpoint: env.S3_ENDPOINT,
-      region: env.S3_REGION ?? 'us-east-1',
-      bucket: env.S3_BUCKET,
-      accessKeyId: env.S3_ACCESS_KEY_ID,
-      secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-      publicUrl: env.S3_PUBLIC_URL,
+      endpoint: storageEnv.S3_ENDPOINT,
+      region: storageEnv.S3_REGION ?? 'us-east-1',
+      bucket: storageEnv.S3_BUCKET,
+      accessKeyId: storageEnv.S3_ACCESS_KEY_ID,
+      secretAccessKey: storageEnv.S3_SECRET_ACCESS_KEY,
+      publicUrl: storageEnv.S3_PUBLIC_URL,
     });
   }
-  const root = env.PHOTOS_LOCAL_DIR ?? './storage';
-  return new LocalFsStorage(root, env.PHOTOS_PUBLIC_URL);
+  const root = storageEnv.PHOTOS_LOCAL_DIR ?? './storage';
+  return new LocalFsStorage(root, storageEnv.PHOTOS_PUBLIC_URL);
 }

@@ -80,7 +80,11 @@ export default function GroupsPage() {
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        throw new Error((err as any).detail || 'Błąd tworzenia grupy.');
+        const detail =
+          typeof err === 'object' && err !== null && 'detail' in err
+            ? String(err.detail)
+            : 'Błąd tworzenia grupy.';
+        throw new Error(detail);
       }
       await fetchGroups();
       setShowCreateForm(false);
@@ -109,7 +113,11 @@ export default function GroupsPage() {
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        throw new Error((err as any).detail || 'Błąd aktualizacji grupy.');
+        const detail =
+          typeof err === 'object' && err !== null && 'detail' in err
+            ? String(err.detail)
+            : 'Błąd aktualizacji grupy.';
+        throw new Error(detail);
       }
       await fetchGroups();
       setEditingGroup(null);
@@ -408,11 +416,11 @@ export default function GroupsPage() {
                   onClick={editingGroup ? handleUpdate : handleCreate}
                   disabled={formLoading || !formName.trim()}
                 >
-                  {(() => {
-                    if (formLoading) return 'Zapisywanie…';
-                    if (editingGroup) return 'Zapisz zmiany';
-                    return 'Utwórz';
-                  })()}
+                  {formLoading
+                    ? 'Zapisywanie…'
+                    : editingGroup
+                      ? 'Zapisz zmiany'
+                      : 'Utwórz'}
                 </button>
               </div>
             </div>

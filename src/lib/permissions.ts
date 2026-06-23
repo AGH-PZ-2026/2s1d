@@ -4,6 +4,32 @@ import { delegations, groupMembers } from '../db/schema';
 
 export type PermissionLevel = 'admin' | 'owner' | 'manage' | 'edit' | null;
 
+const FULL_ITEM_UPDATE_FIELDS = new Set([
+  'name',
+  'manufacturer',
+  'model',
+  'serial',
+  'inventoryNumber',
+  'description',
+  'purchaseDate',
+  'systemId',
+  'categoryId',
+  'statusId',
+  'locationId',
+  'ownerId',
+  'ownerGroupId',
+]);
+const EDIT_ITEM_UPDATE_FIELDS = new Set(['statusId', 'description']);
+
+export function canUpdateItemField(
+  permission: Exclude<PermissionLevel, null>,
+  field: string
+): boolean {
+  return permission === 'edit'
+    ? EDIT_ITEM_UPDATE_FIELDS.has(field)
+    : FULL_ITEM_UPDATE_FIELDS.has(field);
+}
+
 export async function getItemPermissionLevel(
   db: MySql2Database<Record<string, never>>,
   itemId: number,

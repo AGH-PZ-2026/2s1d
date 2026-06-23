@@ -1,1 +1,0 @@
-ALTER TABLE `groups` ADD `default_permission` enum('manage','edit') DEFAULT 'edit' NOT NULL;

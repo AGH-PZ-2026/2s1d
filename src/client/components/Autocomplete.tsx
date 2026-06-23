@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 export interface AutocompleteOption {
   value: number;
   label: string;
+  extra?: { defaultPermission?: 'manage' | 'edit' };
 }
 
 interface Props {
@@ -10,6 +11,8 @@ interface Props {
   onSearch: (query: string) => Promise<AutocompleteOption[]>;
   onSelect: (option: AutocompleteOption) => void;
   onClear: () => void;
+  initialValue?: string;
+  disabled?: boolean;
 }
 
 export default function Autocomplete({
@@ -17,8 +20,10 @@ export default function Autocomplete({
   onSearch,
   onSelect,
   onClear,
+  initialValue = '',
+  disabled = false,
 }: Props) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialValue);
   const [options, setOptions] = useState<AutocompleteOption[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -112,6 +117,7 @@ export default function Autocomplete({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           autoComplete="off"
+          disabled={disabled}
           style={{ flex: 1 }}
         />
         {query && (

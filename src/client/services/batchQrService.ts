@@ -4,12 +4,6 @@ import { jsonAuthHeaders } from './authHeaders';
 
 export type QrSize = 'small' | 'medium' | 'large';
 
-interface BatchQrItem {
-  name: string;
-  id: number;
-  systemId: string | null;
-}
-
 export const batchQrService = {
   async download(itemIds: number[], size: QrSize = 'medium'): Promise<void> {
     const response = await fetch('/api/v1/batch-qr/print', {
@@ -18,16 +12,13 @@ export const batchQrService = {
       body: JSON.stringify({ item_ids: itemIds }),
     });
     await ensureOk(response);
-    const data: { items: BatchQrItem[] } = await response.json();
+    const data = (await response.json()) as {
+      items: { id: number; systemId: string | null; name: string }[];
+    };
     const items = data.items;
 
     const doc = new jsPDF();
-    const qrSizes: Record<QrSize, number> = {
-      small: 24,
-      medium: 30,
-      large: 40,
-    };
-    const qrSize = qrSizes[size];
+    const qrSize = size === 'small' ? 24 : size === 'large' ? 40 : 30;
     const rowHeight = qrSize + 20;
     doc.setFontSize(16);
     doc.text(`Etykiety QR`, 20, 20);
@@ -49,13 +40,8 @@ export const batchQrService = {
         y + 6
       );
 
-      const qrWidths: Record<QrSize, number> = {
-        small: 120,
-        medium: 150,
-        large: 180,
-      };
       const qrDataUrl = await QRCode.toDataURL(identifier, {
-        width: qrWidths[size],
+        width: size === 'small' ? 120 : size === 'large' ? 180 : 150,
         margin: 1,
         color: { dark: '#000000', light: '#ffffff' },
       });
@@ -73,7 +59,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data: { detail?: string } = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {}
   throw new Error(detail);

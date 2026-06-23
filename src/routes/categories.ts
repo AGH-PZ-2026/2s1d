@@ -18,6 +18,8 @@ const createSchema = z.object({
   description: z.string().optional(),
 });
 
+type CategoryInput = z.infer<typeof createSchema>;
+
 const router = new Hono<{ Variables: Variables }>();
 
 function toResponse(cat: Category) {
@@ -109,7 +111,7 @@ router.get('/:id', async (c) => {
 
 router.post('/', zValidator('json', createSchema), async (c) => {
   const db = c.get('db');
-  const body = c.req.valid('json');
+  const body = c.req.valid('json') as CategoryInput;
   const parentId = body.parent_id ?? null;
   if (parentId != null) await ensureParentExists(db, parentId);
   await checkNameUnique(db, body.name, parentId);
@@ -128,7 +130,7 @@ router.post('/', zValidator('json', createSchema), async (c) => {
 router.patch('/:id', zValidator('json', createSchema), async (c) => {
   const db = c.get('db');
   const id = Number(c.req.param('id'));
-  const body = c.req.valid('json');
+  const body = c.req.valid('json') as CategoryInput;
   const parentId = body.parent_id ?? null;
 
   const existing = await db

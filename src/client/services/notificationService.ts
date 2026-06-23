@@ -12,7 +12,7 @@ export interface NotificationEvent {
   userId: number;
   borrowingId: number | null;
   eventType: 'return_due' | 'borrowing_approved';
-  channel: 'email' | 'push';
+  channel: 'in_app' | 'email' | 'push';
   payload: string;
   scheduledAt: string;
   sentAt: string | null;
@@ -25,8 +25,7 @@ export const notificationService = {
       headers: authHeaders(),
     });
     await ensureOk(r);
-    const data: NotificationPreference = await r.json();
-    return data;
+    return r.json();
   },
   async updatePreferences(
     p: Pick<
@@ -40,16 +39,14 @@ export const notificationService = {
       body: JSON.stringify(p),
     });
     await ensureOk(r);
-    const data: NotificationPreference = await r.json();
-    return data;
+    return r.json();
   },
   async listEvents(): Promise<NotificationEvent[]> {
     const r = await fetch('/api/v1/notifications/events', {
       headers: authHeaders(),
     });
     await ensureOk(r);
-    const data: NotificationEvent[] = await r.json();
-    return data;
+    return r.json();
   },
 };
 
@@ -57,7 +54,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data: { detail?: string } = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {}
   throw new Error(detail);

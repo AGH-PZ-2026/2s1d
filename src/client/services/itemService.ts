@@ -133,8 +133,7 @@ export const itemService = {
     }
     const r = await fetch('/api/v1/items/', { headers: authHeaders() });
     await ensureOk(r);
-    const items: BackendItem[] = await r.json();
-    return items.map(mapItem);
+    return ((await r.json()) as BackendItem[]).map(mapItem);
   },
   async create(payload: CreateItemPayload): Promise<Item> {
     if (USE_MOCKS) {
@@ -213,8 +212,7 @@ export const itemService = {
     }
     const r = await fetch('/api/v1/categories/', { headers: authHeaders() });
     await ensureOk(r);
-    const cats: BackendCat[] = await r.json();
-    return cats.map((c) => ({
+    return ((await r.json()) as BackendCat[]).map((c) => ({
       id: c.id,
       name: c.name,
       parentId: c.parent_id ?? null,
@@ -227,8 +225,7 @@ export const itemService = {
     }
     const r = await fetch('/api/v1/locations/', { headers: authHeaders() });
     await ensureOk(r);
-    const locs: BackendLocation[] = await r.json();
-    return locs.map((l) => ({
+    return ((await r.json()) as BackendLocation[]).map((l) => ({
       id: l.id,
       name: l.name,
       kind: l.kind,
@@ -247,8 +244,7 @@ export const itemService = {
     }
     const r = await fetch('/api/v1/auth/users', { headers: authHeaders() });
     await ensureOk(r);
-    const users: { id: number; email: string }[] = await r.json();
-    return users.map((u) => ({
+    return ((await r.json()) as { id: number; email: string }[]).map((u) => ({
       id: u.id,
       fullName: u.email,
     }));
@@ -260,9 +256,9 @@ export const itemService = {
     }
     const r = await fetch('/api/v1/item-status/', { headers: authHeaders() });
     await ensureOk(r);
-    const statuses: { id: number; name: string; is_system: boolean }[] =
-      await r.json();
-    return statuses.map((s) => ({
+    return (
+      (await r.json()) as { id: number; name: string; is_system: boolean }[]
+    ).map((s) => ({
       id: s.id,
       name: s.name,
       slug: s.name
@@ -295,7 +291,7 @@ export const itemService = {
       body: JSON.stringify(payload),
     });
     await ensureOk(r);
-    const data: BackendLocation = await r.json();
+    const data = (await r.json()) as BackendLocation;
     return mapLocation(data);
   },
   async updateLocation(itemId: number, locationId: number): Promise<void> {
@@ -320,8 +316,7 @@ export const itemService = {
     }
     const r = await fetch('/api/v1/groups/', { headers: authHeaders() });
     await ensureOk(r);
-    const groups: BackendGroup[] = await r.json();
-    return groups.map((g) => ({
+    return ((await r.json()) as BackendGroup[]).map((g) => ({
       id: g.id,
       name: g.name,
     }));
@@ -367,7 +362,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data: { detail?: string } = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {}
   throw new Error(detail);

@@ -18,13 +18,27 @@ const SYSTEM_STATUSES = [
   { name: 'Wypożyczony', is_system: true, slug: 'wypozyczony' },
   { name: 'Zarezerwowany', is_system: true, slug: 'zarezerwowany' },
   { name: 'Zarchiwizowany', is_system: true, slug: 'zarchiwizowany' },
-  { name: 'Oczekuje zatwierdzenia', is_system: true, slug: 'oczekuje-zatwierdzenia' },
+  {
+    name: 'Oczekuje zatwierdzenia',
+    is_system: true,
+    slug: 'oczekuje-zatwierdzenia',
+  },
 ];
 
 const DEFAULT_LOCATIONS = [
-  { name: 'Magazyn główny', kind: 'internal', building: 'Budynek A', room: '001' },
+  {
+    name: 'Magazyn główny',
+    kind: 'internal',
+    building: 'Budynek A',
+    room: '001',
+  },
   { name: 'Sala 101', kind: 'internal', building: 'Budynek A', room: '101' },
-  { name: 'Laboratorium', kind: 'internal', building: 'Budynek B', room: '203' },
+  {
+    name: 'Laboratorium',
+    kind: 'internal',
+    building: 'Budynek B',
+    room: '203',
+  },
   { name: 'Biuro', kind: 'internal', building: 'Budynek A', room: '305' },
 ];
 
@@ -35,7 +49,10 @@ const DEFAULT_LOCATIONS = [
  * `__drizzle_migrations` table, and inserts default statuses / locations
  * if the tables are empty.
  */
-export async function runMigrations(pool: Pool, migrationsDir: string): Promise<void> {
+export async function runMigrations(
+  pool: Pool,
+  migrationsDir: string
+): Promise<void> {
   // 1. Ensure tracking table exists
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`${MIGRATIONS_TABLE}\` (
@@ -58,7 +75,9 @@ export async function runMigrations(pool: Pool, migrationsDir: string): Promise<
   const [applied] = await pool.query(
     `SELECT idx, version FROM \`${MIGRATIONS_TABLE}\` ORDER BY idx`
   );
-  const appliedSet = new Set((applied as MigrationRecord[]).map((r) => r.version));
+  const appliedSet = new Set(
+    (applied as MigrationRecord[]).map((r) => r.version)
+  );
 
   // 4. Apply pending migrations
   for (let i = 0; i < files.length; i++) {
@@ -83,7 +102,7 @@ export async function runMigrations(pool: Pool, migrationsDir: string): Promise<
         [i, version]
       );
       await conn.commit();
-      // eslint-disable-next-line no-console
+
       console.log(`[migrate] applied ${files[i]}`);
     } catch (err) {
       await conn.rollback();
@@ -99,7 +118,9 @@ export async function runMigrations(pool: Pool, migrationsDir: string): Promise<
 
 async function seedDefaults(pool: Pool): Promise<void> {
   // Seed system statuses if table is empty
-  const [statusRows] = await pool.query('SELECT COUNT(*) as cnt FROM `item_status`');
+  const [statusRows] = await pool.query(
+    'SELECT COUNT(*) as cnt FROM `item_status`'
+  );
   const statusCount = (statusRows as { cnt: number }[])[0].cnt;
   if (statusCount === 0) {
     for (const s of SYSTEM_STATUSES) {
@@ -108,7 +129,7 @@ async function seedDefaults(pool: Pool): Promise<void> {
         [s.name, s.is_system, s.slug]
       );
     }
-    // eslint-disable-next-line no-console
+
     console.log('[seed] inserted default item statuses');
   }
 
@@ -122,7 +143,7 @@ async function seedDefaults(pool: Pool): Promise<void> {
         [loc.name, loc.kind, loc.building, loc.room]
       );
     }
-    // eslint-disable-next-line no-console
+
     console.log('[seed] inserted default locations');
   }
 }

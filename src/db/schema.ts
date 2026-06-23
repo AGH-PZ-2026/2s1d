@@ -12,6 +12,7 @@ import {
   text,
   float,
   timestamp,
+  check,
 } from 'drizzle-orm/mysql-core';
 import { foreignKey } from 'drizzle-orm/mysql-core';
 import { sql } from 'drizzle-orm';
@@ -63,6 +64,9 @@ export const users = mysqlTable('users', {
 export const groups = mysqlTable('groups', {
   id: int('id').autoincrement().primaryKey(),
   name: varchar('name', { length: 255 }).notNull().unique(),
+  defaultPermission: mysqlEnum('default_permission', ['manage', 'edit'])
+    .notNull()
+    .default('edit'),
 });
 
 export const groupMembers = mysqlTable(
@@ -238,6 +242,18 @@ export const delegations = mysqlTable(
     permission: mysqlEnum('permission', ['manage', 'edit']).notNull(),
   },
   (table) => ({
+    userUnique: uniqueIndex('delegations_item_user_unique').on(
+      table.itemId,
+      table.userId
+    ),
+    groupUnique: uniqueIndex('delegations_item_group_unique').on(
+      table.itemId,
+      table.groupId
+    ),
+    targetCheck: check(
+      'delegations_exactly_one_target',
+      sql`(${table.userId} IS NULL) <> (${table.groupId} IS NULL)`
+    ),
     itemFk: foreignKey({
       name: 'delegations_item_fk',
       columns: [table.itemId],
@@ -271,7 +287,7 @@ export const auditLogs = mysqlTable('audit_logs', {
 export const notificationPreferences = mysqlTable('notification_preferences', {
   id: int('id').autoincrement().primaryKey(),
   userId: int('user_id').notNull().unique(),
-  emailEnabled: boolean('email_enabled').notNull().default(true),
+  emailEnabled: boolean('email_enabled').notNull().default(false),
   pushEnabled: boolean('push_enabled').notNull().default(false),
   returnDueNoticeHours: int('return_due_notice_hours').notNull().default(24),
 });
@@ -286,7 +302,7 @@ export const notificationEvents = mysqlTable(
       'return_due',
       'borrowing_approved',
     ]).notNull(),
-    channel: mysqlEnum('channel', ['email', 'push']).notNull(),
+    channel: mysqlEnum('channel', ['in_app', 'email', 'push']).notNull(),
     payload: varchar('payload', { length: 1000 }).notNull(),
     scheduledAt: datetime('scheduled_at').notNull(),
     sentAt: datetime('sent_at'),
@@ -305,6 +321,12 @@ export const notificationEvents = mysqlTable(
       columns: [table.borrowingId],
       foreignColumns: [borrowings.id],
     }),
+    deliveryUnique: uniqueIndex('notification_events_delivery_unique').on(
+      table.userId,
+      table.borrowingId,
+      table.eventType,
+      table.channel
+    ),
   })
 );
 

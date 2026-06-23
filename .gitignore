@@ -1,5 +1,13 @@
 node_modules/
 dist/
+backend/.venv/
+backend/.pytest_cache/
+backend/.ruff_cache/
+.ruff_cache/
+frontend/node_modules/
+frontend/dist/
+**/__pycache__/
+*.pyc
 .env
 .env.local
 .dev.vars
@@ -10,6 +18,8 @@ docker-compose.override.yml
 .DS_Store
 Thumbs.db
 .wrangler/
-worker-configuration.d.ts
 coverage/
+backups/
 2025-03-06_koidc.sql
+.agents/
+skills-lock.json

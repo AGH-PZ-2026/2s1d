@@ -96,8 +96,7 @@ export const statusService = {
     }
     const response = await fetch(`${API_BASE}/`, { headers: authHeaders() });
     if (!response.ok) await handleApiError(response);
-    const statuses: BackendStatusResponse[] = await response.json();
-    return statuses.map(mapBackend);
+    return ((await response.json()) as BackendStatusResponse[]).map(mapBackend);
   },
   async create(payload: CreateStatusPayload): Promise<Status> {
     if (USE_MOCKS) {
@@ -115,8 +114,7 @@ export const statusService = {
       body: JSON.stringify({ name: payload.name }),
     });
     if (!response.ok) await handleApiError(response);
-    const status: BackendStatusResponse = await response.json();
-    return mapBackend(status);
+    return mapBackend((await response.json()) as BackendStatusResponse);
   },
   async update(id: number, payload: UpdateStatusPayload): Promise<Status> {
     if (USE_MOCKS) {
@@ -144,8 +142,7 @@ export const statusService = {
       body: JSON.stringify({ name: payload.name }),
     });
     if (!response.ok) await handleApiError(response);
-    const status: BackendStatusResponse = await response.json();
-    return mapBackend(status);
+    return mapBackend((await response.json()) as BackendStatusResponse);
   },
   async remove(id: number): Promise<void> {
     if (USE_MOCKS) {
@@ -168,7 +165,7 @@ export const statusService = {
 async function handleApiError(response: Response): Promise<never> {
   let detail = `Błąd serwera (kod: ${response.status}).`;
   try {
-    const d: { detail?: string } = await response.json();
+    const d = (await response.json()) as Record<string, unknown>;
     if (typeof d.detail === 'string') detail = d.detail;
   } catch {}
   throw new Error(detail);

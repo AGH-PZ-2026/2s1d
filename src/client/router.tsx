@@ -1,22 +1,41 @@
 import { createBrowserRouter } from 'react-router-dom';
+import { Suspense, type ReactNode } from 'react';
 import { Layout } from './components/Layout';
 import { AuthGate } from './components/AuthGate';
-import { HomePage } from './pages/HomePage';
+import { GuestOnly } from './components/GuestOnly';
 import { ErrorPage } from './pages/ErrorPage';
-import StatusesPage from './pages/StatusesPage';
-import CategoriesPage from './pages/CategoriesPage';
-import DelegationsPage from './pages/DelegationsPage';
-import BorrowingsPage from './pages/BorrowingsPage';
-import AuditLogsPage from './pages/AuditLogsPage';
-import ExcelImportPage from './pages/ExcelImportPage';
-import ItemsPage from './pages/ItemsPage';
-import UsersPage from './pages/UsersPage';
-import LoginPage from './pages/LoginPage';
-import NotificationsPage from './pages/NotificationsPage';
-import OverdueReportsPage from './pages/OverdueReportsPage';
-import QrScannerPage from './pages/QrScannerPage';
-import BatchQrPage from './pages/BatchQrPage';
-import GroupsPage from './pages/GroupsPage';
+import {
+  AuditLogsPage,
+  BatchQrPage,
+  BorrowingsPage,
+  CategoriesPage,
+  DelegationsPage,
+  ExcelImportPage,
+  GroupsPage,
+  HomePage,
+  ItemsPage,
+  LoginPage,
+  NotificationsPage,
+  OverdueReportsPage,
+  QrScannerPage,
+  StatusesPage,
+  UsersPage,
+} from './lazy-pages';
+
+function loading(element: ReactNode) {
+  return (
+    <Suspense
+      fallback={
+        <div className="loading-state">
+          <div className="spinner" />
+          Ładowanie...
+        </div>
+      }
+    >
+      {element}
+    </Suspense>
+  );
+}
 
 export const router = createBrowserRouter([
   {
@@ -24,120 +43,65 @@ export const router = createBrowserRouter([
     element: <Layout />,
     errorElement: <ErrorPage />,
     children: [
-      {
-        path: '/',
-        element: (
-          <AuthGate>
-            <HomePage />
-          </AuthGate>
-        ),
-      },
+      { path: '/', element: <AuthGate>{loading(<HomePage />)}</AuthGate> },
       {
         path: '/statuses',
-        element: (
-          <AuthGate>
-            <StatusesPage />
-          </AuthGate>
-        ),
+        element: <AuthGate>{loading(<StatusesPage />)}</AuthGate>,
       },
       {
         path: '/categories',
-        element: (
-          <AuthGate>
-            <CategoriesPage />
-          </AuthGate>
-        ),
+        element: <AuthGate>{loading(<CategoriesPage />)}</AuthGate>,
       },
       {
         path: '/delegations',
-        element: (
-          <AuthGate>
-            <DelegationsPage />
-          </AuthGate>
-        ),
+        element: <AuthGate>{loading(<DelegationsPage />)}</AuthGate>,
       },
       {
         path: '/borrowings',
-        element: (
-          <AuthGate>
-            <BorrowingsPage />
-          </AuthGate>
-        ),
+        element: <AuthGate>{loading(<BorrowingsPage />)}</AuthGate>,
       },
       {
         path: '/users',
-        element: (
-          <AuthGate requireAdmin>
-            <UsersPage />
-          </AuthGate>
-        ),
+        element: <AuthGate requireAdmin>{loading(<UsersPage />)}</AuthGate>,
       },
       {
         path: '/audit-logs',
-        element: (
-          <AuthGate requireAdmin>
-            <AuditLogsPage />
-          </AuthGate>
-        ),
+        element: <AuthGate requireAdmin>{loading(<AuditLogsPage />)}</AuthGate>,
       },
       {
         path: '/items',
-        element: (
-          <AuthGate>
-            <ItemsPage />
-          </AuthGate>
-        ),
+        element: <AuthGate>{loading(<ItemsPage />)}</AuthGate>,
       },
       {
         path: '/qr',
-        element: (
-          <AuthGate>
-            <QrScannerPage />
-          </AuthGate>
-        ),
+        element: <AuthGate>{loading(<QrScannerPage />)}</AuthGate>,
       },
       {
         path: '/import',
         element: (
-          <AuthGate requireAdmin>
-            {' '}
-            <ExcelImportPage />
-          </AuthGate>
+          <AuthGate requireAdmin>{loading(<ExcelImportPage />)}</AuthGate>
         ),
       },
       {
         path: '/reports/overdue',
-        element: (
-          <AuthGate>
-            <OverdueReportsPage />
-          </AuthGate>
-        ),
+        element: <AuthGate>{loading(<OverdueReportsPage />)}</AuthGate>,
       },
       {
         path: '/batch-qr',
-        element: (
-          <AuthGate>
-            <BatchQrPage />
-          </AuthGate>
-        ),
+        element: <AuthGate>{loading(<BatchQrPage />)}</AuthGate>,
       },
       {
         path: '/notifications',
-        element: (
-          <AuthGate>
-            <NotificationsPage />
-          </AuthGate>
-        ),
+        element: <AuthGate>{loading(<NotificationsPage />)}</AuthGate>,
       },
       {
         path: '/groups',
-        element: (
-          <AuthGate requireAdmin>
-            <GroupsPage />
-          </AuthGate>
-        ),
+        element: <AuthGate requireAdmin>{loading(<GroupsPage />)}</AuthGate>,
       },
-      { path: '/login', element: <LoginPage /> },
+      {
+        path: '/login',
+        element: <GuestOnly>{loading(<LoginPage />)}</GuestOnly>,
+      },
     ],
   },
 ]);

@@ -2,56 +2,34 @@
 
 Zintegrowany i wszechstronny system do zarządzania bazą danych aparatury pomiarowej AGH.
 
-## Tryby uruchomienia
-
-Aplikacja jest **runtime-agnostic** — ten sam kod źródłowy Hono działa zarówno na Cloudflare Workers, jak i na zwykłym serwerze Node.js:
-
-| Tryb               | Entry point          | Adapter            | Kiedy                                       |
-| ------------------ | -------------------- | ------------------ | ------------------------------------------- |
-| Cloudflare Workers | `src/index.ts`       | workerd            | Produkcja, edge, darmowy tier CF            |
-| Self-hosted (Node) | `src/server.ts`      | `@hono/node-server`| Własny serwer, kontener Docker, on-prem     |
-
-Wybór trybu odbywa się przez to, **co uruchamiasz**: `wrangler dev` / `wrangler deploy` vs `pnpm start` / `docker compose up app`. Nie trzeba nic zmieniać w kodzie.
-
-Abstrakcje pozwalające na to są w:
-- `src/db/client.ts` — `createDb(env)` akceptuje `HYPERDRIVE` (binding CF), `DATABASE_URL` albo `MYSQL_*` env vars
-- `src/lib/storage.ts` — `ObjectStorage` ma 3 implementacje: `R2ObjectStorage` (binding CF), `S3ObjectStorage` (S3/MinIO/R2-S3), `LocalFsStorage` (dysk)
-
 ## Stack
 
-| Warstwa     | Technologia                                            |
-| ----------- | ------------------------------------------------------ |
-| Runtime     | Cloudflare Workers **lub** Node.js 22+ (Bun też działa) |
-| Framework   | [Hono](https://hono.dev/)                              |
-| ORM         | [Drizzle](https://orm.drizzle.team/) + `drizzle-kit`   |
-| DB          | MySQL 8.4 przez [Hyperdrive](https://developers.cloudflare.com/hyperdrive/) (CF) lub bezpośrednio mysql2 (self-hosted) |
-| Frontend    | React 19 + Vite 8 + react-router-dom 7                 |
-| Bundler     | Vite (frontend) + esbuild (server)                     |
-| Testy       | Vitest 3 (`@cloudflare/vitest-pool-workers` dla workera) |
-| Środowisko  | Nix (`flake.nix`), `pnpm` jako package manager         |
-| Walidacja   | Zod + `@hono/zod-validator`                            |
-| Ikony       | lucide-react                                           |
+| Warstwa    | Technologia                                                                   |
+| ---------- | ----------------------------------------------------------------------------- |
+| Runtime    | Docker + Node 22 (`src/server.ts`), Cloudflare Worker jako legacy/alternatywa |
+| Framework  | [Hono](https://hono.dev/)                                                     |
+| ORM        | [Drizzle](https://orm.drizzle.team/) + `drizzle-kit`                          |
+| DB         | MySQL 8.4 w Docker Compose; Hyperdrive tylko dla ścieżki Cloudflare           |
+| Frontend   | React 19 + Vite 8 + react-router-dom 7                                        |
+| Testy      | Vitest 3 (`@cloudflare/vitest-pool-workers` dla workera)                      |
+| Środowisko | Nix (`flake.nix`), `pnpm` jako package manager                                |
+| Walidacja  | Zod + `@hono/zod-validator`                                                   |
+| Ikony      | lucide-react                                                                  |
 
 ## Struktura projektu
 
 ```
 src/
-├── index.ts                  # Hono app — entry point (działa w obu trybach)
-├── server.ts                 # Self-hosted Node.js entrypoint (tylko dla self-hosted)
-├── env.d.ts                  # Typy Hyperdrive/R2/Queue + Node.js env shape
+├── index.ts                  # Hono app i legacy Worker export
+├── server.ts                 # Produkcyjny serwer Node dla Docker
 ├── db/
 │   ├── schema.ts             # 12 tabel Drizzle (MySQL)
-│   ├── client.ts             # createDb(env) — Hyperdrive / DATABASE_URL / MYSQL_*
+│   ├── client.ts             # MySQL config → mysql2 → Drizzle
 │   ├── seed.ts               # Systemowe statusy + domyślne lokalizacje + slugify
-│   ├── import-koidc.ts       # Skrypt importu z bazy referencyjnej
 │   └── migrations/           # Migracje SQL generowane przez drizzle-kit
 ├── middleware/
 │   ├── auth.ts               # JWT (HS256, Web Crypto), authMiddleware
 │   └── db.ts                 # dbMiddleware — per-request DB connection
-├── lib/
-│   ├── errors.ts             # AppError + notFound/badRequest/forbidden/unauthorized
-│   ├── storage.ts            # ObjectStorage: R2 / S3 / LocalFs
-│   └── storageProxy.ts       # /storage/<key> route (self-hosted)
 ├── routes/
 │   ├── auth.ts               # /google-login, /register, /users, /config
 │   ├── items.ts              # CRUD przedmiotów + filtrowanie
@@ -66,23 +44,19 @@ src/
 │   ├── quick-action.ts       # Szybkie akcje (/mark-damaged)
 │   ├── batch-qr.ts           # Drukowanie zbiorcze kodów QR
 │   ├── excel-import.ts       # Import CSV
-│   ├── item-photos.ts        # Zdjęcia (R2 / S3 / local FS)
+│   ├── item-photos.ts        # Zdjęcia (R2 bucket)
 │   ├── notifications.ts      # Preferencje + eventy
 │   └── audit-logs.ts         # Logi operacji (admin only)
-└── client/                   # React SPA (Vite)
-    ├── main.tsx / App.tsx / router.tsx
-    ├── components/           # Layout, AuthGate, Autocomplete, CategoryTree, itd.
-    ├── pages/                # Wszystkie strony (Items, Categories, Borrowings, itd.)
-    ├── services/             # Klienckie serwisy API (z mockami dla MODE=test)
-    ├── types/                # TypeScript typy
-    └── hooks/                # useAuth
-
-scripts/
-└── build-server.mjs          # esbuild bundle → dist-server/server.js
-
-Dockerfile                    # Multi-stage build (client → server → runtime)
-docker-compose.yml            # MySQL + app (+ opcjonalne MinIO)
-worker-configuration.d.ts     # Generowane przez `wrangler types` — NIE edytować ręcznie
+├── lib/
+│   └── errors.ts             # AppError + notFound/badRequest/forbidden/unauthorized
+├── client/                   # React SPA (Vite)
+│   ├── main.tsx / App.tsx / router.tsx
+│   ├── components/           # Layout, AuthGate, Autocomplete, CategoryTree, itd.
+│   ├── pages/                # Wszystkie strony (Items, QrScanner, BatchQr, Borrowings, itd.)
+│   ├── services/             # Klienckie serwisy API (z mockami dla MODE=test)
+│   ├── types/                # TypeScript typy
+│   └── hooks/                # useAuth
+worker-configuration.d.ts     # Generowane przez `wrangler types` dla legacy Worker — NIE edytować ręcznie
 ```
 
 ## Dev — komendy
@@ -98,100 +72,51 @@ docker compose up db               # MySQL 8.4 na localhost:3306
 pnpm run db:migrate                # Aplikuj migracje
 pnpm run db:generate               # Generuj migrację ze zmian w schema.ts
 
-# Dev — Cloudflare (workerd)
-pnpm run dev                       # vite build + wrangler dev → localhost:8787
-
-# Dev — Self-hosted (Node)
-pnpm run dev:server                # vite build + tsx watch src/server.ts
-# albo do szybkiego testu bez watch:
-DATABASE_URL=... JWT_SECRET=... pnpm run start:dev
-
-# Build
-pnpm run build                     # = build:client + build:server (self-hosted prod)
-pnpm run build:client              # Vite → dist/client
-pnpm run build:server              # esbuild → dist-server/server.js (52 KB)
-
-# Self-hosted start (po build)
-DATABASE_URL=... JWT_SECRET=... pnpm start
-
-# Docker
-docker compose up -d --build app   # self-hosted kontener + MySQL
-docker build -t pz-worker .        # standalone build
+# Dev / Docker
+docker compose up --build          # Produkcyjny kształt lokalnie → localhost:8787
+docker compose --profile tools run --rm migrate
+pnpm run dev                       # Docker Compose (główna ścieżka)
+pnpm run worker:dev                # Legacy Worker dev przez Wrangler
 
 # TypeScript
 pnpm exec tsc --noEmit             # Type check
-pnpm exec wrangler types           # Regeneruj worker-configuration.d.ts
+pnpm run types:worker              # Regeneruj worker-configuration.d.ts
 
 # Testy
-pnpm exec vitest run tests/business-logic.test.ts       # Testy logiki (szybkie)
+pnpm run test:logic                                    # Testy logiki (szybkie)
 pnpm exec vitest run --config vitest.client.config.ts   # Testy klienckie (jsdom)
-pnpm test                          # Oba powyższe (bez vitest-pool-workers)
-```
-
-## Self-hosted — env vars
-
-Patrz `.env.example`. Najważniejsze:
-
-```bash
-# Baza danych (DATABASE_URL wygrywa z MYSQL_*)
-DATABASE_URL=mysql://user:pass@host:3306/db
-# albo
-MYSQL_HOST=db
-MYSQL_PORT=3306
-MYSQL_USER=pz_user
-MYSQL_PASSWORD=pz_pass
-MYSQL_DATABASE=pz_db
-
-# Auth
-JWT_SECRET=<openssl rand -hex 32>     # wymagane
-DEV_BYPASS_AUTH=false                 # true w dev = logowanie przez email
-GOOGLE_CLIENT_ID=                     # opcjonalnie, OAuth Google
-
-# Storage
-PHOTOS_BACKEND=local                  # local | s3
-PHOTOS_LOCAL_DIR=./storage            # dla local
-S3_ENDPOINT=                          # dla s3 (MinIO/R2/AWS)
-S3_REGION=us-east-1
-S3_BUCKET=
-S3_ACCESS_KEY_ID=
-S3_SECRET_ACCESS_KEY=
-S3_PUBLIC_URL=                        # opcjonalnie, dla CDN
-
-# Server
-PORT=8787
-HOST=0.0.0.0
-STATIC_DIR=./dist/client              # path do zbudowanego frontu
+pnpm test                          # Logika + testy klienta (bez vitest-pool-workers)
 ```
 
 ## Testy — ważne
 
-- **`vitest.config.ts`** (worker tests) używa `@cloudflare/vitest-pool-workers` — **alokuje ogromne ilości RAM** (kilka GB), bo każdy plik testowy dostaje izolowany workerd runtime. Na Macu (aarch64-darwin) potrafi zająć całą pamięć i zostać ubity przez OOM killer. **Nie uruchamiaj tych testów lokalnie bez potrzeby.**
+- **`vitest.config.ts`** (legacy worker tests) używa `@cloudflare/vitest-pool-workers` — **alokuje ogromne ilości RAM** (kilka GB), bo każdy plik testowy dostaje izolowany workerd runtime. Nie jest częścią domyślnego `pnpm test`.
 - **`vitest.client.config.ts`** (client tests) — lekkie, jsdom, działają szybko. Te testy są bezpieczne lokalnie.
 - Serwisy klienckie mają wbudowane mocki (sprawdzają `import.meta.env.MODE === 'test'`), więc testy klienckie nie potrzebują działającego workera ani bazy danych.
 - `tests/business-logic.test.ts` — testuje `slugify` i stałe z `seed.ts`, czysta logika, szybkie.
 
 ## Baza danych — tabele
 
-| Tabela                    | Opis                                           |
-| ------------------------- | ---------------------------------------------- |
-| `categories`              | Drzewo kategorii (self-referencing FK parent_id) |
-| `item_status`             | Statusy (systemowe is_system=true + custom)     |
-| `items`                   | Przedmioty (system_id, nazwa, producent, model, serial, nr_inw, itd.) + legacy_item_id |
-| `locations`               | Lokalizacje (building/room/cabinet/shelf/mapX/mapY) |
-| `borrowings`              | Wypożyczenia (4 tryby: classic/trusted/asynchronous/external) |
-| `delegations`             | Delegacje uprawnień (manage/edit, user_id/group_id) |
-| `users`                   | Użytkownicy (email, hashed_password, role, is_approved) |
-| `groups`                  | Grupy użytkowników                              |
-| `group_members`           | Członkostwo w grupach (PK: group_id + user_id)  |
-| `item_photos`             | Zdjęcia przedmiotów (storage_path)             |
-| `audit_logs`              | Logi zdarzeń (user_id, action, old_value, new_value JSON) |
-| `notification_preferences`| Preferencje powiadomień per user                |
-| `notification_events`     | Zdarzenia powiadomień (return_due, borrowing_approved) |
+| Tabela                     | Opis                                                                                   |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `categories`               | Drzewo kategorii (self-referencing FK parent_id)                                       |
+| `item_status`              | Statusy (systemowe is_system=true + custom)                                            |
+| `items`                    | Przedmioty (system_id, nazwa, producent, model, serial, nr_inw, itd.) + legacy_item_id |
+| `locations`                | Lokalizacje (building/room/cabinet/shelf/mapX/mapY)                                    |
+| `borrowings`               | Wypożyczenia (4 tryby: classic/trusted/asynchronous/external)                          |
+| `delegations`              | Delegacje uprawnień (manage/edit, user_id/group_id)                                    |
+| `users`                    | Użytkownicy (email, hashed_password, role, is_approved)                                |
+| `groups`                   | Grupy użytkowników                                                                     |
+| `group_members`            | Członkostwo w grupach (PK: group_id + user_id)                                         |
+| `item_photos`              | Zdjęcia przedmiotów (R2 storage_path)                                                  |
+| `audit_logs`               | Logi zdarzeń (user_id, action, old_value, new_value JSON)                              |
+| `notification_preferences` | Preferencje powiadomień per user                                                       |
+| `notification_events`      | Zdarzenia powiadomień (return_due, borrowing_approved)                                 |
 
 ## Auth
 
 - **Google OAuth**: `POST /api/v1/auth/google-login` — body: `{ credential }` (Google ID token). Backend weryfikuje token przez Google `tokeninfo`, sprawdza domenę `@agh.edu.pl`, tworzy/linkuje użytkownika z `auth_provider = "google"`.
-- **Dev bypass**: `DEV_BYPASS_AUTH="true"` w `wrangler.jsonc` lub `.env` pomija weryfikację tokenu — `credential` traktowany jako email (tylko development).
+- **Dev bypass**: `DEV_BYPASS_AUTH="true"` w `wrangler.jsonc` pomija weryfikację tokenu — `credential` traktowany jako email (tylko development).
 - **Rejestracja**: `POST /api/v1/auth/register` — body: `{email, password: min 8}` → konto `is_approved: false`, `auth_provider: "local"`.
 - **JWT**: HS256 z Web Crypto API. Secret z `c.env.JWT_SECRET`. Token ważny 24h.
 - **Role**: `admin` / `user`. Domyślnie po rejestracji brak uprawnień — admin musi zatwierdzić.
@@ -202,50 +127,43 @@ STATIC_DIR=./dist/client              # path do zbudowanego frontu
 - `index.ts` `onError` — łapie HTTPException → `{detail}` z kodem; nieobsłużone → 500
 - Serwisy klienckie: `handleApiError` / `ensureOk` parsują `response.json().detail`
 
-## Docker — ważne szczegóły implementacyjne
-
-- **pnpm 11+** wymaga Node 22+ (używa `node:sqlite` builtin) — `Dockerfile` używa `node:22-bookworm-slim`.
-- **Runtime stage** używa `pnpm install --prod --frozen-lockfile --shamefully-hoist`. Flaga `--shamefully-hoist` jest krytyczna — bez niej pnpm nie tworzy top-level `node_modules/mysql2/`, a serwer bundle importuje `mysql2/promise` bezpośrednio.
-- **Bezpieczeństwo**: runtime user to `node` (non-root), port 8787, healthcheck na `/api/health`.
-- **Wolumeny**: `photos_data` zamontowany na `/app/storage` dla zachowania uploadowanych zdjęć.
-- **Bundle**: `dist-server/server.js` ma 52 KB (cały backend Hono + Drizzle + esbuild). Reszta to node_modules.
-
 ## Wymagania — pokrycie
 
-| Etap | US                                                                 | Status |
-| ---- | ------------------------------------------------------------------ | ------ |
-| 1    | US-01 Hierarchia kategorii + flagi statusów                         | ✅     |
-| 1    | US-02 Dodawanie przedmiotów                                         | ✅     |
-| 1    | US-03 Identyfikacja (QR, systemId)                                  | ✅     |
-| 1    | US-04 Szybkie akcje po QR                                           | ✅     |
-| 1    | US-05: Dokumentacja zdjęciowa                                       | ✅     |
-| 1    | Lokalizacja US-01 Przypisanie/aktualizacja                           | ✅     |
-| 1    | Lokalizacja US-02 Podgląd na mapie                                   | ✅     |
-| 1    | Role US-01 Opiekun/grupa                                            | ✅     |
-| 1    | Role US-03 Google OAuth (konto @agh.edu.pl) + rejestracja            | ✅ |
-| 1    | Wypożyczenia US-01 (classic)                                        | ✅     |
-| 1    | Narzędzia US-01 Zaawansowane filtrowanie                            | ✅     |
-| 2    | US-05 Zdjęcia                                                       | ✅     |
-| 2    | Role US-02 Delegacje                                                | ✅     |
-| 2    | Role US-04 Brak publicznego dostępu                                 | ✅     |
-| 2    | Wypożyczenia US-02 (trusted)                                        | ✅     |
-| 2    | Wypożyczenia US-03 (asynchronous)                                   | ✅     |
-| 2    | Wypożyczenia US-05 Raport przetrzymań                               | ✅     |
-| 2    | Narzędzia US-02 Audit log                                           | ✅     |
-| 2    | Narzędzia US-04 Migracja (Excel/CSV)                                | ✅ (CSV) |
-| 3    | Wypożyczenia US-04 (external)                                       | ✅     |
-| 3    | Narzędzia US-03 Powiadomienia                                       | ✅ (struktura, brak faktycznego wysyłania) |
-| 3    | Narzędzia US-04 Migracja z poprzedniego systemu                     | ⚠️ (do doprecyzowania) |
-| 3    | Narzędzia US-05 Drukowanie etykiet                                  | ✅ (batch QR, jsPDF + qrcode) |
+| Etap | US                                                        | Status                                     |
+| ---- | --------------------------------------------------------- | ------------------------------------------ |
+| 1    | US-01 Hierarchia kategorii + flagi statusów               | ✅                                         |
+| 1    | US-02 Dodawanie przedmiotów                               | ✅                                         |
+| 1    | US-03 Identyfikacja (QR, systemId)                        | ✅                                         |
+| 1    | US-04 Szybkie akcje po QR                                 | ✅                                         |
+| 1    | US-05: Dokumentacja zdjęciowa                             | ✅                                         |
+| 1    | Lokalizacja US-01 Przypisanie/aktualizacja                | ✅                                         |
+| 1    | Lokalizacja US-02 Podgląd na mapie                        | ✅                                         |
+| 1    | Role US-01 Opiekun/grupa                                  | ✅                                         |
+| 1    | Role US-03 Google OAuth (konto @agh.edu.pl) + rejestracja | ✅                                         |
+| 1    | Wypożyczenia US-01 (classic)                              | ✅                                         |
+| 1    | Narzędzia US-01 Zaawansowane filtrowanie                  | ✅                                         |
+| 2    | US-05 Zdjęcia                                             | ✅                                         |
+| 2    | Role US-02 Delegacje                                      | ✅                                         |
+| 2    | Role US-04 Brak publicznego dostępu                       | ✅                                         |
+| 2    | Wypożyczenia US-02 (trusted)                              | ✅                                         |
+| 2    | Wypożyczenia US-03 (asynchronous)                         | ✅                                         |
+| 2    | Wypożyczenia US-05 Raport przetrzymań                     | ✅                                         |
+| 2    | Narzędzia US-02 Audit log                                 | ✅                                         |
+| 2    | Narzędzia US-04 Migracja (Excel/CSV)                      | ✅ (CSV)                                   |
+| 3    | Wypożyczenia US-04 (external)                             | ✅                                         |
+| 3    | Narzędzia US-03 Powiadomienia                             | ✅ (struktura, brak faktycznego wysyłania) |
+| 3    | Narzędzia US-04 Migracja z poprzedniego systemu           | ⚠️ (do doprecyzowania)                     |
+| 3    | Narzędzia US-05 Drukowanie etykiet                        | ✅ (batch QR, jsPDF + qrcode)              |
 
 ## Znane problemy / ograniczenia
 
-1. **`wrangler.jsonc`** `compatibility_date: "2026-06-09"` — lokalny workerd wspiera max `2025-09-06`. Na produkcji OK, lokalnie tylko warningi.
-2. **Powiadomienia** — struktura w DB istnieje, ale nie ma cron-job/schedulera do faktycznego wysyłania e-mail/push. Na CF Workers wymagałoby `scheduled()` handlera.
-3. **Mapa** — mapa Leaflet została zintegrowana w widoku przedmiotów.
-4. **E2E** — katalog `e2e/` istnieje, `playwright.config.ts` jest, ale testy nie są zaimplementowane.
-5. **Google OAuth** — działa z kontami Google w domenie `@agh.edu.pl`.
-6. **Baza referencyjna koidc** — aplikacja wspiera współistnienie z tabelami referencyjnymi (`inv_urzadzenia`, `pracownicy`, `publikacje`, itd.) z bazy `2025-03-06_koidc.sql`. Tabele referencyjne są read-only. Import danych do tabel aplikacji przez `src/db/import-koidc.ts`. Pracownicy są dostępni przez API `/api/v1/staff`. W development `DEV_BYPASS_AUTH=true` pomija weryfikację tokenu. Wymagany `GOOGLE_CLIENT_ID` z Google Cloud Console.
+1. **Cloudflare Worker** — ścieżka legacy/alternatywna; nie jest głównym runtime Docker.
+2. **Powiadomienia** — Docker runtime tworzy cykliczne eventy in-app; e-mail/push nadal nie mają dostawcy wysyłki.
+3. **Reverse proxy** — produkcyjny Docker wystawia HTTP; TLS/HSTS/log retention muszą być na zewnętrznym proxy. `TRUST_PROXY=true` tylko gdy proxy czyści i ustawia nagłówki forwarded.
+4. **Mapa** — mapa Leaflet została zintegrowana w widoku przedmiotów.
+5. **E2E** — katalog `e2e/` istnieje, `playwright.config.ts` jest, ale testy nie są zaimplementowane.
+6. **Google OAuth** — działa z kontami Google w domenie `@agh.edu.pl`.
+7. **Baza referencyjna koidc** — aplikacja wspiera współistnienie z tabelami referencyjnymi (`inv_urzadzenia`, `pracownicy`, `publikacje`, itd.) z bazy `2025-03-06_koidc.sql`. Tabele referencyjne są read-only. Import danych do tabel aplikacji przez `src/db/import-koidc.ts`. Pracownicy są dostępni przez API `/api/v1/staff`. W development `DEV_BYPASS_AUTH=true` pomija weryfikację tokenu. Wymagany `GOOGLE_CLIENT_ID` z Google Cloud Console.
 
 ## Konwencje kodu
 
@@ -254,5 +172,3 @@ STATIC_DIR=./dist/client              # path do zbudowanego frontu
 - **API shape**: `POST/PATCH` z JSON body walidowanym przez `zValidator`, błędy przez `AppError`
 - **Frontend services**: każdy service ma tryb mock (`USE_MOCKS = import.meta.env.MODE === 'test'`)
 - **Testy**: `describe`/`it` Vitest, mocki w service'ach (nie mockuje się fetch)
-- **Storage**: nigdy nie importuj `c.env.PHOTOS_BUCKET` bezpośrednio — użyj `createObjectStorage(c.env)` z `src/lib/storage.ts`
-- **DB**: nigdy nie czytaj `c.env.HYPERDRIVE` wprost — użyj `createDb(c.env)` z `src/db/client.ts`

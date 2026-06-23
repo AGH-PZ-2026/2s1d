@@ -55,31 +55,13 @@ export default function NotificationsPage() {
     }
   }
 
-  function getNotificationContent(payload: string) {
-    try {
-      return JSON.parse(payload) as {
-        title?: string;
-        message?: string;
-      };
-    } catch {
-      return {
-        title: 'Powiadomienie',
-        message: payload,
-      };
-    }
-  }
-  const sortedEvents = [...events].sort(
-    (a, b) =>
-      new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()
-  );
-
   return (
     <section>
       <div className="page-header">
         <div>
           <h1 className="page-title">Powiadomienia</h1>
           <p className="page-subtitle">
-            Konfiguracja kanałów e-mail i push oraz historia zdarzeń.
+            Powiadomienia w aplikacji i historia zdarzeń.
           </p>
         </div>
       </div>
@@ -93,32 +75,10 @@ export default function NotificationsPage() {
       ) : (
         <>
           <form className="notification-form" onSubmit={handleSubmit}>
-            <label>
-              <input
-                checked={preference.emailEnabled}
-                onChange={(e) =>
-                  setPreference({
-                    ...preference,
-                    emailEnabled: e.target.checked,
-                  })
-                }
-                type="checkbox"
-              />
-              E-mail
-            </label>
-            <label>
-              <input
-                checked={preference.pushEnabled}
-                onChange={(e) =>
-                  setPreference({
-                    ...preference,
-                    pushEnabled: e.target.checked,
-                  })
-                }
-                type="checkbox"
-              />
-              Push
-            </label>
+            <p className="alert alert-info">
+              Kanały e-mail i push nie są dostępne. Zdarzenia są widoczne w tej
+              aplikacji.
+            </p>
             <label className="form-label" htmlFor="notice-hours">
               Godziny przed terminem zwrotu
             </label>
@@ -137,31 +97,33 @@ export default function NotificationsPage() {
               }
             />
             <button className="btn btn-primary" type="submit">
-              Zapisz preferencje
+              Zapisz ustawienie
             </button>
           </form>
           <table className="table">
             <thead>
               <tr>
-                <th>Tytuł</th>
+                <th>Typ</th>
+                <th>Kanał</th>
                 <th>Treść</th>
-                <th>Dostarczono</th>
+                <th>Zaplanowano</th>
+                <th>Wysłano</th>
               </tr>
             </thead>
             <tbody>
-              {sortedEvents.map((item) => {
-                const content = getNotificationContent(item.payload);
-
-                return (
-                  <tr key={item.id}>
-                    <td>{content.title}</td>
-                    <td>{content.message}</td>
-                    <td>
-                      {new Date(item.scheduledAt).toLocaleString('pl-PL')}
-                    </td>
-                  </tr>
-                );
-              })}
+              {events.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.eventType}</td>
+                  <td>{item.channel}</td>
+                  <td>{item.payload}</td>
+                  <td>{new Date(item.scheduledAt).toLocaleString('pl-PL')}</td>
+                  <td>
+                    {item.sentAt
+                      ? new Date(item.sentAt).toLocaleString('pl-PL')
+                      : 'Nie'}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </>

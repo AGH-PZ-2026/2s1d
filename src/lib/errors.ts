@@ -22,3 +22,11 @@ export function forbidden(detail: string): never {
 export function unauthorized(detail: string = 'Unauthorized'): never {
   throw new AppError(401, detail);
 }
+
+export function serviceUnavailable(detail: string): never {
+  throw new AppError(503, detail);
+}
+
+export function tooManyRequests(detail: string): never {
+  throw new AppError(429, detail);
+}

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Connection } from 'mysql2/promise';
 import { authMiddleware } from '../middleware/auth';
-import { notFound } from '../lib/errors';
+import { badRequest, notFound, serviceUnavailable } from '../lib/errors';
 
 type Variables = {
   rawDb: Connection;
@@ -43,6 +43,29 @@ function staffResponse(r: StaffRow) {
   };
 }
 
+function validateNonNegativeInteger(
+  value: string | undefined,
+  fallback: number,
+  name: string
+): number {
+  const parsed = value === undefined ? fallback : Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0)
+    badRequest(`${name} must be a non-negative integer`);
+  return parsed;
+}
+
+function handleStaffQueryError(error: unknown): never {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'ER_NO_SUCH_TABLE'
+  ) {
+    serviceUnavailable('Reference staff database is not configured');
+  }
+  throw error;
+}
+
 const STAFF_QUERY = `
   SELECT p.id, p.imie, p.nazwisko, p.email, p.pokoj, p.tel, p.www,
     s.pl AS stopien_pl, s.en AS stopien_en,
@@ -59,11 +82,14 @@ const STAFF_QUERY = `
 router.get('/', async (c) => {
   const rawDb = c.get('rawDb');
   const search = c.req.query('search');
-  const limit = Math.min(Number(c.req.query('limit') || '100'), 500);
-  const offset = Number(c.req.query('offset') || '0');
+  const limit = Math.min(
+    validateNonNegativeInteger(c.req.query('limit'), 100, 'limit'),
+    500
+  );
+  const offset = validateNonNegativeInteger(c.req.query('offset'), 0, 'offset');
 
   let query = STAFF_QUERY;
-  const params: any[] = [];
+  const params: Array<string | number> = [];
 
   if (search) {
     query += ` AND (p.imie LIKE ? OR p.nazwisko LIKE ? OR p.email LIKE ?)`;
@@ -72,23 +98,31 @@ router.get('/', async (c) => {
   }
 
   query += ` ORDER BY p.nazwisko ASC, p.imie ASC LIMIT ? OFFSET ?`;
-  params.push(String(limit), String(offset));
+  params.push(limit, offset);
 
-  const [rows] = await rawDb.execute(query, params);
-  return c.json((rows as StaffRow[]).map(staffResponse));
+  try {
+    const [rows] = await rawDb.execute(query, params);
+    return c.json((rows as StaffRow[]).map(staffResponse));
+  } catch (error) {
+    handleStaffQueryError(error);
+  }
 });
 
 // GET /api/v1/staff/:id
 router.get('/:id', async (c) => {
   const rawDb = c.get('rawDb');
   const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0)
+    badRequest('id must be a positive integer');
 
-  const [rows] = await rawDb.execute(`${STAFF_QUERY} AND p.id = ?`, [
-    String(id),
-  ]);
-  const arr = rows as StaffRow[];
-  if (arr.length === 0) notFound('Staff member not found');
-  return c.json(staffResponse(arr[0]));
+  try {
+    const [rows] = await rawDb.execute(`${STAFF_QUERY} AND p.id = ?`, [id]);
+    const arr = rows as StaffRow[];
+    if (arr.length === 0) notFound('Staff member not found');
+    return c.json(staffResponse(arr[0]));
+  } catch (error) {
+    handleStaffQueryError(error);
+  }
 });
 
 export { router as staffRouter };

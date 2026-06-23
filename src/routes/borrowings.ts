@@ -1,20 +1,14 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, inArray, ne, sql } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
-import {
-  borrowings,
-  items,
-  users,
-  itemStatus,
-  notificationEvents,
-  notificationPreferences,
-} from '../db/schema';
+import { borrowings, items, users } from '../db/schema';
 import type { Borrowing } from '../db/schema';
 import { authMiddleware } from '../middleware/auth';
 import { notFound, badRequest, forbidden } from '../lib/errors';
 import { createAuditLog } from '../lib/audit';
+import { createBorrowingApprovedNotification } from '../lib/notifications';
 
 type Variables = {
   db: MySql2Database<Record<string, never>>;
@@ -26,13 +20,23 @@ type Variables = {
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
 router.use('/*', authMiddleware);
 
-const createSchema = z.object({
-  itemId: z.number().int().positive(),
-  borrowerId: z.number().int().positive().optional(),
-  externalBorrower: z.string().max(160).optional(),
-  mode: z.enum(['classic', 'trusted', 'asynchronous', 'external']),
-  plannedReturnAt: z.string().optional(),
-});
+const createSchema = z
+  .object({
+    itemId: z.number().int().positive(),
+    borrowerId: z.number().int().positive().optional(),
+    externalBorrower: z.string().max(160).optional(),
+    mode: z.enum(['classic', 'trusted', 'asynchronous', 'external']),
+    plannedReturnAt: z.string().datetime().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.mode === 'external' && !value.externalBorrower?.trim()) {
+      context.addIssue({
+        code: 'custom',
+        path: ['externalBorrower'],
+        message: 'External borrower is required',
+      });
+    }
+  });
 
 function toResponse(b: Borrowing) {
   return {
@@ -49,6 +53,12 @@ function toResponse(b: Borrowing) {
     returnComment: b.returnComment,
     createdAt: b.createdAt,
   };
+}
+
+function csvCell(value: unknown): string {
+  let text = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 router.get('/', async (c) => {
@@ -210,7 +220,7 @@ router.get('/overdue.csv', async (c) => {
     const plannedReturn = b.plannedReturnAt
       ? new Date(b.plannedReturnAt).toLocaleString('pl-PL')
       : '—';
-    csv += `${b.id};"${itemName}";"${borrower}";"${plannedReturn}";${daysOverdue}\n`;
+    csv += `${b.id};${csvCell(itemName)};${csvCell(borrower)};${csvCell(plannedReturn)};${daysOverdue}\n`;
   }
 
   c.header('Content-Type', 'text/csv');
@@ -247,41 +257,43 @@ router.post('/', zValidator('json', createSchema), async (c) => {
       forbidden('Only admins or item owners can create external borrowings');
     }
   }
+  if (
+    body.mode !== 'external' &&
+    body.borrowerId !== undefined &&
+    body.borrowerId !== c.get('userId') &&
+    c.get('userRole') !== 'admin'
+  ) {
+    forbidden('Only admins can create a borrowing for another user');
+  }
   if (!body.plannedReturnAt) {
     badRequest('Poda datę planowanego zwrotu');
   }
-  const plannedDate = new Date(body.plannedReturnAt);
-  if (plannedDate < new Date()) {
-    badRequest('Return date cannot be past date');
-  }
-
+  const plannedReturnAt = new Date(body.plannedReturnAt);
+  if (plannedReturnAt.getTime() <= Date.now())
+    badRequest('Planned return date must be in the future');
   const active = await db
     .select()
     .from(borrowings)
     .where(
-      and(eq(borrowings.itemId, body.itemId), eq(borrowings.status, 'borrowed'))
+      and(
+        eq(borrowings.itemId, body.itemId),
+        inArray(borrowings.status, ['pending', 'reserved', 'borrowed'])
+      )
     )
     .limit(1);
   if (active.length > 0) badRequest('Item is already borrowed');
-  const active2 = await db
-    .select()
-    .from(borrowings)
-    .where(
-      and(eq(borrowings.itemId, body.itemId), eq(borrowings.status, 'reserved'))
-    )
-    .limit(1);
-  if (active2.length > 0) badRequest('Item is already reserved');
   const values: Record<string, unknown> = {
     itemId: body.itemId,
-    borrowerId: body.borrowerId ?? c.get('userId'),
-    externalBorrower: body.externalBorrower ?? null,
+    borrowerId:
+      body.mode === 'external' ? null : (body.borrowerId ?? c.get('userId')),
+    externalBorrower:
+      body.mode === 'external' ? body.externalBorrower!.trim() : null,
     mode: body.mode,
     status: body.mode === 'external' ? 'borrowed' : 'pending',
     approvedAt: body.mode === 'external' ? sql`NOW()` : null,
     handedOverAt: body.mode === 'external' ? sql`NOW()` : null,
   };
-  if (body.plannedReturnAt)
-    values.plannedReturnAt = new Date(body.plannedReturnAt);
+  values.plannedReturnAt = plannedReturnAt;
   const result = await db
     .insert(borrowings)
     .values(values as typeof borrowings.$inferInsert);
@@ -290,24 +302,6 @@ router.post('/', zValidator('json', createSchema), async (c) => {
     .from(borrowings)
     .where(eq(borrowings.id, result[0].insertId))
     .limit(1);
-
-  if (body.mode === 'external') {
-    const borrowedStatus = await db
-      .select({ id: itemStatus.id })
-      .from(itemStatus)
-      .where(eq(itemStatus.slug, 'dostepny'))
-      .limit(1);
-
-    if (borrowedStatus.length > 0) {
-      await db
-        .update(items)
-        .set({ statusId: borrowedStatus[0].id })
-        .where(eq(items.id, body.itemId));
-    }
-  }
-
-  const allStatuses = await db.select().from(itemStatus);
-  console.log('=== MOJE STATUSY W BAZIE ===', allStatuses);
 
   await createAuditLog(db, {
     userId: c.get('userId'),
@@ -331,7 +325,7 @@ router.patch('/:id/approve', async (c) => {
   const id = Number(c.req.param('id'));
   const userId = c.get('userId');
   const item = await db
-    .select({ ownerId: items.ownerId, itemName: items.name })
+    .select({ ownerId: items.ownerId })
     .from(items)
     .innerJoin(borrowings, eq(borrowings.itemId, items.id))
     .where(eq(borrowings.id, id))
@@ -348,6 +342,19 @@ router.patch('/:id/approve', async (c) => {
     .limit(1);
   if (existing.length === 0) notFound('Borrowing not found');
   if (existing[0].status !== 'pending') badRequest('Borrowing is not pending');
+  const conflicting = await db
+    .select({ id: borrowings.id })
+    .from(borrowings)
+    .where(
+      and(
+        eq(borrowings.itemId, existing[0].itemId),
+        ne(borrowings.id, id),
+        inArray(borrowings.status, ['reserved', 'borrowed'])
+      )
+    )
+    .limit(1);
+  if (conflicting.length > 0)
+    badRequest('Item is already reserved or borrowed');
   await db
     .update(borrowings)
     .set({ status: 'reserved', approvedAt: sql`NOW()` })
@@ -357,60 +364,6 @@ router.patch('/:id/approve', async (c) => {
     .from(borrowings)
     .where(eq(borrowings.id, id))
     .limit(1);
-
-  const reservedStatus = await db
-    .select({ id: itemStatus.id })
-    .from(itemStatus)
-    .where(eq(itemStatus.slug, 'zarezerwowany'))
-    .limit(1);
-
-  if (reservedStatus.length > 0) {
-    await db
-      .update(items)
-      .set({ statusId: reservedStatus[0].id })
-      .where(eq(items.id, existing[0].itemId));
-  }
-  const itemName = item[0]?.itemName ?? 'przedmiot';
-
-  await db.insert(notificationEvents).values({
-    userId: existing[0].borrowerId!,
-    borrowingId: existing[0].id,
-    eventType: 'borrowing_approved',
-    channel: 'push',
-    payload: JSON.stringify({
-      title: 'Wypożyczenie zaakceptowane',
-      message: `Prośba o wypożyczenie przedmiotu "${itemName}" została zaakceptowana.`,
-    }),
-    scheduledAt: sql`NOW()`,
-  });
-
-  const prefs = await db
-    .select()
-    .from(notificationPreferences)
-    .where(eq(notificationPreferences.userId, existing[0].borrowerId!))
-    .limit(1);
-
-  const hoursBefore = prefs[0]?.returnDueNoticeHours ?? 24;
-
-  const plannedReturn = existing[0].plannedReturnAt;
-
-  if (plannedReturn) {
-    const scheduledAt = new Date(
-      new Date(plannedReturn).getTime() - hoursBefore * 60 * 60 * 1000
-    );
-
-    await db.insert(notificationEvents).values({
-      userId: existing[0].borrowerId!,
-      borrowingId: existing[0].id,
-      eventType: 'return_due',
-      channel: 'push',
-      payload: JSON.stringify({
-        title: 'Zbliża się termin zwrotu',
-        message: `Przedmiot "${itemName}" należy zwrócić do ${new Date(plannedReturn).toLocaleString('pl-PL')}`,
-      }),
-      scheduledAt,
-    });
-  }
 
   await createAuditLog(db, {
     userId: c.get('userId'),
@@ -424,6 +377,7 @@ router.patch('/:id/approve', async (c) => {
       approvedAt: updated[0].approvedAt,
     },
   });
+  await createBorrowingApprovedNotification(db, updated[0]);
 
   return c.json(toResponse(updated[0]));
 });
@@ -472,6 +426,18 @@ router.patch('/:id/handover', async (c) => {
   if (existing.length === 0) notFound('Borrowing not found');
   if (existing[0].status !== 'reserved')
     badRequest('Borrowing is not reserved');
+  const conflicting = await db
+    .select({ id: borrowings.id })
+    .from(borrowings)
+    .where(
+      and(
+        eq(borrowings.itemId, existing[0].itemId),
+        ne(borrowings.id, id),
+        eq(borrowings.status, 'borrowed')
+      )
+    )
+    .limit(1);
+  if (conflicting.length > 0) badRequest('Item is already borrowed');
 
   const userId = c.get('userId');
   const item = await db
@@ -501,19 +467,6 @@ router.patch('/:id/handover', async (c) => {
     .from(borrowings)
     .where(eq(borrowings.id, id))
     .limit(1);
-
-  const borrowedStatus = await db
-    .select({ id: itemStatus.id })
-    .from(itemStatus)
-    .where(eq(itemStatus.slug, 'wypozyczony'))
-    .limit(1);
-
-  if (borrowedStatus.length > 0) {
-    await db
-      .update(items)
-      .set({ statusId: borrowedStatus[0].id })
-      .where(eq(items.id, existing[0].itemId));
-  }
 
   await createAuditLog(db, {
     userId: c.get('userId'),
@@ -576,19 +529,6 @@ router.patch('/:id/return', zValidator('json', returnSchema), async (c) => {
     .from(borrowings)
     .where(eq(borrowings.id, id))
     .limit(1);
-
-  const availableStatus = await db
-    .select({ id: itemStatus.id })
-    .from(itemStatus)
-    .where(eq(itemStatus.slug, 'dostepny'))
-    .limit(1);
-
-  if (availableStatus.length > 0) {
-    await db
-      .update(items)
-      .set({ statusId: availableStatus[0].id })
-      .where(eq(items.id, existing[0].itemId));
-  }
 
   await createAuditLog(db, {
     userId: c.get('userId'),

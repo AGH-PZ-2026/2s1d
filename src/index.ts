@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 import { HTTPException } from 'hono/http-exception';
 import { sql } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
+import type { Connection } from 'mysql2/promise';
 import { dbMiddleware } from './middleware/db';
-import { autoMigrateMiddleware } from './middleware/auto-migrate';
 import { authRouter } from './routes/auth';
 import { statusesRouter } from './routes/statuses';
 import { categoriesRouter } from './routes/categories';
@@ -23,20 +23,26 @@ import { itemPhotosRouter } from './routes/item-photos';
 import { notificationsRouter } from './routes/notifications';
 import { auditLogsRouter } from './routes/audit-logs';
 import { staffRouter } from './routes/staff';
-import { storageProxyApp } from './lib/storageProxy';
+import { createDb } from './db/client';
+import { createReturnDueNotifications } from './lib/notifications';
 
 type AppVariables = {
   db: MySql2Database<Record<string, never>>;
-  rawDb: unknown;
+  rawDb: Pick<Connection, 'end'>;
 };
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>({
   strict: false,
 });
 
-app.use('*', cors());
+app.use(
+  '*',
+  secureHeaders({
+    crossOriginOpenerPolicy: 'same-origin-allow-popups',
+    referrerPolicy: 'strict-origin-when-cross-origin',
+  })
+);
 app.use('/api/*', dbMiddleware);
-app.use('/api/*', autoMigrateMiddleware);
 
 app.route('/api/v1/auth', authRouter);
 app.route('/api/v1/item-status', statusesRouter);
@@ -58,32 +64,24 @@ app.route('/api/v1/items', delegationsRouter);
 app.route('/api/v1/items', itemPhotosRouter);
 app.route('/api/v1/items', itemsRouter);
 
-// Self-hosted storage proxy: GET /storage/<key>  → file bytes
-// On Cloudflare we don't need this (the R2 binding or a custom domain
-// serves files directly). On Node, the storage adapter returns
-// `/storage/...` as its publicUrl by default, and this router serves them.
-app.route('/storage', storageProxyApp);
-
 app.get('/api/health', async (c) => {
-  let dbStatus: 'ok' | 'error' = 'error';
   try {
     const db = c.get('db');
     await db.execute(sql`SELECT 1`);
-    dbStatus = 'ok';
+    return c.json({ status: 'ok' as const, database: 'ok' as const });
   } catch {
-    dbStatus = 'error';
+    return c.json(
+      { status: 'degraded' as const, database: 'error' as const },
+      503
+    );
   }
-  return c.json({
-    status: dbStatus === 'ok' ? 'ok' : 'degraded',
-    database: dbStatus,
-  });
 });
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
     return c.json(
       { detail: err.message },
-      err.status as 400 | 401 | 403 | 404 | 500
+      err.status as 400 | 401 | 403 | 404 | 429 | 500 | 503
     );
   }
   console.error(
@@ -97,4 +95,22 @@ app.onError((err, c) => {
 
 app.notFound((c) => c.json({ detail: 'Not found' }, 404));
 
-export default app;
+export { app };
+
+export default {
+  fetch: app.fetch,
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    const { db, connection } = await createDb(env.HYPERDRIVE);
+    try {
+      const created = await createReturnDueNotifications(db);
+      console.log(
+        JSON.stringify({
+          message: 'return due notifications processed',
+          created,
+        })
+      );
+    } finally {
+      await connection.end();
+    }
+  },
+} satisfies ExportedHandler<Env>;

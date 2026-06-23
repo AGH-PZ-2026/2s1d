@@ -72,14 +72,11 @@ export default function CategoryDropdown({
 
   const selectedCategoryObj =
     value !== '' ? categories.find((c) => c.id === value) : null;
-  let displayValue: string;
-  if (selectedCategoryObj) {
-    displayValue = selectedCategoryObj.name;
-  } else if (allowEmpty) {
-    displayValue = emptyLabel;
-  } else {
-    displayValue = placeholder;
-  }
+  const displayValue = selectedCategoryObj
+    ? selectedCategoryObj.name
+    : allowEmpty
+      ? emptyLabel
+      : placeholder;
 
   return (
     <div

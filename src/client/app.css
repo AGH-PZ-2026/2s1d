@@ -253,7 +253,9 @@ a:hover {
 .main-content {
   padding: 32px 40px;
   min-width: 0;
+  width: 100%;
   max-width: 1200px;
+  margin-inline: auto;
 }
 
 /* ============ Page ============ */
@@ -841,7 +843,8 @@ select.form-input {
   align-self: end;
   grid-row: 1;
 }
-.filters-panel .form-input, .filters-panel .category-dropdown {
+.filters-panel .form-input,
+.filters-panel .category-dropdown {
   grid-row: 2;
 }
 
@@ -1228,7 +1231,8 @@ select.form-input {
   position: relative;
   min-height: 320px;
   overflow: hidden;
-  background: linear-gradient(var(--border) 1px, transparent 1px),
+  background:
+    linear-gradient(var(--border) 1px, transparent 1px),
     linear-gradient(90deg, var(--border) 1px, transparent 1px), var(--surface-2);
   background-size: 40px 40px;
 }

@@ -18,11 +18,18 @@ type Variables = {
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
 router.use('/*', authMiddleware);
 
-const createSchema = z.object({
-  user_id: z.number().int().positive().optional(),
-  group_id: z.number().int().positive().optional(),
-  permission: z.enum(['edit', 'manage']),
-});
+const createSchema = z
+  .object({
+    user_id: z.number().int().positive().optional(),
+    group_id: z.number().int().positive().optional(),
+    permission: z.enum(['edit', 'manage']),
+  })
+  .refine(
+    (value) => (value.user_id === undefined) !== (value.group_id === undefined),
+    {
+      message: 'Podaj dokładnie jednego użytkownika albo jedną grupę.',
+    }
+  );
 
 async function resolveUserEmails(
   db: MySql2Database<Record<string, never>>,
@@ -279,7 +286,7 @@ router.delete('/:itemId/delegations/:id', async (c) => {
   const existing = await db
     .select()
     .from(delegations)
-    .where(eq(delegations.id, id))
+    .where(and(eq(delegations.id, id), eq(delegations.itemId, itemId)))
     .limit(1);
 
   if (existing.length === 0) {

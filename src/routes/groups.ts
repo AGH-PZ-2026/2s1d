@@ -16,12 +16,20 @@ type Variables = {
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
 router.use('/*', authMiddleware);
 
-const createSchema = z.object({ name: z.string().min(1).max(255) });
+const createSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  defaultPermission: z.enum(['manage', 'edit']).default('edit'),
+});
 const addMemberSchema = z.object({ userId: z.number().int().positive() });
 const searchSchema = z.object({ q: z.string().min(1).max(255) });
 
 function toResponse(group: Group, memberIds?: number[]) {
-  return { id: group.id, name: group.name, memberIds: memberIds ?? [] };
+  return {
+    id: group.id,
+    name: group.name,
+    defaultPermission: group.defaultPermission,
+    memberIds: memberIds ?? [],
+  };
 }
 
 router.get('/', async (c) => {
@@ -46,7 +54,11 @@ router.get('/search', zValidator('query', searchSchema), async (c) => {
   const db = c.get('db');
   const { q } = c.req.valid('query');
   const rows = await db
-    .select({ id: groups.id, name: groups.name })
+    .select({
+      id: groups.id,
+      name: groups.name,
+      defaultPermission: groups.defaultPermission,
+    })
     .from(groups)
     .where(like(groups.name, `%${q}%`))
     .limit(20);
@@ -79,7 +91,7 @@ router.post('/', zValidator('json', createSchema), async (c) => {
     .where(eq(groups.name, body.name))
     .limit(1);
   if (exist.length > 0) badRequest('Group with this name already exists');
-  const result = await db.insert(groups).values({ name: body.name });
+  const result = await db.insert(groups).values(body);
   const created = await db
     .select()
     .from(groups)
@@ -89,6 +101,7 @@ router.post('/', zValidator('json', createSchema), async (c) => {
 });
 
 router.put('/:id', zValidator('json', createSchema), async (c) => {
+  if (c.get('userRole') !== 'admin') forbidden('Only admins can update groups');
   const db = c.get('db');
   const id = Number(c.req.param('id'));
   const body = c.req.valid('json');
@@ -104,7 +117,7 @@ router.put('/:id', zValidator('json', createSchema), async (c) => {
     .where(and(eq(groups.name, body.name), ne(groups.id, id)))
     .limit(1);
   if (dup.length > 0) badRequest('Group with this name already exists');
-  await db.update(groups).set({ name: body.name }).where(eq(groups.id, id));
+  await db.update(groups).set(body).where(eq(groups.id, id));
   const updated = await db
     .select()
     .from(groups)
@@ -129,6 +142,8 @@ router.delete('/:id', async (c) => {
 });
 
 router.post('/:id/members', zValidator('json', addMemberSchema), async (c) => {
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can manage group members');
   const db = c.get('db');
   const gid = Number(c.req.param('id'));
   const body = c.req.valid('json');
@@ -161,6 +176,8 @@ router.post('/:id/members', zValidator('json', addMemberSchema), async (c) => {
 });
 
 router.delete('/:id/members/:userId', async (c) => {
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can manage group members');
   const db = c.get('db');
   const gid = Number(c.req.param('id'));
   const uid = Number(c.req.param('userId'));

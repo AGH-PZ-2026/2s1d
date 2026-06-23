@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type {
+import {
   Category,
   CategoryTreeNode,
   CreateCategoryPayload,
@@ -288,9 +288,9 @@ export const CategoriesPage: React.FC = () => {
               mode={showCreateRootForm ? 'root' : 'subcategory'}
               parentCategoryId={selectedParentId ?? undefined}
               onSubmit={(payload) => {
-                if (showCreateRootForm) handleCreateRoot(payload);
+                if (showCreateRootForm) void handleCreateRoot(payload);
                 else if (selectedParentId !== null)
-                  handleCreateSubcategory(selectedParentId, payload);
+                  void handleCreateSubcategory(selectedParentId, payload);
               }}
               onCancel={() => {
                 setShowCreateRootForm(false);

@@ -44,19 +44,18 @@ export default function LeafletMap({
   const defaultLng = 19.9236;
 
   // Używamy podglądu lub oryginalnych współrzędnych do wycentrowania mapy
-  let centerLat = defaultLat;
-  if (typeof previewY === 'number') {
-    centerLat = previewY;
-  } else if (typeof mapY === 'number') {
-    centerLat = mapY;
-  }
-
-  let centerLng = defaultLng;
-  if (typeof previewX === 'number') {
-    centerLng = previewX;
-  } else if (typeof mapX === 'number') {
-    centerLng = mapX;
-  }
+  const centerLat =
+    typeof previewY === 'number'
+      ? previewY
+      : typeof mapY === 'number'
+        ? mapY
+        : defaultLat;
+  const centerLng =
+    typeof previewX === 'number'
+      ? previewX
+      : typeof mapX === 'number'
+        ? mapX
+        : defaultLng;
 
   const hasOriginalCoordinates =
     typeof mapX === 'number' && typeof mapY === 'number';

@@ -50,8 +50,7 @@ export const delegationService = {
       headers: authHeaders(),
     });
     await ensureOk(response);
-    const data: Delegation[] = await response.json();
-    return data;
+    return response.json();
   },
   async getAllGlobal(): Promise<GlobalDelegation[]> {
     if (USE_MOCKS) {
@@ -62,8 +61,7 @@ export const delegationService = {
       headers: authHeaders(),
     });
     await ensureOk(response);
-    const data: GlobalDelegation[] = await response.json();
-    return data;
+    return response.json();
   },
   async create(
     itemId: number,
@@ -91,8 +89,41 @@ export const delegationService = {
       body: JSON.stringify(payload),
     });
     await ensureOk(response);
-    const data: Delegation = await response.json();
-    return data;
+    return response.json();
+  },
+  async update(
+    itemId: number,
+    delegationId: number,
+    payload: CreateDelegationPayload
+  ): Promise<Delegation> {
+    if (USE_MOCKS) {
+      await delay(300);
+      mockDelegations = mockDelegations.map((delegation) =>
+        delegation.id === delegationId
+          ? {
+              ...delegation,
+              user_id: payload.user_id ?? null,
+              group_id: payload.group_id ?? null,
+              permission: payload.permission,
+            }
+          : delegation
+      );
+      const updated = mockDelegations.find(
+        (delegation) => delegation.id === delegationId
+      );
+      if (!updated) throw new Error('Delegation not found');
+      return updated;
+    }
+    const response = await fetch(
+      `/api/v1/items/${itemId}/delegations/${delegationId}`,
+      {
+        method: 'PUT',
+        headers: jsonAuthHeaders(),
+        body: JSON.stringify(payload),
+      }
+    );
+    await ensureOk(response);
+    return response.json();
   },
   async remove(itemId: number, delegationId: number): Promise<void> {
     if (USE_MOCKS) {
@@ -154,8 +185,43 @@ export const delegationService = {
       { headers: authHeaders() }
     );
     await ensureOk(response);
-    const data: { id: number; name: string }[] = await response.json();
-    return data.map((g) => ({ value: g.id, label: g.name }));
+    const data: {
+      id: number;
+      name: string;
+      defaultPermission: 'manage' | 'edit';
+    }[] = await response.json();
+    return data.map((g) => ({
+      value: g.id,
+      label: g.name,
+      extra: { defaultPermission: g.defaultPermission },
+    }));
+  },
+
+  async searchAndCreateGroup(
+    name: string,
+    defaultPermission: 'manage' | 'edit'
+  ): Promise<AutocompleteOption> {
+    const matches = await this.searchGroups(name);
+    const existing = matches.find(
+      (group) => group.label.toLocaleLowerCase() === name.toLocaleLowerCase()
+    );
+    if (existing) return existing;
+    const response = await fetch('/api/v1/groups/', {
+      method: 'POST',
+      headers: jsonAuthHeaders(),
+      body: JSON.stringify({ name, defaultPermission }),
+    });
+    await ensureOk(response);
+    const group = (await response.json()) as {
+      id: number;
+      name: string;
+      defaultPermission: 'manage' | 'edit';
+    };
+    return {
+      value: group.id,
+      label: group.name,
+      extra: { defaultPermission: group.defaultPermission },
+    };
   },
 };
 
@@ -163,7 +229,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data: { detail?: string } = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {}
   throw new Error(detail);

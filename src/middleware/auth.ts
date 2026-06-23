@@ -125,12 +125,11 @@ export const authMiddleware = createMiddleware<{
   Bindings: Env;
 }>(async (c, next) => {
   const header = c.req.header('Authorization');
-  const queryToken = c.req.query('token');
-  if (!header?.startsWith('Bearer ') && !queryToken) {
+  if (!header?.startsWith('Bearer ')) {
     unauthorized('Missing or invalid authorization header');
   }
 
-  const token = header?.startsWith('Bearer ') ? header.slice(7) : queryToken!;
+  const token = header.slice(7);
   const secret = c.env.JWT_SECRET;
   if (!secret) {
     console.error(JSON.stringify({ message: 'JWT_SECRET not configured' }));
@@ -162,7 +161,7 @@ export const authMiddleware = createMiddleware<{
   }
 
   c.set('userId', user.id);
-  c.set('userRole', user.role);
+  c.set('userRole', user.role as 'admin' | 'user');
   c.set('isAuthenticated', true);
 
   await next();

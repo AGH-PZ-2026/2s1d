@@ -4,24 +4,35 @@
   outputs =
     { self, nixpkgs }:
     let
-      system = "aarch64-darwin";
-      pkgs = nixpkgs.legacyPackages.${system};
+      systems = [
+        "aarch64-darwin"
+        "x86_64-linux"
+      ];
+      forAllSystems = nixpkgs.lib.genAttrs systems;
     in
     {
-      devShells.${system}.default = pkgs.mkShellNoCC {
-        packages = with pkgs; [
-          nodejs
-          corepack
-        ];
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        {
+          default = pkgs.mkShellNoCC {
+            packages = with pkgs; [
+              nodejs
+              corepack
+            ];
 
-        shellHook = ''
-          export PATH=$PWD/node_modules/.bin:$PATH
-          echo "pz-worker dev shell"
-          echo "  node:  $(node --version)"
-          echo "  pnpm:  $(pnpm --version)"
-          echo ""
-          echo "  pnpm run dev    # start worker"
-        '';
-      };
+            shellHook = ''
+              export PATH=$PWD/node_modules/.bin:$PATH
+              echo "pz-worker dev shell"
+              echo "  node:  $(node --version)"
+              echo "  pnpm:  $(pnpm --version)"
+              echo ""
+              echo "  pnpm run dev    # start worker"
+            '';
+          };
+        }
+      );
     };
 }

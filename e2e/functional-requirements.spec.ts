@@ -8,7 +8,14 @@ const user = {
   is_approved: true,
 };
 
-const categories = [
+interface CategoryFixture {
+  id: number;
+  name: string;
+  parent_id: number | null;
+  description: string;
+}
+
+const categories: CategoryFixture[] = [
   {
     id: 1,
     name: 'Urządzenia',
@@ -233,7 +240,9 @@ test('US role i dostęp: niezalogowany użytkownik nie widzi zasobów, rejestrac
 
   await expect(page.getByText('Wymagane logowanie')).toBeVisible();
   await page.getByRole('link', { name: /Przejdź do logowania/ }).click();
-  await expect(page.getByText('Logowanie do systemu aparatury pomiarowej')).toBeVisible();
+  await expect(
+    page.getByText('Logowanie do systemu aparatury pomiarowej')
+  ).toBeVisible();
 
   await page.locator('#register-email').fill('nowy.pracownik@agh.edu.pl');
   await page.locator('#register-password').fill('bezpieczne-haslo');
@@ -245,10 +254,11 @@ test('US role i dostęp: niezalogowany użytkownik nie widzi zasobów, rejestrac
   await page.locator('#dev-email').fill('admin@agh.edu.pl');
   await page.getByRole('button', { name: 'Zaloguj (dev bypass)' }).click();
 
-  await expect(
-    page.getByRole('main').getByText('admin@agh.edu.pl')
-  ).toBeVisible();
-  await expect(page.locator('dd', { hasText: 'Administrator' })).toBeVisible();
+  await expect(page).toHaveURL('/');
+  await expect(page.locator('.sidebar-user-name')).toHaveText(
+    'admin@agh.edu.pl'
+  );
+  await expect(page.locator('.sidebar-user-role')).toHaveText('Administrator');
 });
 
 test('US użytkownicy: administrator zatwierdza i odrzuca konta oczekujące', async ({
@@ -388,9 +398,13 @@ test('US-02/03/05 przedmioty: dodawanie, identyfikacja, klasyfikacja, mapa lokal
 
   await page.getByRole('button', { name: '+ Dodaj przedmiot' }).click();
   const itemModal = page.locator('.modal');
-  await itemModal.getByPlaceholder('np. Oscyloskop Tektronix').fill('Generator funkcyjny');
+  await itemModal
+    .getByPlaceholder('np. Oscyloskop Tektronix')
+    .fill('Generator funkcyjny');
   await itemModal.getByPlaceholder('np. Tektronix').fill('Rigol');
-  await itemModal.getByPlaceholder('Opcjonalny opis').fill('Generator do zajęć');
+  await itemModal
+    .getByPlaceholder('Opcjonalny opis')
+    .fill('Generator do zajęć');
   await page.locator('.modal input[name="ownerType"][value="group"]').check();
   await page
     .locator('.modal')
@@ -407,7 +421,9 @@ test('US-02/03/05 przedmioty: dodawanie, identyfikacja, klasyfikacja, mapa lokal
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Usuń przedmiot' }).click();
   await expect(page.getByText('Przedmiot został usunięty.')).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Generator funkcyjny' })).toHaveCount(0);
+  await expect(
+    page.getByRole('cell', { name: 'Generator funkcyjny' })
+  ).toHaveCount(0);
 
   const upload = page.locator('input[type="file"]');
   await upload.setInputFiles({
@@ -465,7 +481,9 @@ test('US wypożyczenia: klasyczne, zaufane, asynchroniczne, zewnętrzne i koment
 
   await page.getByRole('button', { name: 'Nowy wniosek' }).click();
   await page.locator('.modal select').nth(1).selectOption('asynchronous');
-  await page.locator('.modal input[type="datetime-local"]').fill('2026-07-01T12:00');
+  await page
+    .locator('.modal input[type="datetime-local"]')
+    .fill('2026-07-01T12:00');
   await page.getByRole('button', { name: 'Utwórz wniosek' }).click();
   await expect(
     page.getByText('Wniosek o wypożyczenie został utworzony.')
@@ -473,7 +491,9 @@ test('US wypożyczenia: klasyczne, zaufane, asynchroniczne, zewnętrzne i koment
 
   await page.getByRole('button', { name: 'Wypożyczenie zewnętrzne' }).click();
   await page.getByPlaceholder('Nazwa osoby lub instytucji').fill('CERN');
-  await page.locator('.modal input[type="datetime-local"]').fill('2026-07-01T12:00');
+  await page
+    .locator('.modal input[type="datetime-local"]')
+    .fill('2026-07-01T12:00');
   await page.getByRole('button', { name: 'Wypożycz', exact: true }).click();
   await expect(
     page.getByText('Wypożyczenie zewnętrzne zostało utworzone.')
@@ -494,25 +514,36 @@ test('US delegacje: właściciel dodaje delegata z poziomem edycji lub zarządza
   await page.getByRole('row', { name: /Oscyloskop Tektronix/ }).click();
 
   // Existing delegation should show email, not just ID
-  await expect(page.getByRole('cell', { name: 'opiekun@agh.edu.pl' }).first()).toBeVisible();
+  await expect(
+    page.getByRole('cell', { name: 'opiekun@agh.edu.pl' }).first()
+  ).toBeVisible();
 
   await page.getByRole('button', { name: 'Dodaj delegata' }).click();
 
   // Type into autocomplete for user email
   await page.getByPlaceholder('Wpisz email...').fill('laborant');
   // Wait for autocomplete dropdown and select the item
-  await expect(page.locator('.autocomplete-dropdown').getByText('laborant@agh.edu.pl')).toBeVisible();
-  await page.locator('.autocomplete-dropdown').getByText('laborant@agh.edu.pl').click();
+  await expect(
+    page.locator('.autocomplete-dropdown').getByText('laborant@agh.edu.pl')
+  ).toBeVisible();
+  await page
+    .locator('.autocomplete-dropdown')
+    .getByText('laborant@agh.edu.pl')
+    .click();
 
   // Select permission
   await page
     .locator('section', { hasText: 'Delegacje i uprawnienia' })
     .locator('select')
     .selectOption('manage');
-  await page.getByRole('button', { name: 'Dodaj delegację', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Dodaj delegację', exact: true })
+    .click();
 
   // Should now show the email in the table
-  await expect(page.getByRole('cell', { name: 'laborant@agh.edu.pl' }).first()).toBeVisible();
+  await expect(
+    page.getByRole('cell', { name: 'laborant@agh.edu.pl' }).first()
+  ).toBeVisible();
   await expect(page.getByText('Zarządzanie')).toBeVisible();
 });
 
@@ -552,7 +583,9 @@ test('US narzędzia: raporty, import, druk QR i powiadomienia', async ({
   await page.goto('/reports/overdue');
   await expect(page.getByText('Multimetr UNI-T UT61E')).toBeVisible();
   await expect(
-    page.getByText('Wyświetlane są wszystkie przeterminowane wypożyczenia w systemie.')
+    page.getByText(
+      'Wyświetlane są wszystkie przeterminowane wypożyczenia w systemie.'
+    )
   ).toBeVisible();
   await page.getByRole('button', { name: 'Pobierz CSV' }).click();
   await page.getByRole('button', { name: 'Pobierz PDF' }).click();
@@ -581,13 +614,15 @@ test('US narzędzia: raporty, import, druk QR i powiadomienia', async ({
   await expect(page.getByRole('button', { name: 'Pobierz PDF' })).toBeEnabled();
 
   await page.goto('/notifications');
-  await page.getByLabel('Push').check();
+  await expect(
+    page.getByText('Kanały e-mail i push nie są dostępne.')
+  ).toBeVisible();
   await page.getByLabel('Godziny przed terminem zwrotu').fill('24');
-  await page.getByRole('button', { name: 'Zapisz preferencje' }).click();
+  await page.getByRole('button', { name: 'Zapisz ustawienie' }).click();
   await expect(
     page.getByText('Preferencje powiadomień zostały zapisane.')
   ).toBeVisible();
-  await expect(page.getByText('accepted')).toBeVisible();
+  await expect(page.getByText('borrowing_approved')).toBeVisible();
   await expect(page.getByText('return_due')).toBeVisible();
 });
 
@@ -597,7 +632,9 @@ async function mockApi(page: Page) {
   let currentItems = [...items];
   let currentUsers = [...managedUsers];
   let currentLocations = [...locations];
-  let currentBorrowings = [...borrowings];
+  let currentBorrowings: Array<
+    Record<string, unknown> & { id: number; status: string }
+  > = [...borrowings];
   let currentDelegations: Array<{
     id: number;
     item_id: number;
@@ -607,7 +644,15 @@ async function mockApi(page: Page) {
     user_email: string | null;
     group_name: string | null;
   }> = [
-    { id: 1, item_id: 1, user_id: 1, group_id: null, permission: 'edit', user_email: 'opiekun@agh.edu.pl', group_name: null },
+    {
+      id: 1,
+      item_id: 1,
+      user_id: 1,
+      group_id: null,
+      permission: 'edit',
+      user_email: 'opiekun@agh.edu.pl',
+      group_name: null,
+    },
   ];
   let _nextDelegationId = 2;
   let photos = [
@@ -662,12 +707,13 @@ async function mockApi(page: Page) {
       const body = request.postDataJSON() as {
         name: string;
         description?: string;
+        parentId?: number | null;
       };
       const created = {
         id: currentCategories.length + 10,
         name: body.name,
         parent_id: body.parentId ?? null,
-        description: body.description,
+        description: body.description ?? '',
       };
       currentCategories = [...currentCategories, created];
       return json(route, created);
@@ -765,7 +811,10 @@ async function mockApi(page: Page) {
           ? { ...managedUser, isActive: true, isApproved: true }
           : managedUser
       );
-      return json(route, currentUsers.find((managedUser) => managedUser.id === userId));
+      return json(
+        route,
+        currentUsers.find((managedUser) => managedUser.id === userId)
+      );
     }
     if (path.match(/\/api\/v1\/users\/\d+\/reject$/) && method === 'PATCH') {
       const userId = Number(path.split('/').at(-2));
@@ -774,15 +823,23 @@ async function mockApi(page: Page) {
           ? { ...managedUser, isActive: false, isApproved: false }
           : managedUser
       );
-      return json(route, currentUsers.find((managedUser) => managedUser.id === userId));
+      return json(
+        route,
+        currentUsers.find((managedUser) => managedUser.id === userId)
+      );
     }
     if (path.match(/\/api\/v1\/users\/\d+\/role$/) && method === 'PATCH') {
       const userId = Number(path.split('/').at(-2));
       const body = request.postDataJSON() as { role: 'admin' | 'user' };
       currentUsers = currentUsers.map((managedUser) =>
-        managedUser.id === userId ? { ...managedUser, role: body.role } : managedUser
+        managedUser.id === userId
+          ? { ...managedUser, role: body.role }
+          : managedUser
       );
-      return json(route, currentUsers.find((managedUser) => managedUser.id === userId));
+      return json(
+        route,
+        currentUsers.find((managedUser) => managedUser.id === userId)
+      );
     }
     if (path === '/api/v1/users/search' && method === 'GET') {
       const q = (url.searchParams.get('q') ?? '').toLowerCase();
@@ -866,7 +923,11 @@ async function mockApi(page: Page) {
     if (path === '/api/v1/borrowings/' && method === 'GET') {
       return json(route, currentBorrowings);
     }
-    if (path === '/api/v1/borrowings/' && method === 'POST' && !request.postDataJSON().externalBorrower) {
+    if (
+      path === '/api/v1/borrowings/' &&
+      method === 'POST' &&
+      !request.postDataJSON().externalBorrower
+    ) {
       const body = request.postDataJSON() as Record<string, unknown>;
       const created = {
         id: currentBorrowings.length + 10,
@@ -880,13 +941,14 @@ async function mockApi(page: Page) {
         createdAt: '2026-06-09T10:00:00.000Z',
         ...body,
       };
-      currentBorrowings = [
-        created as (typeof currentBorrowings)[number],
-        ...currentBorrowings,
-      ];
+      currentBorrowings = [created, ...currentBorrowings];
       return json(route, created);
     }
-    if (path === '/api/v1/borrowings/' && method === 'POST' && request.postDataJSON().externalBorrower) {
+    if (
+      path === '/api/v1/borrowings/' &&
+      method === 'POST' &&
+      request.postDataJSON().externalBorrower
+    ) {
       const body = request.postDataJSON() as Record<string, unknown>;
       const created = {
         id: currentBorrowings.length + 10,
@@ -900,13 +962,13 @@ async function mockApi(page: Page) {
         createdAt: '2026-06-09T10:00:00.000Z',
         ...body,
       };
-      currentBorrowings = [
-        created as (typeof currentBorrowings)[number],
-        ...currentBorrowings,
-      ];
+      currentBorrowings = [created, ...currentBorrowings];
       return json(route, created);
     }
-    if (path.match(/\/api\/v1\/borrowings\/\d+\/approve/) && method === 'PATCH') {
+    if (
+      path.match(/\/api\/v1\/borrowings\/\d+\/approve/) &&
+      method === 'PATCH'
+    ) {
       const id = Number(path.split('/').at(-2));
       currentBorrowings = currentBorrowings.map((item) =>
         item.id === id ? { ...item, status: 'borrowed' } : item
@@ -941,11 +1003,21 @@ async function mockApi(page: Page) {
         }))
       );
     }
-    if (path.match(/\/api\/v1\/items\/1\/delegations\/?$/) && method === 'GET') {
+    if (
+      path.match(/\/api\/v1\/items\/1\/delegations\/?$/) &&
+      method === 'GET'
+    ) {
       return json(route, currentDelegations);
     }
-    if (path.match(/\/api\/v1\/items\/1\/delegations\/?$/) && method === 'POST') {
-      const body = request.postDataJSON() as { user_id?: number; group_id?: number; permission: string };
+    if (
+      path.match(/\/api\/v1\/items\/1\/delegations\/?$/) &&
+      method === 'POST'
+    ) {
+      const body = request.postDataJSON() as {
+        user_id?: number;
+        group_id?: number;
+        permission: string;
+      };
       let userEmail: string | null = null;
       let groupName: string | null = null;
       if (body.user_id) {
@@ -1028,7 +1100,7 @@ async function mockApi(page: Page) {
 
     if (path === '/api/v1/notifications/preferences' && method === 'GET') {
       return json(route, {
-        emailEnabled: true,
+        emailEnabled: false,
         pushEnabled: false,
         returnDueNoticeHours: 48,
       });
@@ -1040,19 +1112,19 @@ async function mockApi(page: Page) {
       return json(route, [
         {
           id: 1,
-          eventType: 'accepted',
-          channel: 'email',
+          eventType: 'borrowing_approved',
+          channel: 'in_app',
           payload: 'Wniosek o wypożyczenie zaakceptowany',
           scheduledAt: '2026-06-10T08:00:00.000Z',
-          sentAt: null,
+          sentAt: '2026-06-10T08:00:00.000Z',
         },
         {
           id: 2,
           eventType: 'return_due',
-          channel: 'push',
+          channel: 'in_app',
           payload: 'Termin zwrotu za 24 godziny',
           scheduledAt: '2026-06-15T12:00:00.000Z',
-          sentAt: null,
+          sentAt: '2026-06-15T12:00:00.000Z',
         },
       ]);
     }

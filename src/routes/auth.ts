@@ -6,11 +6,44 @@ import { eq, and } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
 import { users } from '../db/schema';
 import { createAuthToken } from '../middleware/auth';
-import { badRequest, unauthorized } from '../lib/errors';
+import { badRequest, tooManyRequests, unauthorized } from '../lib/errors';
+import {
+  hashPassword,
+  verifyLegacyPassword,
+  verifyPassword,
+} from '../lib/password';
+import { authMiddleware } from '../middleware/auth';
 
 type Variables = { db: MySql2Database<Record<string, never>> };
 
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
+
+async function enforceAuthRateLimit(
+  env: Env,
+  ipAddress: string
+): Promise<void> {
+  const outcome = await env.AUTH_RATE_LIMITER.limit({ key: ipAddress });
+  if (!outcome.success) tooManyRequests('Too many authentication attempts');
+}
+
+function isInitialAdmin(env: Env, email: string): boolean {
+  return email === env.INITIAL_ADMIN_EMAIL.trim().toLowerCase();
+}
+
+function getClientIp(c: {
+  req: { header: (name: string) => string | undefined };
+  env: Env;
+}): string {
+  const trustProxy =
+    (c.env as Env & { TRUST_PROXY?: string }).TRUST_PROXY === 'true';
+  if (trustProxy) {
+    const forwardedFor = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim();
+    if (forwardedFor) return forwardedFor;
+    const cfConnectingIp = c.req.header('CF-Connecting-IP')?.trim();
+    if (cfConnectingIp) return cfConnectingIp;
+  }
+  return c.req.header('X-Real-IP') ?? 'local';
+}
 
 // ─── Register (local password) ─────────────────────────────────────────────
 
@@ -19,10 +52,11 @@ const registerSchema = z.object({
     .string()
     .email()
     .transform((v) => v.trim().toLowerCase()),
-  password: z.string().min(8),
+  password: z.string().min(8).max(128),
 });
 
 router.post('/register', zValidator('json', registerSchema), async (c) => {
+  await enforceAuthRateLimit(c.env, getClientIp(c));
   const db = c.get('db');
   const body = c.req.valid('json');
 
@@ -33,14 +67,7 @@ router.post('/register', zValidator('json', registerSchema), async (c) => {
     .limit(1);
   if (existing.length > 0) badRequest('User with this email already exists');
 
-  const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest(
-    'SHA-256',
-    encoder.encode(body.password)
-  );
-  const hashedPassword = Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  const hashedPassword = await hashPassword(body.password);
 
   await db.insert(users).values({
     email: body.email,
@@ -60,65 +87,40 @@ const loginSchema = z.object({
   email: z
     .string()
     .email()
-    .transform((v) => v.trim().toLowerCase()),
-  password: z.string().min(1),
+    .transform((value) => value.trim().toLowerCase()),
+  password: z.string().min(1).max(128),
 });
 
 router.post('/login', zValidator('json', loginSchema), async (c) => {
+  await enforceAuthRateLimit(c.env, getClientIp(c));
   const db = c.get('db');
-  const body = c.req.valid('json');
-
+  const { email, password } = c.req.valid('json');
   const userRows = await db
     .select()
     .from(users)
-    .where(and(eq(users.email, body.email), eq(users.authProvider, 'local')))
+    .where(eq(users.email, email))
     .limit(1);
-
-  if (userRows.length === 0) {
-    unauthorized('Nieprawidłowy e-mail lub hasło');
-  }
-
   const user = userRows[0];
 
-  const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest(
-    'SHA-256',
-    encoder.encode(body.password)
-  );
-  const hashedPassword = Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-
-  if (user.hashedPassword !== hashedPassword) {
-    unauthorized('Nieprawidłowy e-mail lub hasło');
+  if (!user?.hashedPassword) unauthorized('Invalid email or password');
+  let passwordValid = await verifyPassword(password, user.hashedPassword);
+  if (
+    !passwordValid &&
+    (await verifyLegacyPassword(password, user.hashedPassword))
+  ) {
+    passwordValid = true;
+    await db
+      .update(users)
+      .set({ hashedPassword: await hashPassword(password) })
+      .where(eq(users.id, user.id));
   }
-
-  if (!user.isActive && !user.isApproved) {
-    unauthorized('Konto zostało odrzucone przez administratora');
+  if (!passwordValid) {
+    unauthorized('Invalid email or password');
   }
-  if (!user.isActive) unauthorized('Konto jest deaktywowane');
-  if (!user.isApproved)
-    unauthorized('Konto wymaga zatwierdzenia przez administratora');
+  if (!user.isActive) unauthorized('Account is deactivated');
+  if (!user.isApproved) unauthorized('Account pending admin approval');
 
-  const secret = c.env.JWT_SECRET;
-  if (!secret) unauthorized('Auth not configured');
-  const token = await createAuthToken(
-    user.id,
-    user.role as 'admin' | 'user',
-    secret
-  );
-
-  return c.json({
-    access_token: token,
-    token_type: 'bearer',
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      is_active: user.isActive,
-      is_approved: user.isApproved,
-    },
-  });
+  return c.json(await authResponse(user, c.env.JWT_SECRET));
 });
 
 // ─── Google OAuth ───────────────────────────────────────────────────────────
@@ -137,14 +139,15 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
 // is SKIPPED and the backend trusts the email sent by the frontend.
 // This is for development/demo only — NEVER set in production.
 
-interface GoogleIdTokenPayload {
-  iss: string;
-  sub: string;
+interface GoogleIdToken {
+  iss: string; // "https://accounts.google.com" or "accounts.google.com"
+  sub: string; // Google user ID
   email: string;
   email_verified: boolean;
   name?: string;
   picture?: string;
-  hd?: string;
+  hd?: string; // hosted domain (Google Workspace)
+  aud: string;
 }
 
 const googleLoginSchema = z.object({
@@ -155,6 +158,7 @@ router.post(
   '/google-login',
   zValidator('json', googleLoginSchema),
   async (c) => {
+    await enforceAuthRateLimit(c.env, getClientIp(c));
     const db = c.get('db');
     const { credential } = c.req.valid('json');
 
@@ -162,8 +166,7 @@ router.post(
     let email: string;
 
     // ── Dev bypass ────────────────────────────────────────────────────────
-    const devBypass =
-      c.env.DEV_BYPASS_AUTH === 'true' || c.env.DEV_BYPASS_AUTH === '1';
+    const devBypass = c.env.DEV_BYPASS_AUTH === 'true';
     if (devBypass) {
       // credential is treated as a plain email address for dev convenience
       email = credential.trim().toLowerCase();
@@ -179,21 +182,25 @@ router.post(
         'SHA-256',
         encoder.encode(email)
       );
-      googleId = `dev-${Array.from(new Uint8Array(hashBuffer))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('')
-        .slice(0, 32)}`;
+      googleId =
+        'dev-' +
+        Array.from(new Uint8Array(hashBuffer))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
+          .slice(0, 32);
     }
     // ── Production: verify Google ID token ─────────────────────────────────
     else {
       try {
+        if (!c.env.GOOGLE_CLIENT_ID)
+          unauthorized('Google authentication is not configured');
         // Verify ID token with Google's tokeninfo endpoint
         const verifyUrl = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`;
         const verifyResp = await fetch(verifyUrl);
         if (!verifyResp.ok) {
           unauthorized('Invalid Google ID token');
         }
-        const payload: GoogleIdTokenPayload = await verifyResp.json();
+        const payload = (await verifyResp.json()) as GoogleIdToken;
 
         // Validate issuer
         const validIssuers = [
@@ -202,6 +209,9 @@ router.post(
         ];
         if (!validIssuers.includes(payload.iss)) {
           unauthorized('Invalid token issuer');
+        }
+        if (payload.aud !== c.env.GOOGLE_CLIENT_ID) {
+          unauthorized('Invalid token audience');
         }
 
         // Require verified email
@@ -265,9 +275,9 @@ router.post(
           email,
           googleId,
           authProvider: 'google',
-          hashedPassword: 'google-oauth-no-password',
+          hashedPassword: null,
           isApproved: isAgh,
-          role: 'user',
+          role: isInitialAdmin(c.env, email) ? 'admin' : 'user',
         });
         const created = await db
           .select()
@@ -279,40 +289,57 @@ router.post(
     }
 
     const user = userRows[0];
-    if (!user.isActive && !user.isApproved) {
-      unauthorized('Konto zostało odrzucone przez administratora');
+    if (isInitialAdmin(c.env, email) && user.role !== 'admin') {
+      const existingAdmin = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.role, 'admin'))
+        .limit(1);
+      if (existingAdmin.length === 0) {
+        await db
+          .update(users)
+          .set({ role: 'admin', isApproved: true, isActive: true })
+          .where(eq(users.id, user.id));
+        user.role = 'admin';
+        user.isApproved = true;
+        user.isActive = true;
+      }
     }
-    if (!user.isActive) unauthorized('Konto jest deaktywowane');
-    if (!user.isApproved)
-      unauthorized('Konto wymaga zatwierdzenia przez administratora');
+    if (!user.isActive) unauthorized('Account is deactivated');
+    if (!user.isApproved) unauthorized('Account pending admin approval');
 
-    const secret = c.env.JWT_SECRET;
-    if (!secret) unauthorized('Auth not configured');
-    const token = await createAuthToken(
-      user.id,
-      user.role as 'admin' | 'user',
-      secret
-    );
-
-    return c.json({
-      access_token: token,
-      token_type: 'bearer',
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        is_active: user.isActive,
-        is_approved: user.isApproved,
-      },
-    });
+    return c.json(await authResponse(user, c.env.JWT_SECRET));
   }
 );
+
+async function authResponse(
+  user: typeof users.$inferSelect,
+  secret: string | undefined
+) {
+  if (!secret) unauthorized('Auth not configured');
+  const token = await createAuthToken(
+    user.id,
+    user.role as 'admin' | 'user',
+    secret
+  );
+  return {
+    access_token: token,
+    token_type: 'bearer',
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      is_active: user.isActive,
+      is_approved: user.isApproved,
+    },
+  };
+}
 
 // ─── List users (for dropdowns) ────────────────────────────────────────────
 
 // List users (for owners dropdown) — frontend expects GET /api/v1/auth/users
 // Response: [{ id, email }]
-router.get('/users', async (c) => {
+router.get('/users', authMiddleware, async (c) => {
   const db = c.get('db');
   const rows = await db
     .select({ id: users.id, email: users.email })
@@ -322,9 +349,8 @@ router.get('/users', async (c) => {
 
 // ─── Auth config (for frontend) ────────────────────────────────────────────
 
-router.get('/config', (c) => {
-  const devBypass =
-    c.env.DEV_BYPASS_AUTH === 'true' || c.env.DEV_BYPASS_AUTH === '1';
+router.get('/config', async (c) => {
+  const devBypass = c.env.DEV_BYPASS_AUTH === 'true';
   return c.json({
     devBypassAuth: devBypass,
     googleClientId: c.env.GOOGLE_CLIENT_ID || '',

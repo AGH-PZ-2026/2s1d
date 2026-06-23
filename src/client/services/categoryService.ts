@@ -43,8 +43,7 @@ export const categoryService = {
     if (!USE_MOCKS) {
       const r = await fetch(`${BASE_URL}/`, { headers: authHeaders() });
       await handleResponse(r);
-      const cats: BackendCat[] = await r.json();
-      return cats.map(mapCat);
+      return ((await r.json()) as BackendCat[]).map(mapCat);
     }
     await delay(100);
     return [...mock];
@@ -71,8 +70,7 @@ export const categoryService = {
         }),
       });
       await handleResponse(r);
-      const cat: BackendCat = await r.json();
-      return mapCat(cat);
+      return mapCat((await r.json()) as BackendCat);
     }
     await delay(300);
     const c: Category = {
@@ -92,8 +90,7 @@ export const categoryService = {
         body: JSON.stringify(payload),
       });
       await handleResponse(r);
-      const cat: BackendCat = await r.json();
-      return mapCat(cat);
+      return mapCat((await r.json()) as BackendCat);
     }
     await delay(300);
     const idx = mock.findIndex((c) => c.id === id);
@@ -139,7 +136,7 @@ async function handleResponse(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data: { detail?: string } = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {}
   throw new Error(detail);

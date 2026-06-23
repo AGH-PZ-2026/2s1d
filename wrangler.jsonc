@@ -8,12 +8,12 @@
   ],
 
   "assets": {
-    "directory": "dist/client",
     "not_found_handling": "single-page-application",
     "run_worker_first": [
       "/api/*"
     ]
-  },
+
+},
 
   "hyperdrive": [
     {
@@ -30,14 +30,13 @@
     }
   ],
 
-  "queues": {
-    "producers": [
-      {
-        "binding": "NOTIFICATION_QUEUE",
-        "queue": "pz-notifications"
-      }
-    ]
-  },
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
 
   "observability": {
     "enabled": true,
@@ -50,14 +49,30 @@
     }
   },
 
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
+
   "vars": {
-    "JWT_SECRET": "",
-    "DEV_BYPASS_AUTH": "true",
-    "GOOGLE_CLIENT_ID": ""
+    "DEV_BYPASS_AUTH": "false",
+    "GOOGLE_CLIENT_ID": "",
+    "INITIAL_ADMIN_EMAIL": "admin@agh.edu.pl"
   },
 
   "env": {
     "production": {
+      "vars": {
+        "DEV_BYPASS_AUTH": "false",
+        "GOOGLE_CLIENT_ID": "<YOUR_GOOGLE_CLIENT_ID>",
+        "INITIAL_ADMIN_EMAIL": "<YOUR_INITIAL_ADMIN_EMAIL>"
+      },
+      "ratelimits": [
+        {
+          "name": "AUTH_RATE_LIMITER",
+          "namespace_id": "1001",
+          "simple": { "limit": 10, "period": 60 }
+        }
+      ],
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
@@ -70,14 +85,6 @@
           "bucket_name": "pz-item-photos"
         }
       ],
-      "queues": {
-        "producers": [
-          {
-            "binding": "NOTIFICATION_QUEUE",
-            "queue": "pz-notifications"
-          }
-        ]
-      },
       "routes": [
         {
           "pattern": "<YOUR_DOMAIN>",
@@ -93,6 +100,9 @@
           "enabled": true,
           "head_sampling_rate": 0.1
         }
+      },
+      "triggers": {
+        "crons": ["0 * * * *"]
       }
     }
   }

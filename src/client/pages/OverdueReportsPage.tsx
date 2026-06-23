@@ -11,7 +11,7 @@ export default function OverdueReportsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  const [includeAll, _setIncludeAll] = useState();
+  const [includeAll] = useState(false);
   const [rows, setRows] = useState<OverdueReportRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);

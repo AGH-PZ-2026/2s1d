@@ -1,182 +1,293 @@
-/**
- * Self-hosted Node.js entrypoint.
- *
- * The Hono app in `src/index.ts` is runtime-agnostic — the same code can
- * run on Cloudflare Workers and on a plain Node.js server. This file
- * provides the Node-specific bootstrap:
- *   1. Create the photos directory
- *   2. Serve the built SPA from `dist/client/` (or whatever STATIC_DIR says)
- *   3. Run the Hono app on `@hono/node-server`
- *
- * Run with:
- *   pnpm run build && pnpm start
- * or
- *   pnpm run start:dev   (tsx, no bundle step)
- *   pnpm run dev:server  (tsx watch — also rebuilds the client first)
- */
-import { existsSync, statSync } from 'node:fs';
-import { readFile, mkdir } from 'node:fs/promises';
-import { extname, join, normalize, resolve, sep } from 'node:path';
+import { createReadStream } from 'node:fs';
+import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import path from 'node:path';
+import { Readable } from 'node:stream';
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
-import type { Context, MiddlewareHandler } from 'hono';
-import app from './index';
-import { closeDb, resolveDbParams } from './db/client';
-import { runMigrations } from './db/migrate';
-import mysql from 'mysql2/promise';
+import type { HttpBindings } from '@hono/node-server';
+import { createDb } from './db/client';
+import { app } from './index';
+import { createReturnDueNotifications } from './lib/notifications';
+import { storageProxyApp } from './lib/storageProxy';
 
-const PORT = Number(process.env.PORT ?? 8787);
-const HOST = process.env.HOST ?? '0.0.0.0';
-const STATIC_DIR = (
-  process.env.STATIC_DIR ?? resolve(process.cwd(), 'dist/client')
-).replace(/\/$/, '');
-const STORAGE_DIR =
-  process.env.PHOTOS_LOCAL_DIR ?? resolve(process.cwd(), 'storage');
-process.env.PHOTOS_LOCAL_DIR = STORAGE_DIR;
-await mkdir(STORAGE_DIR, { recursive: true });
+const rootDir = process.cwd();
+const distDir = path.resolve(rootDir, 'dist/client');
+const storageRoot = path.resolve(
+  process.env.PHOTOS_STORAGE_DIR ?? '/data/photos'
+);
+const port = Number(process.env.PORT ?? process.env.APP_PORT ?? 8787);
+const hostname = process.env.HOST ?? '0.0.0.0';
 
-// Run database migrations + seed before accepting requests
-const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR ?? resolve(process.cwd(), 'src/db/migrations');
-if (existsSync(MIGRATIONS_DIR)) {
-  const params = resolveDbParams(process.env as unknown as import('./db/client').DbEnv);
-  const migratePool = mysql.createPool({
-    host: params.host,
-    port: params.port,
-    user: params.user,
-    password: params.password,
-    database: params.database,
-    waitForConnections: true,
-    connectionLimit: 2,
-  });
-  try {
-    await runMigrations(migratePool, MIGRATIONS_DIR);
-  } finally {
-    await migratePool.end();
-  }
-}
-
-if (!existsSync(STATIC_DIR)) {
-  // eslint-disable-next-line no-console
-  console.warn(
-    `[pz-worker] WARNING: static dir not found at ${STATIC_DIR} — run \`pnpm run build:client\` first.`
-  );
-}
-
-const MIME: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.mjs': 'application/javascript; charset=utf-8',
+const mimeTypes: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.html': 'text/html; charset=utf-8',
+  '.ico': 'image/x-icon',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.ico': 'image/x-icon',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.ttf': 'font/ttf',
-  '.txt': 'text/plain; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.txt': 'text/plain; charset=utf-8',
+  '.webp': 'image/webp',
 };
 
-/**
- * Paths that should never be served as static files — they're handled
- * by the Hono app mounted at "/". The wrangler config achieves the same
- * separation in Cloudflare Workers via `run_worker_first: ["/api/*"]`.
- */
-const API_PREFIXES = ['/api/', '/storage/'];
-
-function isApiPath(pathname: string): boolean {
-  return API_PREFIXES.some(
-    (p) => pathname === p.slice(0, -1) || pathname.startsWith(p)
-  );
+function requiredEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
 }
 
-async function tryServeFile(pathname: string, c: Context) {
-  if (pathname.includes('..')) return null;
-  const requested = normalize(join(STATIC_DIR, pathname));
-  if (!requested.startsWith(STATIC_DIR + sep) && requested !== STATIC_DIR)
-    return null;
-  if (existsSync(requested) && statSync(requested).isFile()) {
-    const data = await readFile(requested);
-    return c.body(data as unknown as ArrayBuffer, 200, {
-      'Content-Type':
-        MIME[extname(requested).toLowerCase()] ?? 'application/octet-stream',
-      'Cache-Control': 'public, max-age=300',
-    });
+function parsePort(value: string | undefined, fallback: number): number {
+  const parsed = Number(value ?? fallback);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 65535) {
+    throw new Error(`Invalid MYSQL_PORT: ${value}`);
   }
-  return null;
+  return parsed;
 }
 
-async function serveSpa(c: Context) {
-  const indexPath = join(STATIC_DIR, 'index.html');
-  if (!existsSync(indexPath)) return c.notFound();
-  const data = await readFile(indexPath);
-  return c.body(data as unknown as ArrayBuffer, 200, {
-    'Content-Type': MIME['.html'],
-    'Cache-Control': 'no-cache',
+function createHyperdriveFromEnv(): Hyperdrive {
+  return {
+    host: requiredEnv('MYSQL_HOST'),
+    port: parsePort(process.env.MYSQL_PORT, 3306),
+    user: requiredEnv('MYSQL_USER'),
+    password: requiredEnv('MYSQL_PASSWORD'),
+    database: requiredEnv('MYSQL_DATABASE'),
+  } as Hyperdrive;
+}
+
+function createInMemoryRateLimit(): RateLimit {
+  const limit = Number(process.env.AUTH_RATE_LIMIT_LIMIT ?? 10);
+  const periodSeconds = Number(
+    process.env.AUTH_RATE_LIMIT_PERIOD_SECONDS ?? 60
+  );
+  const buckets = new Map<string, { count: number; resetAt: number }>();
+
+  return {
+    async limit({ key }: { key: string }) {
+      const now = Date.now();
+      const existing = buckets.get(key);
+      if (!existing || existing.resetAt <= now) {
+        buckets.set(key, { count: 1, resetAt: now + periodSeconds * 1000 });
+        return { success: true };
+      }
+      existing.count += 1;
+      return { success: existing.count <= limit };
+    },
+  } as RateLimit;
+}
+
+function safeStoragePath(key: string): string {
+  const resolved = path.resolve(storageRoot, key);
+  if (!resolved.startsWith(`${storageRoot}${path.sep}`)) {
+    throw new Error('Invalid storage key');
+  }
+  return resolved;
+}
+
+async function bodyToBuffer(
+  value: ReadableStream | ArrayBuffer | ArrayBufferView | Blob | string
+): Promise<Buffer> {
+  if (typeof value === 'string') return Buffer.from(value);
+  if (value instanceof Blob) return Buffer.from(await value.arrayBuffer());
+  if (value instanceof ArrayBuffer) return Buffer.from(value);
+  if (ArrayBuffer.isView(value))
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  const chunks: Buffer[] = [];
+  for await (const chunk of Readable.fromWeb(
+    value as unknown as Parameters<typeof Readable.fromWeb>[0]
+  )) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+function createLocalPhotosBucket(): R2Bucket {
+  return {
+    async put(
+      key: string,
+      value: ReadableStream | ArrayBuffer | ArrayBufferView | Blob | string
+    ) {
+      const target = safeStoragePath(key);
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, await bodyToBuffer(value));
+      return null;
+    },
+    async get(key: string) {
+      const target = safeStoragePath(key);
+      try {
+        await stat(target);
+      } catch {
+        return null;
+      }
+      return { body: Readable.toWeb(createReadStream(target)) } as R2ObjectBody;
+    },
+    async delete(keys: string | string[]) {
+      const list = Array.isArray(keys) ? keys : [keys];
+      await Promise.all(
+        list.map(async (key) => {
+          try {
+            await unlink(safeStoragePath(key));
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          }
+        })
+      );
+    },
+  } as R2Bucket;
+}
+
+function createEnv(): Env {
+  if (
+    process.env.DEV_BYPASS_AUTH === 'true' &&
+    process.env.NODE_ENV === 'production'
+  ) {
+    throw new Error(
+      'DEV_BYPASS_AUTH=true is not allowed when NODE_ENV=production'
+    );
+  }
+  if (requiredEnv('JWT_SECRET').length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters');
+  }
+  return {
+    HYPERDRIVE: createHyperdriveFromEnv(),
+    PHOTOS_BUCKET: createLocalPhotosBucket(),
+    AUTH_RATE_LIMITER: createInMemoryRateLimit(),
+    DB_POOL: 'true',
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? '',
+    INITIAL_ADMIN_EMAIL: process.env.INITIAL_ADMIN_EMAIL ?? 'admin@agh.edu.pl',
+    DEV_BYPASS_AUTH: process.env.DEV_BYPASS_AUTH ?? 'false',
+    JWT_SECRET: process.env.JWT_SECRET,
+    TRUST_PROXY: process.env.TRUST_PROXY ?? 'false',
+  } as Env;
+}
+
+function parsePositiveIntegerEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function startNotificationScheduler(env: Env): void {
+  if (process.env.NOTIFICATIONS_SCHEDULER_ENABLED === 'false') return;
+
+  const intervalMinutes = parsePositiveIntegerEnv(
+    'NOTIFICATIONS_INTERVAL_MINUTES',
+    60
+  );
+  let running = false;
+
+  const run = async () => {
+    if (running) {
+      console.warn(
+        JSON.stringify({
+          message:
+            'return due notifications skipped because previous run is still active',
+        })
+      );
+      return;
+    }
+    running = true;
+    const { db, connection } = await createDb(env.HYPERDRIVE);
+    try {
+      const created = await createReturnDueNotifications(db);
+      console.log(
+        JSON.stringify({
+          message: 'return due notifications processed',
+          created,
+        })
+      );
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          message: 'return due notifications failed',
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    } finally {
+      await connection.end();
+      running = false;
+    }
+  };
+
+  void run();
+  const timer = setInterval(() => void run(), intervalMinutes * 60_000);
+  timer.unref();
+}
+
+async function staticResponse(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const decodedPath = decodeURIComponent(url.pathname);
+  const normalized = path.normalize(decodedPath).replace(/^(\.\.[/\\])+/, '');
+  const requestedPath = path.resolve(distDir, normalized.slice(1));
+  const indexPath = path.join(distDir, 'index.html');
+  const targetPath = requestedPath.startsWith(`${distDir}${path.sep}`)
+    ? requestedPath
+    : indexPath;
+
+  try {
+    const fileStat = await stat(targetPath);
+    if (fileStat.isFile()) {
+      return new Response(await readFile(targetPath), {
+        headers: {
+          'Content-Type':
+            mimeTypes[path.extname(targetPath)] ?? 'application/octet-stream',
+          'Cache-Control': targetPath.endsWith('index.html')
+            ? 'no-cache'
+            : 'public, max-age=31536000, immutable',
+        },
+      });
+    }
+  } catch {
+    // Fall through to SPA entrypoint.
+  }
+
+  return new Response(await readFile(indexPath), {
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    },
   });
 }
 
-const staticMiddleware: MiddlewareHandler = async (c, next) => {
-  if (c.req.method !== 'GET' && c.req.method !== 'HEAD') return next();
-  const url = new URL(c.req.url);
-  let pathname: string;
-  try {
-    pathname = decodeURIComponent(url.pathname);
-  } catch {
-    return next();
+const env = createEnv();
+startNotificationScheduler(env);
+app.route('/storage', storageProxyApp);
+
+serve(
+  {
+    fetch: (request, nodeEnv) => {
+      const url = new URL(request.url);
+      const headers = new Headers(request.headers);
+      const remoteAddress = (nodeEnv as HttpBindings | undefined)?.incoming
+        ?.socket.remoteAddress;
+      if (remoteAddress) headers.set('X-Real-IP', remoteAddress);
+      const normalizedRequest = new Request(request, { headers });
+      if (
+        url.pathname.startsWith('/api/') ||
+        url.pathname.startsWith('/storage/')
+      ) {
+        return app.fetch(normalizedRequest, env);
+      }
+      return staticResponse(normalizedRequest);
+    },
+    hostname,
+    port,
+    createServer,
+  },
+  (info) => {
+    console.log(
+      JSON.stringify({
+        message: 'server started',
+        hostname: info.address,
+        port: info.port,
+      })
+    );
   }
-  if (isApiPath(pathname)) return next();
-
-  const fileResp = await tryServeFile(pathname, c);
-  if (fileResp) return fileResp;
-
-  if (!extname(pathname)) return serveSpa(c);
-  return next();
-};
-
-const composed = new Hono<{ Bindings: Env }>({ strict: false });
-composed.use('*', staticMiddleware);
-composed.route('/', app);
-
-/**
- * When the inner `app` doesn't match a request, the parent's notFound
- * fires (Hono's behaviour with mounted sub-apps). Provide a parent
- * notFound that returns the same JSON shape as the inner one for API
- * paths, and serves the SPA for everything else.
- */
-composed.notFound(async (c) => {
-  if (isApiPath(new URL(c.req.url).pathname)) {
-    return c.json({ detail: 'Not found' }, 404);
-  }
-  return serveSpa(c);
-});
-
-/**
- * Pass `process.env` to the Hono app as its `Bindings` so route handlers
- * that read `c.env.JWT_SECRET`, `c.env.DATABASE_URL`, etc. see the same
- * values that the Cloudflare Workers binding system would inject.
- */
-const fetch = (request: Request, _bindings: unknown) =>
-  composed.fetch(request, process.env as unknown as Env);
-
-const server = serve({ fetch, port: PORT, hostname: HOST }, (info) => {
-  // eslint-disable-next-line no-console
-  console.log(
-    `[pz-worker] listening on http://${info.address}:${info.port} (static=${STATIC_DIR}, storage=${STORAGE_DIR})`
-  );
-});
-
-const shutdown = async (signal: string) => {
-  // eslint-disable-next-line no-console
-  console.log(`[pz-worker] received ${signal}, shutting down...`);
-  server.close();
-  await closeDb();
-  process.exit(0);
-};
-process.on('SIGINT', () => void shutdown('SIGINT'));
-process.on('SIGTERM', () => void shutdown('SIGTERM'));
+);

@@ -1,41 +1,11 @@
 import mysql from 'mysql2/promise';
 
-interface CategoryRow {
-  id: number;
-  legacy_type_id: number;
-}
-
-interface LocationRow {
-  id: number;
-  legacy_room_id: number;
-}
-
-interface StatusRow {
-  id: number;
-  slug: string;
-}
-
-interface ProducerRow {
-  id: number;
-  nazwa: string;
-}
-
-interface DeviceRow {
-  id: number;
-  id_pokoju: number | null;
-  id_modelu: number | null;
-  serial: string | null;
-  nr_inw: string | null;
-  opis: string | null;
-  wypozyczony: number | boolean;
-  model_name: string | null;
-  id_typu: number | null;
-  id_producenta: number | null;
-  model_opis: string | null;
-}
-
-interface ExistingItemRow {
-  id: number;
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-ąćęłńóśźż-]/g, '');
 }
 
 async function importData() {
@@ -97,25 +67,25 @@ async function importData() {
   console.log('🔄 Lookups...');
   const [typeRows] = (await conn.query(
     'SELECT id, legacy_type_id FROM categories WHERE legacy_type_id IS NOT NULL'
-  )) as [CategoryRow[], mysql.FieldPacket[]];
+  )) as any;
   const typeMap = new Map<number, number>();
   for (const r of typeRows) typeMap.set(r.legacy_type_id, r.id);
 
   const [locRows] = (await conn.query(
     'SELECT id, legacy_room_id FROM locations WHERE legacy_room_id IS NOT NULL'
-  )) as [LocationRow[], mysql.FieldPacket[]];
+  )) as any;
   const locMap = new Map<number, number>();
   for (const r of locRows) locMap.set(r.legacy_room_id, r.id);
 
   const [statusRows] = (await conn.query(
     'SELECT id, slug FROM item_status'
-  )) as [StatusRow[], mysql.FieldPacket[]];
+  )) as any;
   const statusBySlug = new Map<string, number>();
   for (const r of statusRows) statusBySlug.set(r.slug, r.id);
 
   const [prodRows] = (await conn.query(
     'SELECT id, nazwa FROM inv_producenci'
-  )) as [ProducerRow[], mysql.FieldPacket[]];
+  )) as any;
   const prodMap = new Map<number, string>();
   for (const r of prodRows) prodMap.set(r.id, r.nazwa);
 
@@ -125,17 +95,15 @@ async function importData() {
     SELECT d.id, d.id_pokoju, d.id_modelu, d.serial, d.nr_inw, d.opis, d.wypozyczony,
            m.nazwa AS model_name, m.id_typu, m.id_producenta, m.opis AS model_opis
     FROM inv_urzadzenia d LEFT JOIN inv_modele m ON m.id=d.id_modelu ORDER BY d.id
-  `)) as [DeviceRow[], mysql.FieldPacket[]];
+  `)) as any;
 
   let imported = 0,
     skipped = 0,
     borrowed = 0;
   for (const d of devices) {
-    const catId = d.id_typu != null ? (typeMap.get(d.id_typu) ?? null) : null;
-    const locId =
-      d.id_pokoju != null ? (locMap.get(d.id_pokoju) ?? null) : null;
-    const manufacturer =
-      d.id_producenta != null ? (prodMap.get(d.id_producenta) ?? null) : null;
+    const catId = typeMap.get(d.id_typu) ?? null;
+    const locId = locMap.get(d.id_pokoju) ?? null;
+    const manufacturer = prodMap.get(d.id_producenta) ?? null;
     const statusSlug = d.wypozyczony ? 'wypozyczony' : 'dostepny';
     const statId = statusBySlug.get(statusSlug) ?? null;
     if (d.wypozyczony) borrowed++;
@@ -148,10 +116,7 @@ async function importData() {
         'SELECT id FROM items WHERE legacy_item_id=?',
         [d.id]
       );
-      if (
-        Array.isArray(existing) &&
-        (existing as ExistingItemRow[]).length > 0
-      ) {
+      if (Array.isArray(existing) && (existing as any[]).length > 0) {
         await conn.execute(
           `UPDATE items SET serial=?, inventory_number=?, description=?, name=?, manufacturer=?, model=?,
            category_id=?, status_id=?, location_id=?, owner_id=NULL WHERE legacy_item_id=?`,
@@ -188,9 +153,8 @@ async function importData() {
         );
       }
       imported++;
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error(`  ⚠️ #${d.id}: ${message.slice(0, 80)}`);
+    } catch (e: any) {
+      console.error(`  ⚠️ #${d.id}: ${e.message?.slice(0, 80)}`);
       skipped++;
     }
   }

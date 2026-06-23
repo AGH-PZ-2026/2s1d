@@ -23,16 +23,14 @@ export const qrService = {
       { headers: authHeaders() }
     );
     await ensureOk(response);
-    const data: ScannedQrItem = await response.json();
-    return data;
+    return response.json();
   },
   async getQuickActions(itemId: number): Promise<QuickActionItem> {
     const response = await fetch(`/api/v1/quick-actions/${itemId}`, {
       headers: authHeaders(),
     });
     await ensureOk(response);
-    const data: QuickActionItem = await response.json();
-    return data;
+    return response.json();
   },
   async markDamaged(itemId: number): Promise<QuickActionItem> {
     const response = await fetch(
@@ -40,8 +38,7 @@ export const qrService = {
       { method: 'PATCH', headers: authHeaders() }
     );
     await ensureOk(response);
-    const data: QuickActionItem = await response.json();
-    return data;
+    return response.json();
   },
 };
 
@@ -49,7 +46,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data: { detail?: string } = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {}
   throw new Error(detail);

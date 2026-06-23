@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Category, CategoryTreeNode } from '../types/category';
+import { Category, CategoryTreeNode } from '../types/category';
 
 interface CategoryTreeProps {
   tree: CategoryTreeNode;
@@ -20,11 +20,8 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
   const toggleExpanded = (cid: number) =>
     setExpandedIds((prev) => {
       const s = new Set(prev);
-      if (s.has(cid)) {
-        s.delete(cid);
-      } else {
-        s.add(cid);
-      }
+      if (s.has(cid)) s.delete(cid);
+      else s.add(cid);
       return s;
     });
   const isLoading = (cid: number) => loadingIds.includes(cid);

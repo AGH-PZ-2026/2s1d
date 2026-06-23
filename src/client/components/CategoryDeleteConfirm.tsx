@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
-import type { Category } from '../types/category';
+import { Category } from '../types/category';
 import './CategoryDeleteConfirm.css';
 
 interface CategoryDeleteConfirmProps {
@@ -66,11 +66,11 @@ export const CategoryDeleteConfirm: React.FC<CategoryDeleteConfirmProps> = ({
             onClick={onConfirm}
             disabled={loading}
           >
-            {(() => {
-              if (loading) return 'Usuwanie...';
-              if (hasChildren) return 'Usuń kategorię i jej podkategorie';
-              return 'Usuń';
-            })()}
+            {loading
+              ? 'Usuwanie...'
+              : hasChildren
+                ? 'Usuń kategorię i jej podkategorie'
+                : 'Usuń'}
           </button>
         </div>
       </div>

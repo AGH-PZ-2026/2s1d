@@ -17,8 +17,7 @@ export const itemPhotoService = {
       headers: authHeaders(),
     });
     await ensureOk(response);
-    const data: ItemPhoto[] = await response.json();
-    return data;
+    return response.json();
   },
   async upload(itemId: number, file: File): Promise<ItemPhoto> {
     const fd = new FormData();
@@ -29,8 +28,19 @@ export const itemPhotoService = {
       body: fd,
     });
     await ensureOk(response);
-    const data: ItemPhoto = await response.json();
-    return data;
+    return response.json();
+  },
+  async download(itemId: number, photo: ItemPhoto): Promise<void> {
+    const response = await fetch(`/api/v1/items/${itemId}/photos/${photo.id}`, {
+      headers: authHeaders(),
+    });
+    await ensureOk(response);
+    const objectUrl = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = photo.originalFilename;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
   },
 };
 
@@ -38,7 +48,7 @@ async function ensureOk(response: Response): Promise<void> {
   if (response.ok) return;
   let detail = `Błąd serwera (${response.status})`;
   try {
-    const data: { detail?: string } = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     if (typeof data.detail === 'string') detail = data.detail;
   } catch {}
   throw new Error(detail);

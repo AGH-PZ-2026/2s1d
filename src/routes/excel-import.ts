@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { sql } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
+import Papa from 'papaparse';
+import readXlsxFile, { type SheetData } from 'read-excel-file/web-worker';
 import { items } from '../db/schema';
 import { authMiddleware } from '../middleware/auth';
 import { badRequest, forbidden } from '../lib/errors';
-import * as XLSX from 'xlsx';
 import { createAuditLog } from '../lib/audit';
 
 type Variables = {
@@ -16,10 +18,42 @@ type Variables = {
 const router = new Hono<{ Variables: Variables; Bindings: Env }>();
 router.use('/*', authMiddleware);
 
-function excelDateToDate(serial: number): string {
-  const date = new Date((serial - 25569) * 86400 * 1000);
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+const MAX_IMPORT_ROWS = 500;
+const IMPORT_FIELDS = new Set([
+  'name',
+  'manufacturer',
+  'description',
+  'purchase_date',
+  'category_id',
+  'status_id',
+  'location_id',
+  'owner_id',
+]);
 
-  return date.toISOString().split('T')[0];
+function formatCellValue(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
+function sheetToRecords(data: SheetData): Record<string, string>[] {
+  if (data.length < 2)
+    badRequest('XLSX must contain a header and at least one data row');
+  const headers = data[0].map((value) => formatCellValue(value).trim());
+  if (
+    headers.some((header) => header.length === 0) ||
+    new Set(headers).size !== headers.length
+  ) {
+    badRequest('XLSX headers must be non-empty and unique');
+  }
+  return data
+    .slice(1)
+    .map((cells) =>
+      Object.fromEntries(
+        headers.map((header, index) => [header, formatCellValue(cells[index])])
+      )
+    );
 }
 
 // POST /api/v1/excel/upload — frontend sends multipart FormData with "file"
@@ -31,54 +65,60 @@ router.post('/upload', async (c) => {
   const formData = await c.req.formData();
   const file = formData.get('file') as File | null;
   if (!file) badRequest('No file uploaded');
+  if (file.size === 0 || file.size > MAX_IMPORT_BYTES)
+    badRequest('Import file must be between 1 byte and 5 MB');
 
   const mappingRaw = formData.get('column_mapping');
-  const mappingStr = typeof mappingRaw === 'string' ? mappingRaw : null;
 
-  const columnMapping: Record<string, string> = mappingStr
-    ? (JSON.parse(mappingStr) as Record<string, string>)
-    : {};
-
-  let rows: Record<string, string>[];
-
-  if (file.name.endsWith('.xlsx') || file.type.includes('sheet')) {
-    const buffer = await file.arrayBuffer();
-
-    const workbook = XLSX.read(buffer, {
-      type: 'array',
-    });
-
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-    rows = XLSX.utils.sheet_to_json(sheet, {
-      defval: '',
-    });
-  } else {
-    const text = await file.text();
-
-    const lines = text
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0);
-
-    if (lines.length < 2) {
-      badRequest('CSV must contain header and at least one data row');
-    }
-
-    const headers = lines[0].split(',').map((h) => h.trim());
-
-    rows = lines.slice(1).map((line) => {
-      const cols = line.split(',');
-
-      const row: Record<string, string> = {};
-
-      headers.forEach((header, idx) => {
-        row[header] = cols[idx]?.trim() ?? '';
-      });
-
-      return row;
-    });
+  let columnMapping: Record<string, string> = {};
+  try {
+    const parsed: unknown = mappingRaw ? JSON.parse(String(mappingRaw)) : {};
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+      badRequest('column_mapping must be an object');
+    columnMapping = parsed as Record<string, string>;
+  } catch {
+    badRequest('column_mapping must be valid JSON');
   }
+  if (Object.keys(columnMapping).some((field) => !IMPORT_FIELDS.has(field)))
+    badRequest('column_mapping contains an unsupported field');
+  if (
+    Object.values(columnMapping).some(
+      (column) =>
+        typeof column !== 'string' || column.length === 0 || column.length > 255
+    )
+  ) {
+    badRequest('column_mapping values must be non-empty column names');
+  }
+
+  let rows: Record<string, string>[] = [];
+
+  try {
+    const lowerName = file.name.toLowerCase();
+    if (lowerName.endsWith('.xlsx')) {
+      const sheets = await readXlsxFile(await file.arrayBuffer());
+      if (!sheets[0]) badRequest('Import file does not contain a worksheet');
+      rows = sheetToRecords(sheets[0].data);
+    } else if (lowerName.endsWith('.csv') || file.type === 'text/csv') {
+      const result = Papa.parse<Record<string, string>>(await file.text(), {
+        header: true,
+        skipEmptyLines: 'greedy',
+        transformHeader: (header) => header.trim(),
+      });
+      if (result.errors.length > 0) {
+        badRequest(`Invalid CSV at row ${result.errors[0].row ?? 1}`);
+      }
+      rows = result.data;
+    } else {
+      badRequest('Only XLSX and CSV files are supported');
+    }
+  } catch (error) {
+    if (error instanceof HTTPException) throw error;
+    badRequest('Import file is not a valid XLSX or CSV document');
+  }
+  if (rows.length === 0)
+    badRequest('Import file must contain at least one data row');
+  if (rows.length > MAX_IMPORT_ROWS)
+    badRequest(`Import file cannot contain more than ${MAX_IMPORT_ROWS} rows`);
 
   const errors: { row_number: number; error_message: string }[] = [];
   let successful = 0;
@@ -90,19 +130,9 @@ router.post('/upload', async (c) => {
     const row: Record<string, unknown> = {};
 
     for (const [field, columnName] of Object.entries(columnMapping)) {
-      row[field] = rawRow[columnName];
+      row[field] = rawRow[columnName as keyof typeof rawRow];
     }
-    console.log('mapping', columnMapping);
-    console.log('rawRow', rawRow);
-    console.log('mapped', row);
-
-    const rawName = row.name;
-    let name = '';
-    if (typeof rawName === 'string') {
-      name = rawName.trim();
-    } else if (typeof rawName === 'number') {
-      name = String(rawName).trim();
-    }
+    const name = String(row.name ?? '').trim();
 
     if (!name) {
       errors.push({
@@ -133,13 +163,7 @@ router.post('/upload', async (c) => {
       };
 
       if (row.purchase_date) {
-        const value = row.purchase_date;
-
-        if (typeof value === 'number') {
-          vals.purchaseDate = excelDateToDate(value);
-        } else {
-          vals.purchaseDate = value;
-        }
+        vals.purchaseDate = row.purchase_date;
       }
 
       const result = await db
@@ -157,10 +181,10 @@ router.post('/upload', async (c) => {
       });
 
       successful++;
-    } catch (err) {
+    } catch {
       errors.push({
         row_number: i + 1,
-        error_message: err instanceof Error ? err.message : 'Unknown error',
+        error_message: 'Nie można zaimportować tego wiersza',
       });
     }
   }

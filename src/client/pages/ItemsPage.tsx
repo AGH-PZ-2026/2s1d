@@ -42,6 +42,8 @@ type SortKey =
   | 'owner';
 type SortDirection = 'asc' | 'desc';
 
+const PAGE_SIZE = 5;
+
 export default function ItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
@@ -73,7 +75,6 @@ export default function ItemsPage() {
     direction: 'asc',
   });
   const [page, setPage] = useState(1);
-  const [pageSizeStr, setPageSizeStr] = useState<string>('10');
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -271,25 +272,21 @@ export default function ItemsPage() {
       return sort.direction === 'asc' ? result : -result;
     });
   }, [
-    filters,
     categories,
+    filters,
     getCategoryName,
     getLocationName,
-    getStatusName,
     getOwnerName,
+    getStatusName,
     items,
     sort,
   ]);
 
-  const pageSize =
-    pageSizeStr === 'all'
-      ? Math.max(filteredItems.length, 1)
-      : parseInt(pageSizeStr, 10);
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginatedItems = filteredItems.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
   );
   const selectedItem =
     filteredItems.find((item) => item.id === selectedItemId) ??
@@ -561,32 +558,10 @@ export default function ItemsPage() {
             </tbody>
           </table>
           <div className="table-pagination">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span>
-                Strona {currentPage} z {totalPages} · Wyniki:{' '}
-                {filteredItems.length}
-              </span>
-              <select
-                className="form-input"
-                style={{
-                  width: 'auto',
-                  padding: '4px 28px 4px 8px',
-                  minHeight: '0',
-                }}
-                value={pageSizeStr}
-                onChange={(e) => {
-                  setPageSizeStr(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="5">5 na stronę</option>
-                <option value="10">10 na stronę</option>
-                <option value="25">25 na stronę</option>
-                <option value="50">50 na stronę</option>
-                <option value="100">100 na stronę</option>
-                <option value="all">Wszystkie</option>
-              </select>
-            </div>
+            <span>
+              Strona {currentPage} z {totalPages} · Wyniki:{' '}
+              {filteredItems.length}
+            </span>
             <div className="td-actions">
               <button
                 className="btn btn-secondary"
@@ -677,12 +652,10 @@ export default function ItemsPage() {
                 item={selectedItem}
                 categories={categories}
                 groups={groups}
-                locations={locations}
                 owners={owners}
                 statuses={statuses}
                 onSubmit={(itemId, payload) => handleEdit(itemId, payload)}
                 loading={formLoading}
-                currentUser={user}
                 permissionLevel={permissionLevel}
               />
             )}
@@ -1229,7 +1202,6 @@ function ItemPhotosPanel({
   loading: boolean;
   onUpload: (file: File) => void;
 }) {
-  const token = localStorage.getItem('access_token');
   return (
     <section className="photos-panel">
       <div>
@@ -1270,13 +1242,15 @@ function ItemPhotosPanel({
             {itemPhotos.map((photo) => (
               <tr key={photo.id}>
                 <td>
-                  <a
-                    href={`/api/v1/items/${item.id}/photos/${photo.id}?token=${token}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    className="btn btn-link"
+                    type="button"
+                    onClick={() =>
+                      void itemPhotoService.download(item.id, photo)
+                    }
                   >
                     {photo.originalFilename}
-                  </a>
+                  </button>
                 </td>
                 <td>{photo.contentType}</td>
                 <td>{new Date(photo.addedAt).toLocaleString('pl-PL')}</td>
@@ -1594,11 +1568,11 @@ function CreateDelegationForm({
             (!selectedUser && !selectedGroup && !customGroupName.trim())
           }
         >
-          {(() => {
-            if (isCreatingGroup) return 'Zapisywanie...';
-            if (initial) return 'Zapisz zmiany';
-            return 'Dodaj delegację';
-          })()}
+          {isCreatingGroup
+            ? 'Zapisywanie...'
+            : initial
+              ? 'Zapisz zmiany'
+              : 'Dodaj delegację'}
         </button>
       </div>
     </div>
@@ -1848,23 +1822,19 @@ function EditForm({
   item,
   categories,
   groups,
-  locations: _locations,
   owners,
   statuses,
   onSubmit,
   loading,
-  currentUser: _currentUser,
   permissionLevel,
 }: {
   item: Item;
   categories: Category[];
   groups: Group[];
-  locations: Location[];
   owners: Owner[];
   statuses: Status[];
   onSubmit: (itemId: number, payload: Partial<CreateItemPayload>) => void;
   loading: boolean;
-  currentUser: AuthUser | null;
   permissionLevel: 'admin' | 'owner' | 'manage' | 'edit' | null;
 }) {
   const [name, setName] = useState(item.name);
@@ -1883,10 +1853,9 @@ function EditForm({
     item.statusId ?? statuses[0]?.id ?? 1
   );
 
-  const initialOwnerType = useMemo<'person' | 'group'>(() => {
-    if (item.ownerGroupId) return 'group';
-    return 'person';
-  }, [item.ownerGroupId]);
+  const initialOwnerType: 'person' | 'group' = item.ownerGroupId
+    ? 'group'
+    : 'person';
 
   const [ownerType, setOwnerType] = useState<'person' | 'group'>(
     initialOwnerType

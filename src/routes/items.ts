@@ -3,10 +3,10 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, like, or, and, desc, sql } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
-import { borrowings, items, type Item } from '../db/schema';
+import { borrowings, itemPhotos, items, type Item } from '../db/schema';
 import { authMiddleware } from '../middleware/auth';
 import { notFound, badRequest, forbidden } from '../lib/errors';
-import { getItemPermissionLevel } from '../lib/permissions';
+import { canUpdateItemField, getItemPermissionLevel } from '../lib/permissions';
 import { createAuditLog } from '../lib/audit';
 
 type Variables = {
@@ -186,61 +186,27 @@ router.patch('/:id', zValidator('json', updateSchema), async (c) => {
     );
   }
 
-  // Determine which fields the user is allowed to update
-  const allowedFields = new Set<string>();
-
-  if (permission === 'admin' || permission === 'owner') {
-    allowedFields.add('name');
-    allowedFields.add('manufacturer');
-    allowedFields.add('model');
-    allowedFields.add('serial');
-    allowedFields.add('inventoryNumber');
-    allowedFields.add('description');
-    allowedFields.add('purchaseDate');
-    allowedFields.add('systemId');
-    allowedFields.add('categoryId');
-    allowedFields.add('statusId');
-    allowedFields.add('locationId');
-    allowedFields.add('ownerId');
-    allowedFields.add('ownerGroupId');
-  } else if (permission === 'manage') {
-    allowedFields.add('name');
-    allowedFields.add('manufacturer');
-    allowedFields.add('model');
-    allowedFields.add('serial');
-    allowedFields.add('inventoryNumber');
-    allowedFields.add('description');
-    allowedFields.add('purchaseDate');
-    allowedFields.add('systemId');
-    allowedFields.add('categoryId');
-    allowedFields.add('statusId');
-    allowedFields.add('locationId');
-    allowedFields.add('ownerId');
-    allowedFields.add('ownerGroupId');
-  } else if (permission === 'edit') {
-    allowedFields.add('statusId');
-    allowedFields.add('description');
-    allowedFields.add('ownerId');
-    allowedFields.add('ownerGroupId');
-  }
-
-  // Build updateData only from allowed fields
   const updateData: Record<string, unknown> = {};
   for (const key of Object.keys(body) as (keyof typeof body)[]) {
-    if (
-      allowedFields.has(key) &&
-      (body as Record<string, unknown>)[key] !== undefined
-    ) {
-      updateData[key] = (body as Record<string, unknown>)[key];
+    const value = body[key];
+    if (canUpdateItemField(permission, key) && value !== undefined) {
+      updateData[key] = value;
     }
   }
 
-  // Ensure the final state still has an owner (not both null)
-  const newOwnerId = body.ownerId !== undefined ? body.ownerId : item.ownerId;
-  const newOwnerGroupId =
-    body.ownerGroupId !== undefined ? body.ownerGroupId : item.ownerGroupId;
+  const newOwnerId = Object.hasOwn(updateData, 'ownerId')
+    ? updateData.ownerId
+    : item.ownerId;
+  const newOwnerGroupId = Object.hasOwn(updateData, 'ownerGroupId')
+    ? updateData.ownerGroupId
+    : item.ownerGroupId;
   if (newOwnerId == null && newOwnerGroupId == null) {
     badRequest('Przedmiot musi mieć przypisanego opiekuna (osobę lub grupę).');
+  }
+  if (newOwnerId != null && newOwnerGroupId != null) {
+    badRequest(
+      'Można przypisać tylko osobę lub grupę jako opiekuna, nie oba jednocześnie.'
+    );
   }
 
   if (Object.keys(updateData).length === 0) badRequest('No fields to update');
@@ -288,7 +254,26 @@ router.delete('/:id', async (c) => {
     oldValue: existing[0],
   });
 
+  const photos = await db
+    .select({ storagePath: itemPhotos.storagePath })
+    .from(itemPhotos)
+    .where(eq(itemPhotos.itemId, id));
   await db.delete(items).where(eq(items.id, id));
+  if (photos.length > 0) {
+    try {
+      await c.env.PHOTOS_BUCKET.delete(
+        photos.map((photo) => photo.storagePath)
+      );
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          message: 'orphaned R2 photos after item deletion',
+          itemId: id,
+          error: String(error),
+        })
+      );
+    }
+  }
   return c.body(null, 204);
 });
 
