@@ -11,7 +11,7 @@ oraz pliki zdjęć przez `/storage/*`. Nie używa `wrangler dev`.
    - `MYSQL_ROOT_PASSWORD`,
    - `MYSQL_PASSWORD`,
    - `JWT_SECRET` (minimum 32 losowe znaki),
-   - `GOOGLE_CLIENT_ID` dla produkcyjnego logowania Google, jeśli ma być użyte,
+   - `GOOGLE_CLIENT_ID` dla produkcyjnego logowania przez AGH Google SSO,
    - `INITIAL_ADMIN_EMAIL`.
      Opcjonalnie dostosuj `DB_CONNECTION_LIMIT` do limitów MySQL i liczby
      instancji aplikacji.
@@ -38,17 +38,18 @@ MYSQL_HOST=db MYSQL_USER="$MYSQL_USER" MYSQL_PASSWORD="$MYSQL_PASSWORD" \
   pnpm run validate:docker
 ```
 
-6. Zbuduj i uruchom:
+6. Zbuduj i uruchom. `docker compose up` najpierw uruchamia MySQL, następnie
+   jednorazowy kontener migracji i seedów, a dopiero potem aplikację:
 
 ```bash
 docker compose up --build -d
 ```
 
-7. Uruchom migracje jednorazowym kontenerem narzędziowym:
+7. Jeżeli chcesz ręcznie ponowić same migracje i seedy, uruchom:
 
 ```bash
-docker compose --profile tools build migrate
-docker compose --profile tools run --rm migrate
+docker compose build migrate
+docker compose run --rm migrate
 ```
 
 Zdjęcia są przechowywane w wolumenie `photos_data`. Baza danych w wolumenie
@@ -75,8 +76,8 @@ Test odtworzenia w środowisku testowym:
 
 ```bash
 scripts/restore-docker.sh backups/<timestamp> --force
-docker compose --profile tools build migrate
-docker compose --profile tools run --rm migrate
+docker compose build migrate
+docker compose run --rm migrate
 curl --fail http://127.0.0.1:${APP_PORT:-8787}/api/health
 ```
 
@@ -123,14 +124,17 @@ Po wdrożeniu sprawdź:
 - dodanie, odczyt i pobranie zdjęcia działa z wolumenu zdjęć;
 - backup MySQL i `photos_data` można odtworzyć w środowisku testowym.
 
-## Google OAuth w Dockerze
+## AGH Google SSO w Dockerze
 
-Backend nie używa sekretu klienta Google. Frontend pobiera `credential` z
-Google Identity Services i wysyła go do `POST /api/v1/auth/google-login`.
+Backend nie używa sekretu klienta Google ani zakresów dostępu do API Google.
+Frontend używa Google Identity Services jako logowania SSO, pobiera
+`credential` z tokenem ID i wysyła go do `POST /api/v1/auth/google-login`.
 Backend weryfikuje token przez Google `tokeninfo`, sprawdza `aud` względem
-`GOOGLE_CLIENT_ID` oraz domenę konta `@agh.edu.pl`.
+`GOOGLE_CLIENT_ID`, wymaga claimu `hd` Google Workspace oraz dopuszcza tylko
+domeny `agh.edu.pl` i `student.agh.edu.pl`.
 
-W Google Cloud Console skonfiguruj klienta OAuth typu **Web application**:
+W Google Cloud Console skonfiguruj identyfikator klienta typu **Web application**
+dla Sign in with Google:
 
 - `Authorized JavaScript origins`: publiczny adres aplikacji, np.
   `https://inventory.example.edu.pl`;
@@ -140,9 +144,10 @@ W Google Cloud Console skonfiguruj klienta OAuth typu **Web application**:
 - `GOOGLE_CLIENT_ID` w `.env`: pełny identyfikator kończący się
   `.apps.googleusercontent.com`.
 
-`DEV_BYPASS_AUTH=true` pozwala w development traktować `credential` jako email.
-Nie wolno używać tego trybu w Docker production; `scripts/validate-docker-env.mjs`
-blokuje taki start.
+`DEV_BYPASS_AUTH=true` pozwala w development traktować `credential` jako email,
+ale nadal akceptuje tylko `@agh.edu.pl` i `@student.agh.edu.pl`. Nie wolno
+używać tego trybu w Docker production; `scripts/validate-docker-env.mjs` blokuje
+taki start.
 
 ## Wariant Cloudflare Worker
 
@@ -156,15 +161,16 @@ dockerowego `.env`.
 - Konfiguracja Hyperdrive wskazująca produkcyjną bazę.
 - Bucket R2 `pz-item-photos`.
 - Domena aplikacji w Cloudflare.
-- Klient OAuth typu Web application dla domeny aplikacji.
-- Konto `@agh.edu.pl`, które zostanie pierwszym administratorem.
+- Klient Google Identity Services typu Web application dla domeny aplikacji.
+- Konto `@agh.edu.pl` albo `@student.agh.edu.pl`, które zostanie pierwszym
+  administratorem.
 
 ### Konfiguracja
 
 1. W `wrangler.jsonc`, w `env.production`, zastąp wszystkie wartości `<YOUR_...>`:
    - identyfikatorem Hyperdrive,
    - domeną aplikacji,
-   - identyfikatorem klienta Google OAuth,
+   - identyfikatorem klienta Google Identity Services,
    - adresem pierwszego administratora.
 2. W Google Cloud dodaj domenę aplikacji do dozwolonych źródeł JavaScript.
 3. Ustaw sekret JWT interaktywnie:

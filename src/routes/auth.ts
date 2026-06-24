@@ -27,7 +27,30 @@ async function enforceAuthRateLimit(
 }
 
 function isInitialAdmin(env: Env, email: string): boolean {
-  return email === env.INITIAL_ADMIN_EMAIL.trim().toLowerCase();
+  const initialAdminEmail = env.INITIAL_ADMIN_EMAIL?.trim().toLowerCase();
+  return Boolean(initialAdminEmail) && email === initialAdminEmail;
+}
+
+async function ensureInitialAdmin(
+  db: MySql2Database<Record<string, never>>,
+  env: Env,
+  user: typeof users.$inferSelect
+): Promise<typeof users.$inferSelect> {
+  if (!isInitialAdmin(env, user.email) || user.role === 'admin') return user;
+
+  const existingAdmin = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.role, 'admin'))
+    .limit(1);
+  if (existingAdmin.length > 0) return user;
+
+  await db
+    .update(users)
+    .set({ role: 'admin', isActive: true })
+    .where(eq(users.id, user.id));
+
+  return { ...user, role: 'admin', isActive: true };
 }
 
 function getClientIp(c: {
@@ -69,12 +92,21 @@ router.post('/register', zValidator('json', registerSchema), async (c) => {
 
   const hashedPassword = await hashPassword(body.password);
 
-  await db.insert(users).values({
+  const result = await db.insert(users).values({
     email: body.email,
     hashedPassword,
     role: 'user',
     authProvider: 'local',
   });
+
+  const created = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, result[0].insertId))
+    .limit(1);
+  if (created[0]) {
+    await ensureInitialAdmin(db, c.env, created[0]);
+  }
 
   return c.json({ message: 'Konto utworzone' }, 201);
 });
@@ -113,20 +145,20 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
   if (!passwordValid) {
     unauthorized('Invalid email or password');
   }
-  if (!user.isActive) unauthorized('Account is deactivated');
+  const authUser = await ensureInitialAdmin(db, c.env, user);
+  if (!authUser.isActive) unauthorized('Account is deactivated');
 
-  return c.json(await authResponse(user, c.env.JWT_SECRET));
+  return c.json(await authResponse(authUser, c.env.JWT_SECRET));
 });
 
-// ─── Google OAuth ───────────────────────────────────────────────────────────
+// ─── Google Workspace SSO ───────────────────────────────────────────────────
 //
 // Flow:
 // 1. Frontend loads Google Identity Services, user clicks "Sign in with Google".
-// 2. Google returns an ID token (Implicit Flow — not authorization code,
-//    because the frontend is a SPA and cannot keep a client secret).
+// 2. Google returns an ID token for the signed-in Google Workspace account.
 // 3. Frontend POSTs { credential } (the ID token) to /google-login.
 // 4. Backend verifies the ID token with Google's tokeninfo endpoint,
-//    creates/updates the user.
+//    enforces the AGH Workspace domain, and creates/updates the user.
 // 5. Backend returns a pz-worker JWT.
 
 // Environment variable: DEV_BYPASS_AUTH
@@ -145,6 +177,10 @@ interface GoogleIdToken {
   aud: string;
 }
 
+const allowedGoogleWorkspaceDomains = ['agh.edu.pl', 'student.agh.edu.pl'];
+const allowedGoogleWorkspaceDomainMessage =
+  'Only @agh.edu.pl or @student.agh.edu.pl Google Workspace accounts are allowed';
+
 const googleLoginSchema = z.object({
   credential: z.string().min(1), // Google ID token (or dev bypass email)
 });
@@ -153,6 +189,30 @@ function isGoogleEmailVerified(
   value: GoogleIdToken['email_verified']
 ): boolean {
   return value === true || value === 'true';
+}
+
+function getEmailDomain(email: string): string | undefined {
+  const atIndex = email.lastIndexOf('@');
+  if (atIndex === -1) return undefined;
+  return email.slice(atIndex + 1).toLowerCase();
+}
+
+function isAllowedGoogleWorkspaceDomain(domain: string | undefined): boolean {
+  return Boolean(
+    domain && allowedGoogleWorkspaceDomains.includes(domain.toLowerCase())
+  );
+}
+
+function enforceAllowedEmailDomain(email: string): void {
+  if (!isAllowedGoogleWorkspaceDomain(getEmailDomain(email))) {
+    unauthorized(allowedGoogleWorkspaceDomainMessage);
+  }
+}
+
+function enforceGoogleWorkspaceDomain(payload: GoogleIdToken): void {
+  if (!isAllowedGoogleWorkspaceDomain(payload.hd)) {
+    unauthorized(allowedGoogleWorkspaceDomainMessage);
+  }
 }
 
 router.post(
@@ -167,7 +227,8 @@ router.post(
     let email: string;
 
     // ── Dev bypass ────────────────────────────────────────────────────────
-    const devBypass = c.env.DEV_BYPASS_AUTH === 'true';
+    const devBypass =
+      c.env.DEV_BYPASS_AUTH === 'true' || c.env.DEV_BYPASS_AUTH === '1';
     if (devBypass) {
       // credential is treated as a plain email address for dev convenience
       email = credential.trim().toLowerCase();
@@ -177,6 +238,7 @@ router.post(
           'DEV_BYPASS_AUTH is enabled — credential must be an email address'
         );
       }
+      enforceAllowedEmailDomain(email);
       // Generate a fake stable google ID from the email
       const encoder = new TextEncoder();
       const hashBuffer = await crypto.subtle.digest(
@@ -221,6 +283,8 @@ router.post(
         }
 
         email = payload.email.trim().toLowerCase();
+        enforceAllowedEmailDomain(email);
+        enforceGoogleWorkspaceDomain(payload);
         googleId = payload.sub;
       } catch (err) {
         // Re-throw our own AppErrors so the global onError handler can format them
@@ -281,22 +345,7 @@ router.post(
       }
     }
 
-    const user = userRows[0];
-    if (isInitialAdmin(c.env, email) && user.role !== 'admin') {
-      const existingAdmin = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.role, 'admin'))
-        .limit(1);
-      if (existingAdmin.length === 0) {
-        await db
-          .update(users)
-          .set({ role: 'admin', isActive: true })
-          .where(eq(users.id, user.id));
-        user.role = 'admin';
-        user.isActive = true;
-      }
-    }
+    const user = await ensureInitialAdmin(db, c.env, userRows[0]);
     if (!user.isActive) unauthorized('Account is deactivated');
 
     return c.json(await authResponse(user, c.env.JWT_SECRET));
@@ -340,7 +389,8 @@ router.get('/users', authMiddleware, async (c) => {
 // ─── Auth config (for frontend) ────────────────────────────────────────────
 
 router.get('/config', async (c) => {
-  const devBypass = c.env.DEV_BYPASS_AUTH === 'true';
+  const devBypass =
+    c.env.DEV_BYPASS_AUTH === 'true' || c.env.DEV_BYPASS_AUTH === '1';
   return c.json({
     devBypassAuth: devBypass,
     googleClientId: c.env.GOOGLE_CLIENT_ID || '',

@@ -4,6 +4,7 @@ import type { CreateItemPayload, Item } from '../types/item';
 import type { Location } from '../types/location';
 import type { Owner } from '../types/owner';
 import type { Status } from '../types/status';
+import { ensureOk } from './apiError';
 import { authHeaders, jsonAuthHeaders } from './authHeaders';
 
 const USE_MOCKS = import.meta.env.MODE === 'test';
@@ -356,14 +357,4 @@ function mapLocation(l: BackendLocation): Location {
     mapX: l.mapX ?? undefined,
     mapY: l.mapY ?? undefined,
   };
-}
-
-async function ensureOk(response: Response): Promise<void> {
-  if (response.ok) return;
-  let detail = `Błąd serwera (${response.status})`;
-  try {
-    const data = (await response.json()) as Record<string, unknown>;
-    if (typeof data.detail === 'string') detail = data.detail;
-  } catch {}
-  throw new Error(detail);
 }

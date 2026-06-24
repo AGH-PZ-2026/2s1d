@@ -34,7 +34,7 @@ describe('LoginPage', () => {
     });
   });
 
-  it('inicjalizuje Google Identity Services i wysyła credential do authService', async () => {
+  it('inicjalizuje Google SSO i wysyła credential do authService', async () => {
     authServiceMock.getConfig.mockResolvedValue({
       devBypassAuth: false,
       googleClientId: 'client-id.apps.googleusercontent.com',
@@ -66,6 +66,7 @@ describe('LoginPage', () => {
         expect.objectContaining({
           client_id: 'client-id.apps.googleusercontent.com',
           callback: expect.any(Function),
+          hd: '*',
         })
       )
     );
@@ -86,7 +87,7 @@ describe('LoginPage', () => {
     );
   });
 
-  it('pokazuje informację, gdy Google OAuth nie jest skonfigurowany', async () => {
+  it('pokazuje informację, gdy Google SSO nie jest skonfigurowany', async () => {
     render(<LoginPage />);
 
     expect(

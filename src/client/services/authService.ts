@@ -35,8 +35,8 @@ export type LoginPayload = RegisterPayload;
 
 export const authService = {
   /**
-   * Google OAuth login.
-   * @param credential Google ID token from GIS (or email string when dev bypass is active)
+   * Google Workspace SSO login.
+   * @param credential Google ID token from GIS (or AGH email string when dev bypass is active)
    */
   async googleLogin(credential: string): Promise<AuthSession> {
     const response = await fetch('/api/v1/auth/google-login', {

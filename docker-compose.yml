@@ -20,8 +20,8 @@ services:
       context: .
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       MYSQL_HOST: db
       MYSQL_PORT: 3306
@@ -52,7 +52,6 @@ services:
     build:
       context: .
       target: build
-    profiles: ["tools"]
     depends_on:
       db:
         condition: service_healthy
@@ -62,7 +61,8 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-pz_db}
       MYSQL_USER: ${MYSQL_USER:-pz_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
-    command: sh -c "pnpm run db:wait && pnpm run db:migrate"
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@agh.edu.pl}
+    command: sh -c "pnpm run db:wait && pnpm run db:migrate && pnpm run db:seed"
 
 volumes:
   mysql_data:

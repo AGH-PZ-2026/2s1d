@@ -18,6 +18,7 @@
     "db:start": "docker compose up -d db",
     "db:wait": "node scripts/wait-for-mysql.mjs",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node --import tsx src/db/seed-defaults.ts",
     "db:generate": "drizzle-kit generate",
     "test": "vitest run --config vitest.logic.config.ts && vitest run --config vitest.client.config.ts",
     "test:logic": "vitest run --config vitest.logic.config.ts",

@@ -5,6 +5,8 @@ lokalizacji, kodów QR i uprawnień do przedmiotów.
 
 Instrukcja dla użytkowników: [docs/INSTRUKCJA_UZYTKOWNIKA.md](docs/INSTRUKCJA_UZYTKOWNIKA.md).
 
+Rozszerzone przewodniki użytkownika: [docs/user/README.md](docs/user/README.md).
+
 Instrukcja wdrożenia Docker: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 Produkcja działa przez Docker: `docker compose up --build -d` po ustawieniu

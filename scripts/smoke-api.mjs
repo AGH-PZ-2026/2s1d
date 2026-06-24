@@ -15,6 +15,30 @@ async function expectResponse(path, status, expectedBody) {
   return response;
 }
 
+async function loginAsDefaultAdmin() {
+  const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: 'admin@agh.edu.pl',
+      password: 'admin',
+    }),
+  });
+  const body = await response.json();
+  if (
+    response.status !== 200 ||
+    typeof body.access_token !== 'string' ||
+    body.token_type !== 'bearer' ||
+    body.user?.email !== 'admin@agh.edu.pl' ||
+    body.user?.role !== 'admin' ||
+    body.user?.is_active !== true
+  ) {
+    throw new Error(
+      `/api/v1/auth/login: default admin login failed with ${response.status} ${JSON.stringify(body)}`
+    );
+  }
+}
+
 const health = await expectResponse('/api/health', 200, {
   status: 'ok',
   database: 'ok',
@@ -26,6 +50,7 @@ await expectResponse('/api/v1/auth/config', 200, {
   devBypassAuth: expectedDevBypass,
   googleClientId: '',
 });
+await loginAsDefaultAdmin();
 
 if (health.headers.get('x-content-type-options') !== 'nosniff') {
   throw new Error('Security headers are missing');

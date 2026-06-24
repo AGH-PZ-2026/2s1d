@@ -13,6 +13,7 @@ declare global {
             auto_select?: boolean;
             cancel_on_tap_outside?: boolean;
             context?: string;
+            hd?: string;
           }) => void;
           renderButton: (
             element: HTMLElement,
@@ -124,6 +125,7 @@ export default function LoginPage() {
         },
         auto_select: false,
         cancel_on_tap_outside: true,
+        hd: '*',
       });
       // Render the Google Sign-In button
       const btnContainer = document.getElementById('g_id_signin');
@@ -211,7 +213,7 @@ export default function LoginPage() {
         </p>
         <h1>Wybierz metodę logowania</h1>
         <p className="login-copy">
-          Zaloguj się przez konto Google albo użyj konta developerskiego.
+          Zaloguj się przez AGH Google SSO albo użyj konta developerskiego.
         </p>
       </div>
 
@@ -229,13 +231,13 @@ export default function LoginPage() {
       {/* ── Google Sign-In (production) ─────────────────────────────────── */}
       {!devBypassAuth && (
         <div className="login-panel">
-          <h2>Konto Google</h2>
+          <h2>AGH Google SSO</h2>
           {isConfigLoading ? (
             <p className="login-copy">Pobieranie konfiguracji logowania...</p>
           ) : googleClientId ? (
             <>
               <p className="login-copy">
-                Kliknij przycisk poniżej, aby zalogować się przez konto Google.
+                Użyj konta w domenie @agh.edu.pl lub @student.agh.edu.pl.
               </p>
               <div
                 id="g_id_signin"
@@ -259,11 +261,11 @@ export default function LoginPage() {
       {/* ── Dev bypass ──────────────────────────────────────────────────── */}
       {devBypassAuth && (
         <div className="login-panel">
-          <h2>Dev Bypass — Google OAuth (symulowane)</h2>
+          <h2>Dev Bypass - Google SSO (symulowane)</h2>
           <p className="login-copy">
             <strong>DEV_BYPASS_AUTH</strong> jest włączone. Podaj adres e-mail,
-            a system utworzy lub znajdzie konto. W produkcji ten panel nie
-            będzie widoczny.
+            a system utworzy lub znajdzie konto w dozwolonej domenie AGH. W
+            produkcji ten panel nie będzie widoczny.
           </p>
           <form className="form" onSubmit={handleDevBypassSubmit}>
             <label className="form-label" htmlFor="dev-email">
@@ -273,7 +275,7 @@ export default function LoginPage() {
               className="form-input"
               id="dev-email"
               type="email"
-              placeholder="jan.kowalski@example.com"
+              placeholder="jan.kowalski@agh.edu.pl"
               value={devEmail}
               onChange={(event) => setDevEmail(event.target.value)}
               required
