@@ -13,6 +13,7 @@ import {
   float,
   timestamp,
   check,
+  primaryKey,
 } from 'drizzle-orm/mysql-core';
 import { foreignKey } from 'drizzle-orm/mysql-core';
 import { sql } from 'drizzle-orm';
@@ -75,7 +76,7 @@ export const groupMembers = mysqlTable(
     userId: int('user_id').notNull(),
   },
   (table) => ({
-    pk: { primaryKey: [table.groupId, table.userId] },
+    pk: primaryKey({ columns: [table.groupId, table.userId] }),
     groupFk: foreignKey({
       name: 'group_members_group_fk',
       columns: [table.groupId],

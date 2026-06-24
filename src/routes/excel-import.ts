@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
 import Papa from 'papaparse';
 import readXlsxFile, { type SheetData } from 'read-excel-file/web-worker';
@@ -150,6 +150,13 @@ router.post('/upload', async (c) => {
       const locationId = row.location_id ? Number(row.location_id) : null;
 
       const ownerId = row.owner_id ? Number(row.owner_id) : null;
+      if (!ownerId || !Number.isInteger(ownerId) || ownerId <= 0) {
+        errors.push({
+          row_number: i + 1,
+          error_message: `Row ${i + 1}: owner_id is required`,
+        });
+        continue;
+      }
 
       const vals: Record<string, unknown> = {
         name,
@@ -169,10 +176,15 @@ router.post('/upload', async (c) => {
       const result = await db
         .insert(items)
         .values(vals as typeof items.$inferInsert);
+      const insertedId = result[0].insertId;
+      await db
+        .update(items)
+        .set({ systemId: `INV-${String(insertedId).padStart(6, '0')}` })
+        .where(eq(items.id, insertedId));
 
       await createAuditLog(db, {
         userId: c.get('userId'),
-        itemId: result[0].insertId,
+        itemId: insertedId,
         action: 'ITEM_IMPORTED',
         newValue: {
           name,

@@ -4,6 +4,8 @@ const required = [
   'MYSQL_PASSWORD',
   'MYSQL_DATABASE',
   'JWT_SECRET',
+  'INITIAL_ADMIN_EMAIL',
+  'INITIAL_ADMIN_PASSWORD',
 ];
 const weakValues = new Set([
   'root',
@@ -37,6 +39,10 @@ for (const name of ['MYSQL_ROOT_PASSWORD']) {
 
 if ((process.env.JWT_SECRET?.trim().length ?? 0) < 32) {
   errors.push('JWT_SECRET must be at least 32 characters');
+}
+
+if ((process.env.INITIAL_ADMIN_PASSWORD?.length ?? 0) < 12) {
+  errors.push('INITIAL_ADMIN_PASSWORD must be at least 12 characters');
 }
 
 if (process.env.DEV_BYPASS_AUTH === 'true') {

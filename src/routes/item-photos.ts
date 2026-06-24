@@ -6,6 +6,7 @@ import { authMiddleware } from '../middleware/auth';
 import { notFound, badRequest, forbidden } from '../lib/errors';
 import { createAuditLog } from '../lib/audit';
 import { getItemPermissionLevel } from '../lib/permissions';
+import { createObjectStorage } from '../lib/storage';
 
 type Variables = {
   db: MySql2Database<Record<string, never>>;
@@ -48,12 +49,37 @@ function toResponse(p: PhotoResponseRow) {
   };
 }
 
+async function requireItemPhotoAccess(
+  db: MySql2Database<Record<string, never>>,
+  itemId: number,
+  userId: number,
+  userRole: 'admin' | 'user'
+) {
+  const item = await db
+    .select({ ownerId: items.ownerId, ownerGroupId: items.ownerGroupId })
+    .from(items)
+    .where(eq(items.id, itemId))
+    .limit(1);
+  if (item.length === 0) notFound('Item not found');
+  const permission = await getItemPermissionLevel(
+    db,
+    itemId,
+    userId,
+    userRole,
+    item[0].ownerId,
+    item[0].ownerGroupId
+  );
+  if (!permission) forbidden('Brak uprawnień do zdjęć przedmiotu');
+  return item[0];
+}
+
 // Nested under items: /api/v1/items/:itemId/photos
 router.get('/:itemId/photos', async (c) => {
   const db = c.get('db');
   const itemId = Number(c.req.param('itemId'));
   if (!Number.isInteger(itemId) || itemId <= 0)
     badRequest('itemId must be a positive integer');
+  await requireItemPhotoAccess(db, itemId, c.get('userId'), c.get('userRole'));
   const rows = await db
     .select({
       id: itemPhotos.id,
@@ -74,25 +100,12 @@ router.get('/:itemId/photos', async (c) => {
 
 router.post('/:itemId/photos', async (c) => {
   const db = c.get('db');
-  const bucket = c.env.PHOTOS_BUCKET;
+  const storage = createObjectStorage(c.env);
   const itemId = Number(c.req.param('itemId'));
   const userId = c.get('userId');
   if (!Number.isInteger(itemId) || itemId <= 0)
     badRequest('itemId must be a positive integer');
-  const item = await db
-    .select({ ownerId: items.ownerId })
-    .from(items)
-    .where(eq(items.id, itemId))
-    .limit(1);
-  if (item.length === 0) notFound('Item not found');
-  const permission = await getItemPermissionLevel(
-    db,
-    itemId,
-    userId,
-    c.get('userRole'),
-    item[0].ownerId
-  );
-  if (!permission) forbidden('Brak uprawnień do dodania zdjęcia');
+  await requireItemPhotoAccess(db, itemId, userId, c.get('userRole'));
   const formData = await c.req.formData();
   const candidate = formData.get('file');
   if (!(candidate instanceof File)) badRequest('No file uploaded');
@@ -110,8 +123,8 @@ router.post('/:itemId/photos', async (c) => {
   };
   const ext = extensionByType[file.type];
   const storagePath = `items/${itemId}/${crypto.randomUUID()}.${ext}`;
-  await bucket.put(storagePath, file.stream(), {
-    httpMetadata: { contentType: file.type || 'application/octet-stream' },
+  await storage.put(storagePath, file.stream(), {
+    contentType: file.type || 'application/octet-stream',
   });
 
   let result;
@@ -124,7 +137,7 @@ router.post('/:itemId/photos', async (c) => {
       storagePath,
     });
   } catch (error) {
-    await bucket.delete(storagePath);
+    await storage.delete(storagePath);
     throw error;
   }
   const created = await db
@@ -161,7 +174,7 @@ router.post('/:itemId/photos', async (c) => {
 
 router.get('/:itemId/photos/:photoId', async (c) => {
   const db = c.get('db');
-  const bucket = c.env.PHOTOS_BUCKET;
+  const storage = createObjectStorage(c.env);
   const itemId = Number(c.req.param('itemId'));
   const photoId = Number(c.req.param('photoId'));
   if (
@@ -178,10 +191,11 @@ router.get('/:itemId/photos/:photoId', async (c) => {
     .limit(1);
   if (rows.length === 0 || rows[0].itemId !== itemId)
     notFound('Photo not found');
+  await requireItemPhotoAccess(db, itemId, c.get('userId'), c.get('userRole'));
   const photo = rows[0];
-  const object = await bucket.get(photo.storagePath);
+  const object = await storage.getStream(photo.storagePath);
   if (!object) notFound('Photo file missing in storage');
-  return new Response(object.body as ReadableStream, {
+  return new Response(object, {
     headers: {
       'Content-Type': photo.contentType,
       'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(photo.originalFilename)}`,

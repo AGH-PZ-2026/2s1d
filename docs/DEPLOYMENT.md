@@ -4,7 +4,7 @@
 
 Docker jest obecnie główną ścieżką uruchomienia. Kontener aplikacji uruchamia
 serwer Node/Hono, serwuje zbudowane pliki SPA z `dist/client`, API `/api/*`
-oraz pliki zdjęć przez `/storage/*`. Nie używa `wrangler dev`.
+oraz pliki zdjęć przez `/storage/*`.
 
 1. Skopiuj `.env.example` do `.env`.
 2. Ustaw mocne wartości:
@@ -12,7 +12,8 @@ oraz pliki zdjęć przez `/storage/*`. Nie używa `wrangler dev`.
    - `MYSQL_PASSWORD`,
    - `JWT_SECRET` (minimum 32 losowe znaki),
    - `GOOGLE_CLIENT_ID` dla produkcyjnego logowania przez AGH Google SSO,
-   - `INITIAL_ADMIN_EMAIL`.
+   - `INITIAL_ADMIN_EMAIL`,
+   - `INITIAL_ADMIN_PASSWORD` (minimum 12 znaków, tylko do pierwszego seeda).
      Opcjonalnie dostosuj `DB_CONNECTION_LIMIT` do limitów MySQL i liczby
      instancji aplikacji.
 3. Upewnij się, że `DEV_BYPASS_AUTH=false`. Walidator Docker blokuje produkcyjne
@@ -32,6 +33,7 @@ MYSQL_HOST=db MYSQL_USER="$MYSQL_USER" MYSQL_PASSWORD="$MYSQL_PASSWORD" \
   MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" MYSQL_DATABASE="$MYSQL_DATABASE" \
   JWT_SECRET="$JWT_SECRET" \
   GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" INITIAL_ADMIN_EMAIL="$INITIAL_ADMIN_EMAIL" \
+  INITIAL_ADMIN_PASSWORD="$INITIAL_ADMIN_PASSWORD" \
   DEV_BYPASS_AUTH="$DEV_BYPASS_AUTH" TRUST_PROXY="$TRUST_PROXY" \
   NOTIFICATIONS_INTERVAL_MINUTES="$NOTIFICATIONS_INTERVAL_MINUTES" \
   DB_CONNECTION_LIMIT="$DB_CONNECTION_LIMIT" DB_QUEUE_LIMIT="$DB_QUEUE_LIMIT" \
@@ -148,79 +150,3 @@ dla Sign in with Google:
 ale nadal akceptuje tylko `@agh.edu.pl` i `@student.agh.edu.pl`. Nie wolno
 używać tego trybu w Docker production; `scripts/validate-docker-env.mjs` blokuje
 taki start.
-
-## Wariant Cloudflare Worker
-
-Ta ścieżka zostaje w repo jako alternatywa/legacy. Domyślna produkcja jest
-Docker-first; Worker wymaga osobnej konfiguracji Cloudflare i nie korzysta z
-dockerowego `.env`.
-
-### Wymagane zasoby
-
-- MySQL 8.4 dostępny z Cloudflare Hyperdrive, z TLS i kopiami zapasowymi.
-- Konfiguracja Hyperdrive wskazująca produkcyjną bazę.
-- Bucket R2 `pz-item-photos`.
-- Domena aplikacji w Cloudflare.
-- Klient Google Identity Services typu Web application dla domeny aplikacji.
-- Konto `@agh.edu.pl` albo `@student.agh.edu.pl`, które zostanie pierwszym
-  administratorem.
-
-### Konfiguracja
-
-1. W `wrangler.jsonc`, w `env.production`, zastąp wszystkie wartości `<YOUR_...>`:
-   - identyfikatorem Hyperdrive,
-   - domeną aplikacji,
-   - identyfikatorem klienta Google Identity Services,
-   - adresem pierwszego administratora.
-2. W Google Cloud dodaj domenę aplikacji do dozwolonych źródeł JavaScript.
-3. Ustaw sekret JWT interaktywnie:
-
-```bash
-pnpm exec wrangler secret put JWT_SECRET --env production
-```
-
-Sekret musi być unikalną, losową wartością. Nie zapisuj go w repozytorium ani w `vars`.
-
-Nie włączaj `DEV_BYPASS_AUTH` poza lokalnym developmentem. Do pracy lokalnej
-utwórz `.dev.vars` z `.dev.vars.example`; plik `.dev.vars` jest ignorowany przez
-Git.
-
-### Baza danych
-
-Przed pierwszym wdrożeniem uruchom migracje przeciwko produkcyjnej bazie:
-
-```bash
-MYSQL_HOST=... MYSQL_PORT=3306 MYSQL_USER=... MYSQL_PASSWORD=... MYSQL_DATABASE=... pnpm run db:migrate
-```
-
-Jeżeli instalacja ma udostępniać katalog pracowników, zaimportuj tabele referencyjne koidc (`pracownicy`, `stopnie`, `grupy`, `zespoly`). Bez nich `/api/v1/staff` celowo zwraca `503`.
-
-### Kontrola i wdrożenie
-
-```bash
-pnpm install --frozen-lockfile
-pnpm run types:worker:check
-pnpm run check
-pnpm run lint
-pnpm test
-pnpm run build:worker
-pnpm audit --prod
-pnpm run deploy:worker:dry-run
-pnpm run deploy:worker
-```
-
-Walidator blokuje wdrożenie z placeholderami, włączonym `DEV_BYPASS_AUTH`,
-brakiem harmonogramu powiadomień, brakiem observability albo błędnym formatem
-domeny produkcyjnej.
-
-Po wdrożeniu Workera sprawdź:
-
-- `GET /api/health` zwraca `200` oraz `{"status":"ok","database":"ok"}`;
-- logowanie Google działa dla skonfigurowanego administratora;
-- niezalogowane `GET /api/v1/items/` zwraca `401`;
-- dodanie, odczyt i pobranie zdjęcia działa z R2;
-- backup MySQL można odtworzyć w środowisku testowym.
-
-### Wycofanie
-
-Kod Worker można wycofać przez `pnpm exec wrangler rollback --env production`. Migracje DB wymagają osobnego, wcześniej przetestowanego planu; nie cofaj ich automatycznie po wdrożeniu kodu.

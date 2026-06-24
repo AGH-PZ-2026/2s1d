@@ -19,11 +19,8 @@
     "src",
     "tests",
     "e2e",
-    "worker-configuration.d.ts",
     "drizzle.config.ts",
     "vite.config.ts",
-    "vite.cloudflare.config.ts",
-    "vitest.config.ts",
     "vitest.client.config.ts",
     "vitest.logic.config.ts",
     "playwright.config.ts"

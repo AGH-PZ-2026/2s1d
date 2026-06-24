@@ -1,8 +1,6 @@
-import { createReadStream } from 'node:fs';
-import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
-import { Readable } from 'node:stream';
 import { serve } from '@hono/node-server';
 import type { HttpBindings } from '@hono/node-server';
 import { createDb } from './db/client';
@@ -79,66 +77,6 @@ function createInMemoryRateLimit(): RateLimit {
   } as RateLimit;
 }
 
-function safeStoragePath(key: string): string {
-  const resolved = path.resolve(storageRoot, key);
-  if (!resolved.startsWith(`${storageRoot}${path.sep}`)) {
-    throw new Error('Invalid storage key');
-  }
-  return resolved;
-}
-
-async function bodyToBuffer(
-  value: ReadableStream | ArrayBuffer | ArrayBufferView | Blob | string
-): Promise<Buffer> {
-  if (typeof value === 'string') return Buffer.from(value);
-  if (value instanceof Blob) return Buffer.from(await value.arrayBuffer());
-  if (value instanceof ArrayBuffer) return Buffer.from(value);
-  if (ArrayBuffer.isView(value))
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-  const chunks: Buffer[] = [];
-  for await (const chunk of Readable.fromWeb(
-    value as unknown as Parameters<typeof Readable.fromWeb>[0]
-  )) {
-    chunks.push(Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
-}
-
-function createLocalPhotosBucket(): R2Bucket {
-  return {
-    async put(
-      key: string,
-      value: ReadableStream | ArrayBuffer | ArrayBufferView | Blob | string
-    ) {
-      const target = safeStoragePath(key);
-      await mkdir(path.dirname(target), { recursive: true });
-      await writeFile(target, await bodyToBuffer(value));
-      return null;
-    },
-    async get(key: string) {
-      const target = safeStoragePath(key);
-      try {
-        await stat(target);
-      } catch {
-        return null;
-      }
-      return { body: Readable.toWeb(createReadStream(target)) } as R2ObjectBody;
-    },
-    async delete(keys: string | string[]) {
-      const list = Array.isArray(keys) ? keys : [keys];
-      await Promise.all(
-        list.map(async (key) => {
-          try {
-            await unlink(safeStoragePath(key));
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-          }
-        })
-      );
-    },
-  } as R2Bucket;
-}
-
 function createEnv(): Env {
   if (
     process.env.DEV_BYPASS_AUTH === 'true' &&
@@ -153,11 +91,11 @@ function createEnv(): Env {
   }
   return {
     HYPERDRIVE: createHyperdriveFromEnv(),
-    PHOTOS_BUCKET: createLocalPhotosBucket(),
+    PHOTOS_LOCAL_DIR: storageRoot,
     AUTH_RATE_LIMITER: createInMemoryRateLimit(),
     DB_POOL: 'true',
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? '',
-    INITIAL_ADMIN_EMAIL: process.env.INITIAL_ADMIN_EMAIL ?? 'admin@agh.edu.pl',
+    INITIAL_ADMIN_EMAIL: process.env.INITIAL_ADMIN_EMAIL ?? '',
     DEV_BYPASS_AUTH: process.env.DEV_BYPASS_AUTH ?? 'false',
     JWT_SECRET: process.env.JWT_SECRET,
     TRUST_PROXY: process.env.TRUST_PROXY ?? 'false',

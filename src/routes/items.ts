@@ -8,6 +8,7 @@ import { authMiddleware } from '../middleware/auth';
 import { notFound, badRequest, forbidden } from '../lib/errors';
 import { canUpdateItemField, getItemPermissionLevel } from '../lib/permissions';
 import { createAuditLog } from '../lib/audit';
+import { createObjectStorage } from '../lib/storage';
 
 type Variables = {
   db: MySql2Database<Record<string, never>>;
@@ -173,7 +174,8 @@ router.patch('/:id', zValidator('json', updateSchema), async (c) => {
     id,
     c.get('userId'),
     c.get('userRole'),
-    item.ownerId
+    item.ownerId,
+    item.ownerGroupId
   );
   if (!permission) forbidden('Brak uprawnień do edycji tego przedmiotu');
 
@@ -261,13 +263,14 @@ router.delete('/:id', async (c) => {
   await db.delete(items).where(eq(items.id, id));
   if (photos.length > 0) {
     try {
-      await c.env.PHOTOS_BUCKET.delete(
-        photos.map((photo) => photo.storagePath)
+      const storage = createObjectStorage(c.env);
+      await Promise.all(
+        photos.map((photo) => storage.delete(photo.storagePath))
       );
     } catch (error) {
       console.error(
         JSON.stringify({
-          message: 'orphaned R2 photos after item deletion',
+          message: 'orphaned photos after item deletion',
           itemId: id,
           error: String(error),
         })

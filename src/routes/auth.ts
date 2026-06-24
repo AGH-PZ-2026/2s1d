@@ -26,33 +26,6 @@ async function enforceAuthRateLimit(
   if (!outcome.success) tooManyRequests('Too many authentication attempts');
 }
 
-function isInitialAdmin(env: Env, email: string): boolean {
-  const initialAdminEmail = env.INITIAL_ADMIN_EMAIL?.trim().toLowerCase();
-  return Boolean(initialAdminEmail) && email === initialAdminEmail;
-}
-
-async function ensureInitialAdmin(
-  db: MySql2Database<Record<string, never>>,
-  env: Env,
-  user: typeof users.$inferSelect
-): Promise<typeof users.$inferSelect> {
-  if (!isInitialAdmin(env, user.email) || user.role === 'admin') return user;
-
-  const existingAdmin = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.role, 'admin'))
-    .limit(1);
-  if (existingAdmin.length > 0) return user;
-
-  await db
-    .update(users)
-    .set({ role: 'admin', isActive: true })
-    .where(eq(users.id, user.id));
-
-  return { ...user, role: 'admin', isActive: true };
-}
-
 function getClientIp(c: {
   req: { header: (name: string) => string | undefined };
   env: Env;
@@ -104,10 +77,6 @@ router.post('/register', zValidator('json', registerSchema), async (c) => {
     .from(users)
     .where(eq(users.id, result[0].insertId))
     .limit(1);
-  if (created[0]) {
-    await ensureInitialAdmin(db, c.env, created[0]);
-  }
-
   return c.json({ message: 'Konto utworzone' }, 201);
 });
 
@@ -145,10 +114,9 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
   if (!passwordValid) {
     unauthorized('Invalid email or password');
   }
-  const authUser = await ensureInitialAdmin(db, c.env, user);
-  if (!authUser.isActive) unauthorized('Account is deactivated');
+  if (!user.isActive) unauthorized('Account is deactivated');
 
-  return c.json(await authResponse(authUser, c.env.JWT_SECRET));
+  return c.json(await authResponse(user, c.env.JWT_SECRET));
 });
 
 // ─── Google Workspace SSO ───────────────────────────────────────────────────
@@ -334,7 +302,7 @@ router.post(
           googleId,
           authProvider: 'google',
           hashedPassword: null,
-          role: isInitialAdmin(c.env, email) ? 'admin' : 'user',
+          role: 'user',
         });
         const created = await db
           .select()
@@ -345,7 +313,7 @@ router.post(
       }
     }
 
-    const user = await ensureInitialAdmin(db, c.env, userRows[0]);
+    const user = userRows[0];
     if (!user.isActive) unauthorized('Account is deactivated');
 
     return c.json(await authResponse(user, c.env.JWT_SECRET));

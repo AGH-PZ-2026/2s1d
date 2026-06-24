@@ -1,6 +1,6 @@
 import { eq, or, and, inArray } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
-import { delegations, groupMembers } from '../db/schema';
+import { delegations, groupMembers, groups } from '../db/schema';
 
 export type PermissionLevel = 'admin' | 'owner' | 'manage' | 'edit' | null;
 
@@ -35,7 +35,8 @@ export async function getItemPermissionLevel(
   itemId: number,
   userId: number,
   userRole: 'admin' | 'user',
-  ownerId: number | null
+  ownerId: number | null,
+  ownerGroupId?: number | null
 ): Promise<PermissionLevel> {
   if (userRole === 'admin') return 'admin';
   if (ownerId !== null && ownerId === userId) return 'owner';
@@ -47,6 +48,16 @@ export async function getItemPermissionLevel(
     .where(eq(groupMembers.userId, userId));
 
   const groupIds = userGroups.map((g) => g.groupId);
+
+  if (ownerGroupId != null && groupIds.includes(ownerGroupId)) {
+    const ownerGroup = await db
+      .select({ defaultPermission: groups.defaultPermission })
+      .from(groups)
+      .where(eq(groups.id, ownerGroupId))
+      .limit(1);
+    if (ownerGroup[0]?.defaultPermission === 'manage') return 'manage';
+    if (ownerGroup[0]?.defaultPermission === 'edit') return 'edit';
+  }
 
   const conditions = [eq(delegations.userId, userId)];
   if (groupIds.length > 0) {

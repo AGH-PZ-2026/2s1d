@@ -3,10 +3,7 @@ import { createObjectStorage } from './storage';
 
 /**
  * Hono sub-app mounted at `/storage`. Serves raw object bytes when the
- * configured storage adapter returns a relative `/storage/...` URL. Used
- * by the self-hosted Node server. On Cloudflare this route is unreachable
- * because the `assets` binding serves `/storage/*` (or a public R2 bucket
- * does) before the worker runs.
+ * configured storage adapter returns a relative `/storage/...` URL.
  */
 export const storageProxyApp = new Hono<{ Bindings: Env }>();
 

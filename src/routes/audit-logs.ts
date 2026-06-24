@@ -41,6 +41,8 @@ router.get('/', async (c) => {
 
 router.get('/item/:itemId', async (c) => {
   const db = c.get('db');
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can view audit logs');
   const itemId = Number(c.req.param('itemId'));
   const rows = await db
     .select({

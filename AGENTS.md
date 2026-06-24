@@ -4,23 +4,23 @@ Zintegrowany i wszechstronny system do zarządzania bazą danych aparatury pomia
 
 ## Stack
 
-| Warstwa    | Technologia                                                                   |
-| ---------- | ----------------------------------------------------------------------------- |
-| Runtime    | Docker + Node 22 (`src/server.ts`), Cloudflare Worker jako legacy/alternatywa |
-| Framework  | [Hono](https://hono.dev/)                                                     |
-| ORM        | [Drizzle](https://orm.drizzle.team/) + `drizzle-kit`                          |
-| DB         | MySQL 8.4 w Docker Compose; Hyperdrive tylko dla ścieżki Cloudflare           |
-| Frontend   | React 19 + Vite 8 + react-router-dom 7                                        |
-| Testy      | Vitest 3 (`@cloudflare/vitest-pool-workers` dla workera)                      |
-| Środowisko | Nix (`flake.nix`), `pnpm` jako package manager                                |
-| Walidacja  | Zod + `@hono/zod-validator`                                                   |
-| Ikony      | lucide-react                                                                  |
+| Warstwa    | Technologia                                          |
+| ---------- | ---------------------------------------------------- |
+| Runtime    | Docker + Node 22 (`src/server.ts`)                   |
+| Framework  | [Hono](https://hono.dev/)                            |
+| ORM        | [Drizzle](https://orm.drizzle.team/) + `drizzle-kit` |
+| DB         | MySQL 8.4 w Docker Compose                           |
+| Frontend   | React 19 + Vite 8 + react-router-dom 7               |
+| Testy      | Vitest 3                                             |
+| Środowisko | Nix (`flake.nix`), `pnpm` jako package manager       |
+| Walidacja  | Zod + `@hono/zod-validator`                          |
+| Ikony      | lucide-react                                         |
 
 ## Struktura projektu
 
 ```
 src/
-├── index.ts                  # Hono app i legacy Worker export
+├── index.ts                  # Hono app
 ├── server.ts                 # Produkcyjny serwer Node dla Docker
 ├── db/
 │   ├── schema.ts             # 12 tabel Drizzle (MySQL)
@@ -44,7 +44,7 @@ src/
 │   ├── quick-action.ts       # Szybkie akcje (/mark-damaged)
 │   ├── batch-qr.ts           # Drukowanie zbiorcze kodów QR
 │   ├── excel-import.ts       # Import CSV
-│   ├── item-photos.ts        # Zdjęcia (R2 bucket)
+│   ├── item-photos.ts        # Zdjęcia (lokalny storage / S3-compatible)
 │   ├── notifications.ts      # Preferencje + eventy
 │   └── audit-logs.ts         # Logi operacji (admin only)
 ├── lib/
@@ -56,7 +56,6 @@ src/
 │   ├── services/             # Klienckie serwisy API (z mockami dla MODE=test)
 │   ├── types/                # TypeScript typy
 │   └── hooks/                # useAuth
-worker-configuration.d.ts     # Generowane przez `wrangler types` dla legacy Worker — NIE edytować ręcznie
 ```
 
 ## Dev — komendy
@@ -76,23 +75,20 @@ pnpm run db:generate               # Generuj migrację ze zmian w schema.ts
 docker compose up --build          # Produkcyjny kształt lokalnie → localhost:8787
 docker compose --profile tools run --rm migrate
 pnpm run dev                       # Docker Compose (główna ścieżka)
-pnpm run worker:dev                # Legacy Worker dev przez Wrangler
 
 # TypeScript
 pnpm exec tsc --noEmit             # Type check
-pnpm run types:worker              # Regeneruj worker-configuration.d.ts
 
 # Testy
 pnpm run test:logic                                    # Testy logiki (szybkie)
 pnpm exec vitest run --config vitest.client.config.ts   # Testy klienckie (jsdom)
-pnpm test                          # Logika + testy klienta (bez vitest-pool-workers)
+pnpm test                          # Logika + testy klienta
 ```
 
 ## Testy — ważne
 
-- **`vitest.config.ts`** (legacy worker tests) używa `@cloudflare/vitest-pool-workers` — **alokuje ogromne ilości RAM** (kilka GB), bo każdy plik testowy dostaje izolowany workerd runtime. Nie jest częścią domyślnego `pnpm test`.
 - **`vitest.client.config.ts`** (client tests) — lekkie, jsdom, działają szybko. Te testy są bezpieczne lokalnie.
-- Serwisy klienckie mają wbudowane mocki (sprawdzają `import.meta.env.MODE === 'test'`), więc testy klienckie nie potrzebują działającego workera ani bazy danych.
+- Serwisy klienckie mają wbudowane mocki (sprawdzają `import.meta.env.MODE === 'test'`), więc testy klienckie nie potrzebują działającego backendu ani bazy danych.
 - `tests/business-logic.test.ts` — testuje `slugify` i stałe z `seed.ts`, czysta logika, szybkie.
 
 ## Baza danych — tabele
@@ -108,7 +104,7 @@ pnpm test                          # Logika + testy klienta (bez vitest-pool-wor
 | `users`                    | Użytkownicy (email, hashed_password, role, is_approved)                                |
 | `groups`                   | Grupy użytkowników                                                                     |
 | `group_members`            | Członkostwo w grupach (PK: group_id + user_id)                                         |
-| `item_photos`              | Zdjęcia przedmiotów (R2 storage_path)                                                  |
+| `item_photos`              | Zdjęcia przedmiotów (storage_path)                                                     |
 | `audit_logs`               | Logi zdarzeń (user_id, action, old_value, new_value JSON)                              |
 | `notification_preferences` | Preferencje powiadomień per user                                                       |
 | `notification_events`      | Zdarzenia powiadomień (return_due, borrowing_approved)                                 |
@@ -116,7 +112,7 @@ pnpm test                          # Logika + testy klienta (bez vitest-pool-wor
 ## Auth
 
 - **Google OAuth**: `POST /api/v1/auth/google-login` — body: `{ credential }` (Google ID token). Backend weryfikuje token przez Google `tokeninfo`, sprawdza domenę `@agh.edu.pl`, tworzy/linkuje użytkownika z `auth_provider = "google"`.
-- **Dev bypass**: `DEV_BYPASS_AUTH="true"` w `wrangler.jsonc` pomija weryfikację tokenu — `credential` traktowany jako email (tylko development).
+- **Dev bypass**: `DEV_BYPASS_AUTH="true"` pomija weryfikację tokenu — `credential` traktowany jako email (tylko development).
 - **Rejestracja**: `POST /api/v1/auth/register` — body: `{email, password: min 8}` → konto `is_approved: false`, `auth_provider: "local"`.
 - **JWT**: HS256 z Web Crypto API. Secret z `c.env.JWT_SECRET`. Token ważny 24h.
 - **Role**: `admin` / `user`. Domyślnie po rejestracji brak uprawnień — admin musi zatwierdzić.
@@ -157,13 +153,12 @@ pnpm test                          # Logika + testy klienta (bez vitest-pool-wor
 
 ## Znane problemy / ograniczenia
 
-1. **Cloudflare Worker** — ścieżka legacy/alternatywna; nie jest głównym runtime Docker.
-2. **Powiadomienia** — Docker runtime tworzy cykliczne eventy in-app; e-mail/push nadal nie mają dostawcy wysyłki.
-3. **Reverse proxy** — produkcyjny Docker wystawia HTTP; TLS/HSTS/log retention muszą być na zewnętrznym proxy. `TRUST_PROXY=true` tylko gdy proxy czyści i ustawia nagłówki forwarded.
-4. **Mapa** — mapa Leaflet została zintegrowana w widoku przedmiotów.
-5. **E2E** — katalog `e2e/` istnieje, `playwright.config.ts` jest, ale testy nie są zaimplementowane.
-6. **Google OAuth** — działa z kontami Google w domenie `@agh.edu.pl`.
-7. **Baza referencyjna koidc** — aplikacja wspiera współistnienie z tabelami referencyjnymi (`inv_urzadzenia`, `pracownicy`, `publikacje`, itd.) z bazy `2025-03-06_koidc.sql`. Tabele referencyjne są read-only. Import danych do tabel aplikacji przez `src/db/import-koidc.ts`. Pracownicy są dostępni przez API `/api/v1/staff`. W development `DEV_BYPASS_AUTH=true` pomija weryfikację tokenu. Wymagany `GOOGLE_CLIENT_ID` z Google Cloud Console.
+1. **Powiadomienia** — Docker runtime tworzy cykliczne eventy in-app; e-mail/push nadal nie mają dostawcy wysyłki.
+2. **Reverse proxy** — produkcyjny Docker wystawia HTTP; TLS/HSTS/log retention muszą być na zewnętrznym proxy. `TRUST_PROXY=true` tylko gdy proxy czyści i ustawia nagłówki forwarded.
+3. **Mapa** — mapa Leaflet została zintegrowana w widoku przedmiotów.
+4. **E2E** — katalog `e2e/` istnieje, `playwright.config.ts` jest, ale testy nie są zaimplementowane.
+5. **Google OAuth** — działa z kontami Google w domenie `@agh.edu.pl`.
+6. **Baza referencyjna koidc** — aplikacja wspiera współistnienie z tabelami referencyjnymi (`inv_urzadzenia`, `pracownicy`, `publikacje`, itd.) z bazy `2025-03-06_koidc.sql`. Tabele referencyjne są read-only. Import danych do tabel aplikacji przez `src/db/import-koidc.ts`. Pracownicy są dostępni przez API `/api/v1/staff`. W development `DEV_BYPASS_AUTH=true` pomija weryfikację tokenu. Wymagany `GOOGLE_CLIENT_ID` z Google Cloud Console.
 
 ## Konwencje kodu
 

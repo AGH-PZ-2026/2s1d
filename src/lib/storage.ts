@@ -1,22 +1,19 @@
 /**
  * Object storage abstraction.
  *
- * The app stores item photos in Cloudflare R2 in production, but for a
- * self-hosted deployment we want to be able to swap in either the local
- * filesystem or an S3-compatible backend (MinIO, AWS S3, etc.) without
- * touching the route handlers.
+ * The app stores item photos through a small object storage abstraction so a
+ * Docker deployment can use local filesystem storage or an S3-compatible
+ * backend (MinIO, AWS S3, R2 S3 API) without touching route handlers.
  *
  * Three implementations are provided:
- *  - `R2ObjectStorage`  – wraps a Cloudflare R2 binding
  *  - `S3ObjectStorage`  – S3-compatible (works with MinIO + AWS S3 + R2's
  *                         S3 API); lazily imports @aws-sdk/client-s3
  *  - `LocalFsStorage`   – local filesystem; sufficient for single-node
  *                         self-hosted deployments and tests
  *
  * The factory `createObjectStorage(env)` picks one based on env vars:
- *   - if `PHOTOS_BUCKET` (R2) is set → R2ObjectStorage
- *   - else if `S3_BUCKET` is set     → S3ObjectStorage
- *   - else                            → LocalFsStorage
+ *   - if `S3_BUCKET` is set → S3ObjectStorage
+ *   - else                  → LocalFsStorage
  */
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, stat, unlink } from 'node:fs/promises';
@@ -74,58 +71,6 @@ export interface ObjectStorage {
 
 export type PutBody = ReadableStream<Uint8Array> | Buffer | string;
 
-// ─── R2 binding ────────────────────────────────────────────────────────────
-
-export class R2ObjectStorage implements ObjectStorage {
-  constructor(
-    private readonly bucket: R2Bucket,
-    private readonly publicPrefix?: string
-  ) {}
-
-  async put(key: string, body: PutBody, options?: PutOptions): Promise<void> {
-    const httpMetadata = options?.contentType
-      ? { contentType: options.contentType }
-      : undefined;
-    await this.bucket.put(key, body as ReadableStream, { httpMetadata });
-  }
-
-  async getStream(key: string): Promise<ReadableStream<Uint8Array> | null> {
-    const obj = await this.bucket.get(key);
-    return obj ? (obj.body as ReadableStream<Uint8Array>) : null;
-  }
-
-  async getBytes(
-    key: string
-  ): Promise<{ body: Uint8Array; contentType: string } | null> {
-    const obj = await this.bucket.get(key);
-    if (!obj) return null;
-    const buf = await obj.arrayBuffer();
-    return {
-      body: new Uint8Array(buf),
-      contentType: obj.httpMetadata?.contentType ?? 'application/octet-stream',
-    };
-  }
-
-  async head(key: string): Promise<ObjectInfo | null> {
-    const obj = await this.bucket.head(key);
-    if (!obj) return null;
-    return {
-      size: obj.size,
-      contentType: obj.httpMetadata?.contentType ?? 'application/octet-stream',
-    };
-  }
-
-  async delete(key: string): Promise<void> {
-    await this.bucket.delete(key);
-  }
-
-  publicUrl(key: string): string {
-    if (this.publicPrefix)
-      return `${this.publicPrefix.replace(/\/$/, '')}/${key}`;
-    return key;
-  }
-}
-
 // ─── S3-compatible (MinIO, AWS S3, R2 S3 API) ──────────────────────────────
 
 interface S3LikeClient {
@@ -160,8 +105,7 @@ export class S3ObjectStorage implements ObjectStorage {
     if (this.client && this.commandClasses) {
       return { client: this.client, cmd: this.commandClasses };
     }
-    // Lazy import so workers (which cannot resolve node modules) are not
-    // affected by this module being loaded.
+    // Lazy import so local-only deployments do not load AWS SDK code.
     const mod = await import('@aws-sdk/client-s3');
     this.commandClasses = mod as unknown as Record<string, unknown>;
     const ClientClass = (
@@ -431,18 +375,11 @@ type StorageEnv = Env & {
 
 /**
  * Pick the right storage backend for the runtime:
- *  - PHOTOS_BUCKET (R2 binding)     → R2ObjectStorage
  *  - S3_BUCKET + S3_* credentials   → S3ObjectStorage
  *  - otherwise                      → LocalFsStorage
  */
 export function createObjectStorage(env: Env): ObjectStorage {
   const storageEnv = env as StorageEnv;
-  if (storageEnv.PHOTOS_BUCKET) {
-    return new R2ObjectStorage(
-      storageEnv.PHOTOS_BUCKET,
-      storageEnv.PHOTOS_PUBLIC_URL
-    );
-  }
   if (
     storageEnv.S3_BUCKET &&
     storageEnv.S3_ACCESS_KEY_ID &&

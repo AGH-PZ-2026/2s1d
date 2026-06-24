@@ -23,8 +23,6 @@ import { itemPhotosRouter } from './routes/item-photos';
 import { notificationsRouter } from './routes/notifications';
 import { auditLogsRouter } from './routes/audit-logs';
 import { staffRouter } from './routes/staff';
-import { createDb } from './db/client';
-import { createReturnDueNotifications } from './lib/notifications';
 
 type AppVariables = {
   db: MySql2Database<Record<string, never>>;
@@ -96,21 +94,3 @@ app.onError((err, c) => {
 app.notFound((c) => c.json({ detail: 'Not found' }, 404));
 
 export { app };
-
-export default {
-  fetch: app.fetch,
-  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
-    const { db, connection } = await createDb(env.HYPERDRIVE);
-    try {
-      const created = await createReturnDueNotifications(db);
-      console.log(
-        JSON.stringify({
-          message: 'return due notifications processed',
-          created,
-        })
-      );
-    } finally {
-      await connection.end();
-    }
-  },
-} satisfies ExportedHandler<Env>;

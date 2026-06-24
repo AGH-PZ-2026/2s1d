@@ -27,8 +27,6 @@ RUN pnpm install --frozen-lockfile --prod
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/src ./src
 COPY --from=build /app/scripts ./scripts
-COPY --from=build /app/worker-configuration.d.ts ./worker-configuration.d.ts
-
 RUN mkdir -p /data/photos && chown -R node:node /app /data
 
 USER node

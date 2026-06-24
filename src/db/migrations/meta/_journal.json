@@ -29,6 +29,13 @@
       "when": 1782236526562,
       "tag": "0003_real_wither",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1782283200000,
+      "tag": "0004_group_members_pk",
+      "breakpoints": true
     }
   ]
 }

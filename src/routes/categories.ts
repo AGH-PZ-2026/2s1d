@@ -4,9 +4,15 @@ import { z } from 'zod';
 import { eq, and, isNull, ne } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
 import { categories, type Category } from '../db/schema';
-import { badRequest, notFound } from '../lib/errors';
+import { badRequest, forbidden, notFound } from '../lib/errors';
+import { authMiddleware } from '../middleware/auth';
 
-type Variables = { db: MySql2Database<Record<string, never>> };
+type Variables = {
+  db: MySql2Database<Record<string, never>>;
+  userId: number;
+  userRole: 'admin' | 'user';
+  isAuthenticated: boolean;
+};
 
 const createSchema = z.object({
   name: z
@@ -21,6 +27,7 @@ const createSchema = z.object({
 type CategoryInput = z.infer<typeof createSchema>;
 
 const router = new Hono<{ Variables: Variables }>();
+router.use('/*', authMiddleware);
 
 function toResponse(cat: Category) {
   return {
@@ -110,6 +117,8 @@ router.get('/:id', async (c) => {
 });
 
 router.post('/', zValidator('json', createSchema), async (c) => {
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can create categories');
   const db = c.get('db');
   const body = c.req.valid('json') as CategoryInput;
   const parentId = body.parent_id ?? null;
@@ -128,10 +137,11 @@ router.post('/', zValidator('json', createSchema), async (c) => {
 });
 
 router.patch('/:id', zValidator('json', createSchema), async (c) => {
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can update categories');
   const db = c.get('db');
   const id = Number(c.req.param('id'));
   const body = c.req.valid('json') as CategoryInput;
-  const parentId = body.parent_id ?? null;
 
   const existing = await db
     .select()
@@ -139,6 +149,9 @@ router.patch('/:id', zValidator('json', createSchema), async (c) => {
     .where(eq(categories.id, id))
     .limit(1);
   if (existing.length === 0) notFound('Kategoria nie istnieje');
+  const parentId = Object.hasOwn(body, 'parent_id')
+    ? (body.parent_id ?? null)
+    : existing[0].parentId;
   await checkNameUnique(db, body.name, parentId, id);
 
   if (parentId != null) {
@@ -159,6 +172,8 @@ router.patch('/:id', zValidator('json', createSchema), async (c) => {
 });
 
 router.delete('/:id', async (c) => {
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can delete categories');
   const db = c.get('db');
   const id = Number(c.req.param('id'));
   const existing = await db

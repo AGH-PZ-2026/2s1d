@@ -2,12 +2,20 @@ import mysql from 'mysql2/promise';
 import { DEFAULT_LOCATIONS, SYSTEM_STATUSES } from './seed';
 import { hashPassword } from '../lib/password';
 
-const DEFAULT_ADMIN_PASSWORD = 'admin';
-
 function getInitialAdminEmail(): string {
-  return (process.env.INITIAL_ADMIN_EMAIL ?? 'admin@agh.edu.pl')
-    .trim()
-    .toLowerCase();
+  const email = process.env.INITIAL_ADMIN_EMAIL?.trim().toLowerCase();
+  if (!email) throw new Error('INITIAL_ADMIN_EMAIL is required');
+  return email;
+}
+
+function getInitialAdminPassword(): string {
+  const password = process.env.INITIAL_ADMIN_PASSWORD;
+  if (!password || password.length < 12) {
+    throw new Error(
+      'INITIAL_ADMIN_PASSWORD must be set and at least 12 characters'
+    );
+  }
+  return password;
 }
 
 async function main() {
@@ -56,7 +64,7 @@ async function main() {
     const userCount = (userRows as { count: number }[])[0]?.count ?? 0;
     if (userCount === 0) {
       const initialAdminEmail = getInitialAdminEmail();
-      const hashedPassword = await hashPassword(DEFAULT_ADMIN_PASSWORD);
+      const hashedPassword = await hashPassword(getInitialAdminPassword());
       await connection.query(
         'INSERT INTO `users` (email, hashed_password, auth_provider, is_active, role) VALUES (?, ?, ?, ?, ?)',
         [initialAdminEmail, hashedPassword, 'local', true, 'admin']

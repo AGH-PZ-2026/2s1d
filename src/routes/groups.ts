@@ -83,6 +83,7 @@ router.get('/:id', async (c) => {
 });
 
 router.post('/', zValidator('json', createSchema), async (c) => {
+  if (c.get('userRole') !== 'admin') forbidden('Only admins can create groups');
   const db = c.get('db');
   const body = c.req.valid('json');
   const exist = await db

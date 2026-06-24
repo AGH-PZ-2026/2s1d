@@ -24,6 +24,7 @@ router.get('/:itemId', async (c) => {
       id: items.id,
       name: items.name,
       ownerId: items.ownerId,
+      ownerGroupId: items.ownerGroupId,
       statusName: itemStatus.name,
       locationName: locations.name,
     })
@@ -40,7 +41,8 @@ router.get('/:itemId', async (c) => {
     itemId,
     c.get('userId'),
     c.get('userRole'),
-    item.ownerId
+    item.ownerId,
+    item.ownerGroupId
   );
   return c.json({
     id: item.id,
@@ -69,7 +71,8 @@ router.patch('/:itemId/mark-damaged', async (c) => {
     itemId,
     userId,
     c.get('userRole'),
-    rows[0].ownerId
+    rows[0].ownerId,
+    rows[0].ownerGroupId
   );
   if (!permission) forbidden('Brak uprawnień do zmiany statusu');
 

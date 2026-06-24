@@ -6,8 +6,14 @@ import type { MySql2Database } from 'drizzle-orm/mysql2';
 import { itemStatus, type Status } from '../db/schema';
 import { slugify } from '../db/seed';
 import { badRequest, forbidden, notFound } from '../lib/errors';
+import { authMiddleware } from '../middleware/auth';
 
-type Variables = { db: MySql2Database<Record<string, never>> };
+type Variables = {
+  db: MySql2Database<Record<string, never>>;
+  userId: number;
+  userRole: 'admin' | 'user';
+  isAuthenticated: boolean;
+};
 
 const createSchema = z.object({
   name: z
@@ -26,6 +32,7 @@ const updateSchema = z.object({
 });
 
 const router = new Hono<{ Variables: Variables }>();
+router.use('/*', authMiddleware);
 
 function toResponse(status: Status) {
   return {
@@ -57,6 +64,8 @@ router.get('/', async (c) => {
 });
 
 router.post('/', zValidator('json', createSchema), async (c) => {
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can create statuses');
   const db = c.get('db');
   const body = c.req.valid('json');
   await checkNameUnique(db, body.name);
@@ -76,6 +85,8 @@ router.post('/', zValidator('json', createSchema), async (c) => {
 });
 
 router.put('/:id', zValidator('json', updateSchema), async (c) => {
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can update statuses');
   const db = c.get('db');
   const id = Number(c.req.param('id'));
   const existing = await db
@@ -101,6 +112,8 @@ router.put('/:id', zValidator('json', updateSchema), async (c) => {
 });
 
 router.delete('/:id', async (c) => {
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can delete statuses');
   const db = c.get('db');
   const id = Number(c.req.param('id'));
   const existing = await db
