@@ -88,6 +88,7 @@ jobs:
           JWT_SECRET: ci-jwt-secret-value-at-least-32-chars
           DEV_BYPASS_AUTH: "false"
           INITIAL_ADMIN_EMAIL: admin@agh.edu.pl
+          INITIAL_ADMIN_PASSWORD: ci-initial-admin-password
           NOTIFICATIONS_INTERVAL_MINUTES: 60
           TRUST_PROXY: "false"
 
