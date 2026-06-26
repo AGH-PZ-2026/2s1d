@@ -5,7 +5,6 @@ const sessionUser = {
   email: 'admin@agh.edu.pl',
   role: 'admin',
   is_active: true,
-  is_approved: true,
 };
 
 test.beforeEach(async ({ page }) => {
@@ -15,7 +14,9 @@ test.beforeEach(async ({ page }) => {
   }, sessionUser);
 });
 
-test('administrator usuwa przedmiot bez historii wypożyczeń', async ({ page }) => {
+test('administrator usuwa przedmiot bez historii wypożyczeń', async ({
+  page,
+}) => {
   let items = [
     {
       id: 10,
@@ -43,10 +44,14 @@ test('administrator usuwa przedmiot bez historii wypożyczeń', async ({ page })
   await page.getByRole('button', { name: 'Usuń przedmiot' }).click();
 
   await expect(page.getByText('Przedmiot został usunięty.')).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Generator funkcyjny Rigol' })).toHaveCount(0);
+  await expect(
+    page.getByRole('cell', { name: 'Generator funkcyjny Rigol' })
+  ).toHaveCount(0);
 });
 
-test('druk QR zaznacza wszystkie pozycje jednym przełącznikiem', async ({ page }) => {
+test('druk QR zaznacza wszystkie pozycje jednym przełącznikiem', async ({
+  page,
+}) => {
   await mockCommonApi(page, {
     getItems: () => [
       {
@@ -77,36 +82,36 @@ test('druk QR zaznacza wszystkie pozycje jednym przełącznikiem', async ({ page
 
   await expect(page.getByText('Wybrano: 2 z 2')).toBeVisible();
   await expect(
-    page.getByRole('row', { name: /Oscyloskop Tektronix/ }).getByRole('checkbox')
+    page
+      .getByRole('row', { name: /Oscyloskop Tektronix/ })
+      .getByRole('checkbox')
   ).toBeChecked();
   await expect(
     page.getByRole('row', { name: /Multimetr UNI-T/ }).getByRole('checkbox')
   ).toBeChecked();
 });
 
-test('administrator odrzuca konto oczekujące', async ({ page }) => {
+test('administrator dezaktywuje aktywne konto', async ({ page }) => {
   let users = [
     {
       id: 1,
       email: 'admin@agh.edu.pl',
       role: 'admin',
       isActive: true,
-      isApproved: true,
     },
     {
       id: 2,
       email: 'nowy.pracownik@agh.edu.pl',
       role: 'user',
       isActive: true,
-      isApproved: false,
     },
   ];
 
   await mockCommonApi(page, {
     getUsers: () => users,
-    rejectUser: (id) => {
+    deactivateUser: (id) => {
       users = users.map((user) =>
-        user.id === id ? { ...user, isActive: false, isApproved: false } : user
+        user.id === id ? { ...user, isActive: false } : user
       );
       return users.find((user) => user.id === id);
     },
@@ -116,11 +121,13 @@ test('administrator odrzuca konto oczekujące', async ({ page }) => {
   page.once('dialog', (dialog) => dialog.accept());
   await page
     .getByRole('row', { name: /nowy\.pracownik@agh\.edu\.pl/ })
-    .getByRole('button', { name: 'Odrzuć' })
+    .getByRole('button', { name: 'Dezaktywuj' })
     .click();
 
   await expect(
-    page.getByRole('row', { name: /nowy\.pracownik@agh\.edu\.pl/ }).getByText('Odrzucony')
+    page
+      .getByRole('row', { name: /nowy\.pracownik@agh\.edu\.pl/ })
+      .getByText('Nieaktywny')
   ).toBeVisible();
 });
 
@@ -130,12 +137,20 @@ async function mockCommonApi(
     getItems?: () => unknown[];
     deleteItem?: (id: number) => void;
     getUsers?: () => unknown[];
-    rejectUser?: (id: number) => unknown;
+    deactivateUser?: (id: number) => unknown;
   }
 ) {
   const categories = [{ id: 1, name: 'Pomiarowe', parent_id: null }];
   const statuses = [{ id: 1, name: 'Dostępny', is_system: true }];
-  const locations = [{ id: 1, name: 'D-17 / 101', kind: 'internal', building: 'D-17', room: '101' }];
+  const locations = [
+    {
+      id: 1,
+      name: 'D-17 / 101',
+      kind: 'internal',
+      building: 'D-17',
+      room: '101',
+    },
+  ];
   const owners = [{ id: 1, email: 'admin@agh.edu.pl' }];
   const groups: unknown[] = [];
 
@@ -145,13 +160,16 @@ async function mockCommonApi(
     const path = url.pathname;
     const method = request.method();
 
-    if (path === '/api/v1/items/' && method === 'GET') return json(route, options.getItems?.() ?? []);
+    if (path === '/api/v1/items/' && method === 'GET')
+      return json(route, options.getItems?.() ?? []);
     if (path.match(/\/api\/v1\/items\/\d+$/) && method === 'DELETE') {
       options.deleteItem?.(Number(path.split('/').at(-1)));
       return route.fulfill({ status: 204 });
     }
-    if (path.match(/\/api\/v1\/items\/\d+\/photos$/) && method === 'GET') return json(route, []);
-    if (path.match(/\/api\/v1\/items\/\d+\/delegations$/) && method === 'GET') return json(route, []);
+    if (path.match(/\/api\/v1\/items\/\d+\/photos$/) && method === 'GET')
+      return json(route, []);
+    if (path.match(/\/api\/v1\/items\/\d+\/delegations$/) && method === 'GET')
+      return json(route, []);
     if (path === '/api/v1/batch-qr/print' && method === 'POST') {
       const body = request.postDataJSON() as { item_ids: number[] };
       return json(route, {
@@ -160,17 +178,32 @@ async function mockCommonApi(
         ),
       });
     }
-    if (path === '/api/v1/categories/' && method === 'GET') return json(route, categories);
-    if (path === '/api/v1/item-status/' && method === 'GET') return json(route, statuses);
-    if (path === '/api/v1/locations/' && method === 'GET') return json(route, locations);
-    if (path === '/api/v1/auth/users' && method === 'GET') return json(route, owners);
-    if (path === '/api/v1/groups/' && method === 'GET') return json(route, groups);
-    if (path === '/api/v1/users' && method === 'GET') return json(route, options.getUsers?.() ?? []);
-    if (path.match(/\/api\/v1\/users\/\d+\/reject$/) && method === 'PATCH') {
-      return json(route, options.rejectUser?.(Number(path.split('/').at(-2))));
+    if (path === '/api/v1/categories/' && method === 'GET')
+      return json(route, categories);
+    if (path === '/api/v1/item-status/' && method === 'GET')
+      return json(route, statuses);
+    if (path === '/api/v1/locations/' && method === 'GET')
+      return json(route, locations);
+    if (path === '/api/v1/auth/users' && method === 'GET')
+      return json(route, owners);
+    if (path === '/api/v1/groups/' && method === 'GET')
+      return json(route, groups);
+    if (path === '/api/v1/users' && method === 'GET')
+      return json(route, options.getUsers?.() ?? []);
+    if (
+      path.match(/\/api\/v1\/users\/\d+\/deactivate$/) &&
+      method === 'PATCH'
+    ) {
+      return json(
+        route,
+        options.deactivateUser?.(Number(path.split('/').at(-2)))
+      );
     }
 
-    return route.fulfill({ status: 404, body: `No mock for ${method} ${path}` });
+    return route.fulfill({
+      status: 404,
+      body: `No mock for ${method} ${path}`,
+    });
   });
 }
 

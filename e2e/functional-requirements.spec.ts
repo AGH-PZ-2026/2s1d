@@ -5,7 +5,6 @@ const user = {
   email: 'pracownik@agh.edu.pl',
   role: 'admin',
   is_active: true,
-  is_approved: true,
 };
 
 interface CategoryFixture {
@@ -81,21 +80,18 @@ const managedUsers = [
     email: 'pracownik@agh.edu.pl',
     role: 'admin' as const,
     isActive: true,
-    isApproved: true,
   },
   {
     id: 2,
     email: 'nowy.pracownik@agh.edu.pl',
     role: 'user' as const,
     isActive: true,
-    isApproved: false,
   },
   {
     id: 3,
     email: 'laborant@agh.edu.pl',
     role: 'user' as const,
     isActive: true,
-    isApproved: true,
   },
 ];
 
@@ -232,7 +228,7 @@ test.beforeEach(async ({ page }) => {
   }, user);
 });
 
-test('US role i dostęp: niezalogowany użytkownik nie widzi zasobów, rejestracja wymaga zatwierdzenia, a mock SSO nadaje rolę', async ({
+test('US role i dostęp: niezalogowany użytkownik nie widzi zasobów, rejestracja tworzy konto, a mock SSO nadaje rolę', async ({
   page,
 }) => {
   await page.addInitScript(() => window.localStorage.clear());
@@ -248,7 +244,7 @@ test('US role i dostęp: niezalogowany użytkownik nie widzi zasobów, rejestrac
   await page.locator('#register-password').fill('bezpieczne-haslo');
   await page.getByRole('button', { name: 'Zarejestruj' }).click();
   await expect(
-    page.getByText('Konto wymaga zatwierdzenia przez administratora')
+    page.getByText('Konto utworzone. Możesz się zalogować.')
   ).toBeVisible();
 
   await page.locator('#dev-email').fill('admin@agh.edu.pl');
@@ -261,24 +257,24 @@ test('US role i dostęp: niezalogowany użytkownik nie widzi zasobów, rejestrac
   await expect(page.locator('.sidebar-user-role')).toHaveText('Administrator');
 });
 
-test('US użytkownicy: administrator zatwierdza i odrzuca konta oczekujące', async ({
+test('US użytkownicy: administrator dezaktywuje aktywne konto', async ({
   page,
 }) => {
   await page.goto('/users');
 
   await expect(page.getByText('nowy.pracownik@agh.edu.pl')).toBeVisible();
-  await expect(page.getByText('Oczekuje na zatwierdzenie')).toBeVisible();
+  await expect(page.getByText('Aktywny')).toBeVisible();
 
   page.once('dialog', (dialog) => dialog.accept());
   await page
     .getByRole('row', { name: /nowy\.pracownik@agh\.edu\.pl/ })
-    .getByRole('button', { name: 'Odrzuć' })
+    .getByRole('button', { name: 'Dezaktywuj' })
     .click();
 
   await expect(
     page
       .getByRole('row', { name: /nowy\.pracownik@agh\.edu\.pl/ })
-      .getByText('Odrzucony')
+      .getByText('Nieaktywny')
   ).toBeVisible();
 });
 
@@ -354,6 +350,9 @@ test('US-02/03/05 przedmioty: dodawanie, identyfikacja, klasyfikacja, mapa lokal
   );
 
   await page.getByLabel('Zmień lokalizację').selectOption('1');
+  await expect(
+    page.getByText('Lokalizacja przedmiotu została zaktualizowana.')
+  ).toBeVisible();
   await page.getByLabel('Nowy punkt na mapie').fill('D-17 / 102 / Szafa B');
   await page.getByLabel('Budynek').fill('D-17');
   await page.getByLabel('Pokój').fill('102');
@@ -690,13 +689,8 @@ async function mockApi(page: Page) {
     }
 
     if (path === '/api/v1/auth/register' && method === 'POST') {
-      const body = request.postDataJSON() as { email: string };
       return json(route, {
-        id: 99,
-        email: body.email,
-        is_active: false,
-        is_approved: false,
-        role: 'user',
+        message: 'Konto utworzone',
       });
     }
 
@@ -804,23 +798,14 @@ async function mockApi(page: Page) {
     if (path === '/api/v1/users' && method === 'GET') {
       return json(route, currentUsers);
     }
-    if (path.match(/\/api\/v1\/users\/\d+\/approve$/) && method === 'PATCH') {
+    if (
+      path.match(/\/api\/v1\/users\/\d+\/deactivate$/) &&
+      method === 'PATCH'
+    ) {
       const userId = Number(path.split('/').at(-2));
       currentUsers = currentUsers.map((managedUser) =>
         managedUser.id === userId
-          ? { ...managedUser, isActive: true, isApproved: true }
-          : managedUser
-      );
-      return json(
-        route,
-        currentUsers.find((managedUser) => managedUser.id === userId)
-      );
-    }
-    if (path.match(/\/api\/v1\/users\/\d+\/reject$/) && method === 'PATCH') {
-      const userId = Number(path.split('/').at(-2));
-      currentUsers = currentUsers.map((managedUser) =>
-        managedUser.id === userId
-          ? { ...managedUser, isActive: false, isApproved: false }
+          ? { ...managedUser, isActive: false }
           : managedUser
       );
       return json(
