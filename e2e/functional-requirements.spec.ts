@@ -262,20 +262,16 @@ test('US użytkownicy: administrator dezaktywuje aktywne konto', async ({
 }) => {
   await page.goto('/users');
 
-  await expect(page.getByText('nowy.pracownik@agh.edu.pl')).toBeVisible();
-  await expect(page.getByText('Aktywny')).toBeVisible();
+  const userRow = page.getByRole('row', {
+    name: /nowy\.pracownik@agh\.edu\.pl/,
+  });
+  await expect(userRow).toBeVisible();
+  await expect(userRow.getByText('Aktywny')).toBeVisible();
 
   page.once('dialog', (dialog) => dialog.accept());
-  await page
-    .getByRole('row', { name: /nowy\.pracownik@agh\.edu\.pl/ })
-    .getByRole('button', { name: 'Dezaktywuj' })
-    .click();
+  await userRow.getByRole('button', { name: 'Dezaktywuj' }).click();
 
-  await expect(
-    page
-      .getByRole('row', { name: /nowy\.pracownik@agh\.edu\.pl/ })
-      .getByText('Nieaktywny')
-  ).toBeVisible();
+  await expect(userRow.getByText('Nieaktywny')).toBeVisible();
 });
 
 test('US-01 kategorie i statusy: drzewo, CRUD kategorii oraz własne i bazowe statusy', async ({
