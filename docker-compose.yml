@@ -10,7 +10,11 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      test:
+        [
+          'CMD-SHELL',
+          'mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD',
+        ]
       timeout: 5s
       retries: 5
       interval: 10s
@@ -34,16 +38,21 @@ services:
       DEV_BYPASS_AUTH: ${DEV_BYPASS_AUTH:-false}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:?set INITIAL_ADMIN_EMAIL in .env}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:?set INITIAL_ADMIN_PASSWORD in .env}
       NOTIFICATIONS_INTERVAL_MINUTES: ${NOTIFICATIONS_INTERVAL_MINUTES:-60}
       NOTIFICATIONS_SCHEDULER_ENABLED: ${NOTIFICATIONS_SCHEDULER_ENABLED:-true}
       PHOTOS_STORAGE_DIR: /data/photos
       TRUST_PROXY: ${TRUST_PROXY:-false}
     ports:
-      - "${APP_PORT:-8787}:8787"
+      - '${APP_PORT:-8787}:8787'
     volumes:
       - photos_data:/data/photos
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8787/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "fetch(''http://127.0.0.1:8787/api/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
       timeout: 5s
       retries: 5
       interval: 10s

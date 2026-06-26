@@ -13,6 +13,7 @@ const weakValues = new Set([
   'pz_pass',
   'change-me-root-password',
   'change-me-user-password',
+  'change-me-initial-admin-password',
   'generate-at-least-32-random-characters',
   'docker-development-secret-change-me',
 ]);

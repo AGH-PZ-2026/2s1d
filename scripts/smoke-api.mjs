@@ -1,5 +1,11 @@
 const baseUrl = process.env.SMOKE_BASE_URL ?? 'http://127.0.0.1:8787';
 const expectedDevBypass = process.env.SMOKE_EXPECT_DEV_BYPASS === 'true';
+const adminEmail = process.env.SMOKE_ADMIN_EMAIL ?? 'admin@agh.edu.pl';
+const adminPassword = process.env.SMOKE_ADMIN_PASSWORD;
+
+if (!adminPassword) {
+  throw new Error('SMOKE_ADMIN_PASSWORD is required');
+}
 
 async function expectResponse(path, status, expectedBody) {
   const response = await fetch(`${baseUrl}${path}`);
@@ -20,8 +26,8 @@ async function loginAsDefaultAdmin() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      email: 'admin@agh.edu.pl',
-      password: 'admin',
+      email: adminEmail,
+      password: adminPassword,
     }),
   });
   const body = await response.json();
@@ -29,7 +35,7 @@ async function loginAsDefaultAdmin() {
     response.status !== 200 ||
     typeof body.access_token !== 'string' ||
     body.token_type !== 'bearer' ||
-    body.user?.email !== 'admin@agh.edu.pl' ||
+    body.user?.email !== adminEmail ||
     body.user?.role !== 'admin' ||
     body.user?.is_active !== true
   ) {

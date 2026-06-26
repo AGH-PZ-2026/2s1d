@@ -13,6 +13,7 @@ export JWT_SECRET="${JWT_SECRET:-ci-jwt-secret-value-at-least-32-chars}"
 export DEV_BYPASS_AUTH="${DEV_BYPASS_AUTH:-false}"
 export GOOGLE_CLIENT_ID="${SMOKE_GOOGLE_CLIENT_ID:-}"
 export INITIAL_ADMIN_EMAIL="${INITIAL_ADMIN_EMAIL:-admin@agh.edu.pl}"
+export INITIAL_ADMIN_PASSWORD="${INITIAL_ADMIN_PASSWORD:-ci-initial-admin-password}"
 export APP_PORT="$app_port"
 export NOTIFICATIONS_INTERVAL_MINUTES="${NOTIFICATIONS_INTERVAL_MINUTES:-60}"
 
@@ -29,7 +30,11 @@ docker compose --project-name "$project" up --build -d app
 
 for attempt in $(seq 1 30); do
   if curl --fail --silent "http://127.0.0.1:${app_port}/api/health" >/dev/null; then
-    SMOKE_BASE_URL="http://127.0.0.1:${app_port}" SMOKE_EXPECT_DEV_BYPASS=false node scripts/smoke-api.mjs
+    SMOKE_BASE_URL="http://127.0.0.1:${app_port}" \
+      SMOKE_EXPECT_DEV_BYPASS=false \
+      SMOKE_ADMIN_EMAIL="$INITIAL_ADMIN_EMAIL" \
+      SMOKE_ADMIN_PASSWORD="$INITIAL_ADMIN_PASSWORD" \
+      node scripts/smoke-api.mjs
     docker compose --project-name "$project" exec -T app pnpm run notifications:run
     exit 0
   fi

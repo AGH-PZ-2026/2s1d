@@ -120,6 +120,8 @@ jobs:
         run: node scripts/smoke-api.mjs
         env:
           SMOKE_EXPECT_DEV_BYPASS: 'false'
+          SMOKE_ADMIN_EMAIL: admin@agh.edu.pl
+          SMOKE_ADMIN_PASSWORD: ci-initial-admin-password
 
       - name: Stop integration server
         if: always()
