@@ -23,10 +23,10 @@ jobs:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: ci-root-password
           MYSQL_DATABASE: pz_db
           MYSQL_USER: pz_user
-          MYSQL_PASSWORD: pz_pass
+          MYSQL_PASSWORD: ci-user-password
         ports:
           - 3306:3306
         options: >-
@@ -42,7 +42,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
@@ -62,7 +62,7 @@ jobs:
           MYSQL_HOST: 127.0.0.1
           MYSQL_PORT: 3306
           MYSQL_USER: pz_user
-          MYSQL_PASSWORD: pz_pass
+          MYSQL_PASSWORD: ci-user-password
           MYSQL_DATABASE: pz_db
 
       - name: Run tests
@@ -74,7 +74,7 @@ jobs:
           MYSQL_HOST: 127.0.0.1
           MYSQL_PORT: 3306
           MYSQL_USER: pz_user
-          MYSQL_PASSWORD: pz_pass
+          MYSQL_PASSWORD: ci-user-password
           MYSQL_DATABASE: pz_db
 
       - name: Validate Docker production environment
@@ -86,11 +86,11 @@ jobs:
           MYSQL_PASSWORD: ci-user-password
           MYSQL_DATABASE: pz_db
           JWT_SECRET: ci-jwt-secret-value-at-least-32-chars
-          DEV_BYPASS_AUTH: "false"
+          DEV_BYPASS_AUTH: 'false'
           INITIAL_ADMIN_EMAIL: admin@agh.edu.pl
           INITIAL_ADMIN_PASSWORD: ci-initial-admin-password
           NOTIFICATIONS_INTERVAL_MINUTES: 60
-          TRUST_PROXY: "false"
+          TRUST_PROXY: 'false'
 
       - name: Start integration server
         run: |
@@ -99,11 +99,12 @@ jobs:
           MYSQL_HOST=127.0.0.1 \
           MYSQL_PORT=3306 \
           MYSQL_USER=pz_user \
-          MYSQL_PASSWORD=pz_pass \
+          MYSQL_PASSWORD=ci-user-password \
           MYSQL_DATABASE=pz_db \
           JWT_SECRET=integration-test-secret-value-32-chars \
           DEV_BYPASS_AUTH=false \
           INITIAL_ADMIN_EMAIL=admin@agh.edu.pl \
+          INITIAL_ADMIN_PASSWORD=ci-initial-admin-password \
           pnpm run start > /tmp/app.log 2>&1 &
           echo $! > /tmp/app.pid
           for attempt in {1..30}; do
@@ -118,7 +119,7 @@ jobs:
       - name: Run API smoke checks
         run: node scripts/smoke-api.mjs
         env:
-          SMOKE_EXPECT_DEV_BYPASS: "false"
+          SMOKE_EXPECT_DEV_BYPASS: 'false'
 
       - name: Stop integration server
         if: always()
