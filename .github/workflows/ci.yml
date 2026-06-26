@@ -56,14 +56,16 @@ jobs:
       - name: Build app
         run: pnpm run build
 
-      - name: Run migrations
-        run: pnpm run db:wait && pnpm run db:migrate
+      - name: Run migrations and seed defaults
+        run: pnpm run db:wait && pnpm run db:migrate && pnpm run db:seed
         env:
           MYSQL_HOST: 127.0.0.1
           MYSQL_PORT: 3306
           MYSQL_USER: pz_user
           MYSQL_PASSWORD: ci-user-password
           MYSQL_DATABASE: pz_db
+          INITIAL_ADMIN_EMAIL: admin@agh.edu.pl
+          INITIAL_ADMIN_PASSWORD: ci-initial-admin-password
 
       - name: Run tests
         run: pnpm test
