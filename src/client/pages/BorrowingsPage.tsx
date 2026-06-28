@@ -87,6 +87,26 @@ export default function BorrowingsPage() {
     [borrowings]
   );
 
+  const requestableItems = useMemo(() => {
+    const blocked = new Set(
+      activeBorrowings
+        .filter(
+          (borrowing) =>
+            borrowing.status === 'reserved' ||
+            borrowing.status === 'borrowed' ||
+            (borrowing.status === 'pending' &&
+              borrowing.borrowerId === user?.id)
+        )
+        .map((borrowing) => borrowing.itemId)
+    );
+    return items.filter((item) => !blocked.has(item.id));
+  }, [activeBorrowings, items, user?.id]);
+
+  const externalBorrowingItems = useMemo(() => {
+    if (user?.role === 'admin') return items;
+    return items.filter((item) => item.ownerId === user?.id);
+  }, [items, user?.id, user?.role]);
+
   const itemName = (itemId: number) =>
     items.find((item) => item.id === itemId)?.name ?? `Przedmiot #${itemId}`;
 
@@ -245,13 +265,13 @@ export default function BorrowingsPage() {
                           canApprove={Boolean(isAdmin || isOwner)}
                           canHandover={Boolean(
                             isAdmin ||
-                              isOwner ||
-                              (borrowing.mode === 'asynchronous' && isBorrower)
+                            isOwner ||
+                            (borrowing.mode === 'asynchronous' && isBorrower)
                           )}
                           canReturn={Boolean(
                             isAdmin ||
-                              isOwner ||
-                              (borrowing.mode !== 'classic' && isBorrower)
+                            isOwner ||
+                            (borrowing.mode !== 'classic' && isBorrower)
                           )}
                           handoverLabel={
                             borrowing.mode === 'asynchronous' && isBorrower
@@ -340,14 +360,14 @@ export default function BorrowingsPage() {
             ) : null}
             {modal.mode === 'request' ? (
               <BorrowingRequestForm
-                items={items}
+                items={requestableItems}
                 loading={formLoading}
                 onSubmit={handleRequest}
               />
             ) : null}
             {modal.mode === 'external' ? (
               <ExternalBorrowingForm
-                items={items}
+                items={externalBorrowingItems}
                 loading={formLoading}
                 onSubmit={handleExternal}
               />
@@ -480,13 +500,22 @@ function BorrowingRequestForm({
   const [mode, setMode] = useState<BorrowingRequestPayload['mode']>('classic');
   const [plannedReturnAt, setPlannedReturnAt] = useState('');
   const [dateError, setDateError] = useState<string | null>(null);
+  useEffect(() => {
+    setItemId(items[0]?.id ?? 0);
+  }, [items]);
   return (
     <div className="form">
+      {items.length === 0 ? (
+        <div className="alert alert-info">
+          Brak przedmiotów dostępnych do złożenia wniosku.
+        </div>
+      ) : null}
       <label className="form-label">Przedmiot *</label>
       <select
         className="form-input"
         value={itemId}
         onChange={(event) => setItemId(Number(event.target.value))}
+        disabled={items.length === 0}
       >
         {items.map((item) => (
           <option key={item.id} value={item.id}>
@@ -554,13 +583,22 @@ function ExternalBorrowingForm({
   const [externalBorrower, setExternalBorrower] = useState('');
   const [plannedReturnAt, setPlannedReturnAt] = useState('');
   const [dateError, setDateError] = useState<string | null>(null);
+  useEffect(() => {
+    setItemId(items[0]?.id ?? 0);
+  }, [items]);
   return (
     <div className="form">
+      {items.length === 0 ? (
+        <div className="alert alert-info">
+          Brak przedmiotów, dla których możesz utworzyć wypożyczenie zewnętrzne.
+        </div>
+      ) : null}
       <label className="form-label">Przedmiot *</label>
       <select
         className="form-input"
         value={itemId}
         onChange={(event) => setItemId(Number(event.target.value))}
+        disabled={items.length === 0}
       >
         {items.map((item) => (
           <option key={item.id} value={item.id}>

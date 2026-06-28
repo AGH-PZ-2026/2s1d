@@ -57,7 +57,7 @@ async function ensureItemExists(
     .from(items)
     .where(eq(items.id, itemId))
     .limit(1);
-  if (item.length === 0) notFound('Item not found');
+  if (item.length === 0) notFound('Przedmiot nie istnieje');
   return item[0];
 }
 
@@ -66,7 +66,7 @@ router.get('/:itemId/photos', async (c) => {
   const db = c.get('db');
   const itemId = Number(c.req.param('itemId'));
   if (!Number.isInteger(itemId) || itemId <= 0)
-    badRequest('itemId must be a positive integer');
+    badRequest('Identyfikator przedmiotu musi być dodatnią liczbą całkowitą');
   await ensureItemExists(db, itemId);
   const rows = await db
     .select({
@@ -92,16 +92,16 @@ router.post('/:itemId/photos', async (c) => {
   const itemId = Number(c.req.param('itemId'));
   const userId = c.get('userId');
   if (!Number.isInteger(itemId) || itemId <= 0)
-    badRequest('itemId must be a positive integer');
+    badRequest('Identyfikator przedmiotu musi być dodatnią liczbą całkowitą');
   await ensureItemExists(db, itemId);
   const formData = await c.req.formData();
   const candidate = formData.get('file');
-  if (!(candidate instanceof File)) badRequest('No file uploaded');
+  if (!(candidate instanceof File)) badRequest('Nie przesłano pliku');
   const file = candidate;
   if (file.size === 0 || file.size > MAX_PHOTO_BYTES)
-    badRequest('Photo must be between 1 byte and 10 MB');
+    badRequest('Zdjęcie musi mieć od 1 bajta do 10 MB');
   if (!ALLOWED_PHOTO_TYPES.has(file.type))
-    badRequest('Only JPEG, PNG, WebP and GIF photos are allowed');
+    badRequest('Dozwolone są tylko zdjęcia JPEG, PNG, WebP i GIF');
 
   const extensionByType: Record<string, string> = {
     'image/jpeg': 'jpg',
@@ -171,18 +171,18 @@ router.get('/:itemId/photos/:photoId', async (c) => {
     !Number.isInteger(photoId) ||
     photoId <= 0
   )
-    badRequest('Invalid photo identifier');
+    badRequest('Nieprawidłowy identyfikator zdjęcia');
   const rows = await db
     .select()
     .from(itemPhotos)
     .where(eq(itemPhotos.id, photoId))
     .limit(1);
   if (rows.length === 0 || rows[0].itemId !== itemId)
-    notFound('Photo not found');
+    notFound('Zdjęcie nie istnieje');
   await ensureItemExists(db, itemId);
   const photo = rows[0];
   const object = await storage.getStream(photo.storagePath);
-  if (!object) notFound('Photo file missing in storage');
+  if (!object) notFound('Plik zdjęcia nie istnieje w magazynie');
   return new Response(object, {
     headers: {
       'Content-Type': photo.contentType,

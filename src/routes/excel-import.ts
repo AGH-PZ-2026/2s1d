@@ -4,7 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
 import Papa from 'papaparse';
 import { readSheet, type SheetData } from 'read-excel-file/node';
-import { items } from '../db/schema';
+import { categories, itemStatus, items, locations, users } from '../db/schema';
 import { authMiddleware } from '../middleware/auth';
 import { badRequest, forbidden } from '../lib/errors';
 import { createAuditLog } from '../lib/audit';
@@ -60,6 +60,45 @@ function sheetToRecords(data: SheetData): Record<string, string>[] {
     );
 }
 
+function parseOptionalPositiveInt(
+  value: unknown,
+  fieldName: string,
+  rowNumber: number
+): number | null {
+  if (value === null || value === undefined || String(value).trim() === '') {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    badRequest(
+      `Wiersz ${rowNumber}: ${fieldName} musi być dodatnią liczbą całkowitą`
+    );
+  }
+  return parsed;
+}
+
+async function ensureReferenceExists(
+  db: MySql2Database<Record<string, never>>,
+  table:
+    | typeof users
+    | typeof categories
+    | typeof itemStatus
+    | typeof locations,
+  id: number | null,
+  fieldName: string,
+  rowNumber: number
+): Promise<void> {
+  if (id === null) return;
+  const rows = await db
+    .select({ id: table.id })
+    .from(table)
+    .where(eq(table.id, id))
+    .limit(1);
+  if (rows.length === 0) {
+    badRequest(`Wiersz ${rowNumber}: ${fieldName}=${id} nie istnieje`);
+  }
+}
+
 router.post('/upload', async (c) => {
   if (c.get('userRole') !== 'admin') {
     forbidden('Tylko administrator może importować dane');
@@ -78,7 +117,11 @@ router.post('/upload', async (c) => {
 
   try {
     const parsed: unknown = mappingRaw ? JSON.parse(String(mappingRaw)) : {};
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       badRequest('Mapowanie kolumn musi być obiektem JSON');
     }
     columnMapping = parsed as Record<string, string>;
@@ -157,18 +200,56 @@ router.post('/upload', async (c) => {
     }
 
     try {
-      const categoryId = row.category_id ? Number(row.category_id) : null;
-      const statusId = row.status_id ? Number(row.status_id) : null;
-      const locationId = row.location_id ? Number(row.location_id) : null;
-      const ownerId = row.owner_id ? Number(row.owner_id) : null;
+      const categoryId = parseOptionalPositiveInt(
+        row.category_id,
+        'category_id',
+        rowNumber
+      );
+      const statusId = parseOptionalPositiveInt(
+        row.status_id,
+        'status_id',
+        rowNumber
+      );
+      const locationId = parseOptionalPositiveInt(
+        row.location_id,
+        'location_id',
+        rowNumber
+      );
+      const ownerId = parseOptionalPositiveInt(
+        row.owner_id,
+        'owner_id',
+        rowNumber
+      );
 
-      if (!ownerId || !Number.isInteger(ownerId) || ownerId <= 0) {
+      if (!ownerId) {
         errors.push({
           row_number: rowNumber,
           error_message: `Wiersz ${rowNumber}: owner_id jest wymagane`,
         });
         continue;
       }
+      await ensureReferenceExists(db, users, ownerId, 'owner_id', rowNumber);
+      await ensureReferenceExists(
+        db,
+        categories,
+        categoryId,
+        'category_id',
+        rowNumber
+      );
+      await ensureReferenceExists(
+        db,
+        itemStatus,
+        statusId,
+        'status_id',
+        rowNumber
+      );
+      await ensureReferenceExists(
+        db,
+        locations,
+        locationId,
+        'location_id',
+        rowNumber
+      );
 
       const vals: Record<string, unknown> = {
         name,
@@ -208,7 +289,14 @@ router.post('/upload', async (c) => {
       });
 
       successful++;
-    } catch {
+    } catch (error) {
+      if (error instanceof HTTPException) {
+        errors.push({
+          row_number: rowNumber,
+          error_message: error.message,
+        });
+        continue;
+      }
       errors.push({
         row_number: rowNumber,
         error_message: 'Nie można zaimportować tego wiersza',

@@ -28,7 +28,7 @@ router.post('/print', zValidator('json', batchSchema), async (c) => {
     .select({ id: items.id, systemId: items.systemId, name: items.name })
     .from(items)
     .where(inArray(items.id, body.item_ids));
-  if (rows.length === 0) notFound('No items found');
+  if (rows.length === 0) notFound('Nie znaleziono wybranych przedmiotów');
 
   return c.json({ items: rows });
 });

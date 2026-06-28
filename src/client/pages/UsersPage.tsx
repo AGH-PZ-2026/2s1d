@@ -14,6 +14,10 @@ const roleLabels = {
   admin: 'Administrator',
 } as const;
 
+function displayedRoleLabel(user: User): string {
+  return user.isActive ? roleLabels[user.role] : 'Brak uprawnień';
+}
+
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
@@ -66,17 +70,16 @@ export default function UsersPage() {
       setUsers(users.map((u) => (u.id === id ? updated : u)));
     } catch (err) {
       alert(
-        err instanceof Error ? err.message : 'Błąd podczas aktywacji użytkownika.'
+        err instanceof Error
+          ? err.message
+          : 'Błąd podczas aktywacji użytkownika.'
       );
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleSetRole = async (
-    id: number,
-    role: 'admin' | 'user'
-  ) => {
+  const handleSetRole = async (id: number, role: 'admin' | 'user') => {
     const confirmMsg = `Czy na pewno chcesz ustawić rolę użytkownika na "${roleLabels[role]}"?`;
     if (!window.confirm(confirmMsg)) return;
 
@@ -162,19 +165,21 @@ export default function UsersPage() {
                     </td>
                     <td>
                       <span
-                        className={`badge ${u.role === 'admin' ? 'badge-accent' : 'badge-custom'}`}
+                        className={`badge ${u.role === 'admin' && u.isActive ? 'badge-accent' : 'badge-custom'}`}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px',
                         }}
                       >
-                        {u.role === 'admin' ? (
+                        {!u.isActive ? (
+                          <UserX size={12} />
+                        ) : u.role === 'admin' ? (
                           <Shield size={12} />
                         ) : (
                           <UserIcon size={12} />
                         )}
-                        {roleLabels[u.role]}
+                        {displayedRoleLabel(u)}
                       </span>
                     </td>
                     <td>
@@ -199,7 +204,10 @@ export default function UsersPage() {
                             onClick={() => handleActivate(u.id)}
                             disabled={actionLoading === u.id}
                           >
-                            <UserCheck size={14} style={{ marginRight: '4px' }} />
+                            <UserCheck
+                              size={14}
+                              style={{ marginRight: '4px' }}
+                            />
                             Zatwierdź
                           </button>
                         ) : null}
@@ -213,7 +221,7 @@ export default function UsersPage() {
                             Dezaktywuj
                           </button>
                         ) : null}
-                        {currentUser?.id !== u.id ? (
+                        {u.isActive && currentUser?.id !== u.id ? (
                           <select
                             className="form-input form-input--compact"
                             value={u.role}

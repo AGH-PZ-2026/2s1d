@@ -54,7 +54,9 @@ export default function QrScannerPage() {
 
   async function startCamera() {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setError('Ta przeglądarka nie udostępnia dostępu do kamery.');
+      setError(
+        'Ta przeglądarka nie udostępnia skanowania kodów QR. Wpisz System ID ręcznie albo wczytaj obraz etykiety.'
+      );
       return;
     }
     setError(null);
@@ -70,13 +72,18 @@ export default function QrScannerPage() {
         scheduleScan();
       }
     } catch {
-      setError('Nie udało się uruchomić kamery. Sprawdź zgodę przeglądarki.');
+      setError(
+        'Nie udało się uruchomić kamery. Wpisz System ID ręcznie albo wczytaj obraz etykiety.'
+      );
       stopCamera();
     }
   }
 
   function scheduleScan() {
-    scanTimerRef.current = window.setTimeout(() => void detectFromCamera(), 300);
+    scanTimerRef.current = window.setTimeout(
+      () => void detectFromCamera(),
+      300
+    );
   }
 
   async function detectFromCamera() {

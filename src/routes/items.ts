@@ -91,7 +91,7 @@ router.get('/:id', async (c) => {
   const db = c.get('db');
   const id = Number(c.req.param('id'));
   const rows = await db.select().from(items).where(eq(items.id, id)).limit(1);
-  if (rows.length === 0) notFound('Item not found');
+  if (rows.length === 0) notFound('Przedmiot nie istnieje');
   return c.json(toResponse(rows[0]));
 });
 
@@ -166,7 +166,7 @@ router.patch('/:id', zValidator('json', updateSchema), async (c) => {
     .from(items)
     .where(eq(items.id, id))
     .limit(1);
-  if (existing.length === 0) notFound('Item not found');
+  if (existing.length === 0) notFound('Przedmiot nie istnieje');
 
   const item = existing[0];
   const permission = await getItemPermissionLevel(
@@ -211,7 +211,8 @@ router.patch('/:id', zValidator('json', updateSchema), async (c) => {
     );
   }
 
-  if (Object.keys(updateData).length === 0) badRequest('No fields to update');
+  if (Object.keys(updateData).length === 0)
+    badRequest('Brak pól do aktualizacji');
 
   await db.update(items).set(updateData).where(eq(items.id, id));
   const updated = await db
@@ -233,13 +234,14 @@ router.patch('/:id', zValidator('json', updateSchema), async (c) => {
 router.delete('/:id', async (c) => {
   const db = c.get('db');
   const id = Number(c.req.param('id'));
-  if (c.get('userRole') !== 'admin') forbidden('Only admins can delete items');
+  if (c.get('userRole') !== 'admin')
+    forbidden('Tylko administrator może usuwać przedmioty');
   const existing = await db
     .select()
     .from(items)
     .where(eq(items.id, id))
     .limit(1);
-  if (existing.length === 0) notFound('Item not found');
+  if (existing.length === 0) notFound('Przedmiot nie istnieje');
   const borrowing = await db
     .select({ id: borrowings.id })
     .from(borrowings)

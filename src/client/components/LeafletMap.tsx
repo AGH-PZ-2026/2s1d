@@ -52,6 +52,7 @@ function MapViewSync({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
     map.setView(center, map.getZoom(), { animate: false });
+    map.invalidateSize();
   }, [center, map]);
   return null;
 }

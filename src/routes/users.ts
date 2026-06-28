@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { eq, like } from 'drizzle-orm';
+import { and, eq, like } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
 import { users } from '../db/schema';
 import { authMiddleware } from '../middleware/auth';
@@ -60,7 +60,7 @@ router.get('/search', zValidator('query', searchSchema), async (c) => {
       isActive: users.isActive,
     })
     .from(users)
-    .where(like(users.email, `%${q}%`))
+    .where(and(like(users.email, `%${q}%`), eq(users.isActive, true)))
     .limit(20);
   return c.json(rows);
 });
@@ -92,7 +92,8 @@ router.patch('/:id/deactivate', async (c) => {
 });
 
 router.patch('/:id/activate', async (c) => {
-  if (c.get('userRole') !== 'admin') forbidden('Only admins can activate users');
+  if (c.get('userRole') !== 'admin')
+    forbidden('Only admins can activate users');
   const db = c.get('db');
   const id = Number(c.req.param('id'));
   const existing = await db

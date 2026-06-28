@@ -298,29 +298,47 @@ export default function ItemsPage() {
     : undefined;
 
   useEffect(() => {
-    async function loadPhotos(itemId: number) {
-      setPhotoError(null);
+    let cancelled = false;
+    const itemId = selectedItem?.id;
+
+    setPhotos([]);
+    setItemDelegations([]);
+    setPhotoError(null);
+    if (!itemId) return;
+
+    async function loadPhotos() {
       setPhotoLoading(true);
       try {
-        setPhotos(await itemPhotoService.list(itemId));
-      } catch {
-        setPhotoError('Nie udało się pobrać historii zdjęć.');
+        const nextPhotos = await itemPhotoService.list(itemId);
+        if (!cancelled) setPhotos(nextPhotos);
+      } catch (err) {
+        if (!cancelled) {
+          setPhotoError(
+            err instanceof Error
+              ? err.message
+              : 'Nie udało się pobrać historii zdjęć.'
+          );
+        }
       } finally {
-        setPhotoLoading(false);
+        if (!cancelled) setPhotoLoading(false);
       }
     }
-    async function loadDelegations(itemId: number) {
+    async function loadDelegations() {
       try {
-        setItemDelegations(await delegationService.getAll(itemId));
+        const nextDelegations = await delegationService.getAll(itemId);
+        if (!cancelled) setItemDelegations(nextDelegations);
       } catch {
-        setItemDelegations([]);
+        if (!cancelled) setItemDelegations([]);
       }
     }
-    if (selectedItem) {
-      void loadPhotos(selectedItem.id);
-      void loadDelegations(selectedItem.id);
-    }
-  }, [selectedItem]);
+
+    void loadPhotos();
+    void loadDelegations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedItem?.id]);
 
   const canManageLocation = useMemo(() => {
     if (!selectedItem || !user) return false;
@@ -435,25 +453,25 @@ export default function ItemsPage() {
     try {
       await itemService.updateLocationPoint(locationId, payload);
       await fetchItems();
-      setSuccessMessage('Lokalizacja zostala zaktualizowana.');
+      setSuccessMessage('Lokalizacja została zaktualizowana.');
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Nie udalo sie zaktualizowac lokalizacji.'
+          : 'Nie udało się zaktualizować lokalizacji.'
       );
     }
   };
 
   const handleDeleteLocationPoint = async (locationId: number) => {
-    if (!window.confirm('Usunac te lokalizacje?')) return;
+    if (!window.confirm('Usunąć tę lokalizację?')) return;
     try {
       await itemService.deleteLocationPoint(locationId);
       await fetchItems();
-      setSuccessMessage('Lokalizacja zostala usunieta.');
+      setSuccessMessage('Lokalizacja została usunięta.');
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Nie udalo sie usunac lokalizacji.'
+        err instanceof Error ? err.message : 'Nie udało się usunąć lokalizacji.'
       );
     }
   };
@@ -1040,6 +1058,7 @@ function LocationMapPanel({
       >
         <div style={{ width: '100%', maxWidth: '400px' }}>
           <LeafletMap
+            key={`${location?.id ?? 'none'}-${location?.mapX ?? 'x'}-${location?.mapY ?? 'y'}`}
             mapX={location?.mapX}
             mapY={location?.mapY}
             previewX={previewCoords?.x}
@@ -1090,15 +1109,15 @@ function LocationMapPanel({
                   type="button"
                 >
                   {editingLocation
-                    ? 'Anuluj edycje lokalizacji'
-                    : 'Edytuj lokalizacje'}
+                    ? 'Anuluj edycję lokalizacji'
+                    : 'Edytuj lokalizację'}
                 </button>
                 <button
                   className="btn btn-danger"
                   onClick={() => onDeleteLocation(location.id)}
                   type="button"
                 >
-                  Usun lokalizacje
+                  Usuń lokalizację
                 </button>
               </div>
               {editingLocation ? (
@@ -1126,8 +1145,8 @@ function LocationMapPanel({
                     }
                     value={locationDraft.kind}
                   >
-                    <option value="internal">Wewnetrzna</option>
-                    <option value="external">Zewnetrzna</option>
+                    <option value="internal">Wewnętrzna</option>
+                    <option value="external">Zewnętrzna</option>
                   </select>
                   <input
                     aria-label="Budynek"
@@ -1142,7 +1161,7 @@ function LocationMapPanel({
                     value={locationDraft.building}
                   />
                   <input
-                    aria-label="Pokoj"
+                    aria-label="Pokój"
                     className="form-input"
                     onChange={(event) =>
                       setLocationDraft((current) => ({
@@ -1150,7 +1169,7 @@ function LocationMapPanel({
                         room: event.target.value,
                       }))
                     }
-                    placeholder="Pokoj"
+                    placeholder="Pokój"
                     value={locationDraft.room}
                   />
                   <input
@@ -1166,7 +1185,7 @@ function LocationMapPanel({
                     value={locationDraft.cabinet}
                   />
                   <input
-                    aria-label="Polka"
+                    aria-label="Półka"
                     className="form-input"
                     onChange={(event) =>
                       setLocationDraft((current) => ({
@@ -1174,7 +1193,7 @@ function LocationMapPanel({
                         shelf: event.target.value,
                       }))
                     }
-                    placeholder="Polka"
+                    placeholder="Półka"
                     value={locationDraft.shelf}
                   />
                   <input
@@ -1225,7 +1244,7 @@ function LocationMapPanel({
                     }}
                     type="button"
                   >
-                    Zapisz lokalizacje
+                    Zapisz lokalizację
                   </button>
                 </div>
               ) : null}
@@ -1351,7 +1370,11 @@ function LocationMapPanel({
             </div>
             <button
               className="btn btn-secondary"
-              disabled={!newLocation.name.trim()}
+              disabled={
+                !newLocation.name.trim() ||
+                !newLocation.mapX ||
+                !newLocation.mapY
+              }
               onClick={() => {
                 onCreateLocation({
                   name: newLocation.name.trim(),
@@ -1469,24 +1492,30 @@ function ItemPhotosPanel({
             </tr>
           </thead>
           <tbody>
-            {itemPhotos.map((photo) => (
-              <tr key={photo.id}>
-                <td>
-                  <button
-                    className="btn btn-link"
-                    type="button"
-                    onClick={() =>
-                      void itemPhotoService.download(item.id, photo)
-                    }
-                  >
-                    {photo.originalFilename}
-                  </button>
-                </td>
-                <td>{photo.contentType}</td>
-                <td>{new Date(photo.addedAt).toLocaleString('pl-PL')}</td>
-                <td>{photo.uploadedByName || photo.uploadedById}</td>
+            {itemPhotos.length === 0 ? (
+              <tr>
+                <td colSpan={4}>Brak zdjęć dla tego przedmiotu.</td>
               </tr>
-            ))}
+            ) : (
+              itemPhotos.map((photo) => (
+                <tr key={photo.id}>
+                  <td>
+                    <button
+                      className="btn btn-link"
+                      type="button"
+                      onClick={() =>
+                        void itemPhotoService.download(item.id, photo)
+                      }
+                    >
+                      {photo.originalFilename}
+                    </button>
+                  </td>
+                  <td>{photo.contentType}</td>
+                  <td>{new Date(photo.addedAt).toLocaleString('pl-PL')}</td>
+                  <td>{photo.uploadedByName || photo.uploadedById}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       )}

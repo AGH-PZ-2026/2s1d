@@ -46,83 +46,110 @@ function getClientIp(c: {
 const registerSchema = z.object({
   email: z
     .string()
-    .email('Podaj prawidlowy adres e-mail.')
+    .email('Podaj prawidłowy adres e-mail.')
     .transform((v) => v.trim().toLowerCase()),
   password: z
     .string()
-    .min(8, 'Haslo musi miec co najmniej 8 znakow.')
-    .max(128, 'Haslo moze miec maksymalnie 128 znakow.'),
+    .min(8, 'Hasło musi mieć co najmniej 8 znaków.')
+    .max(128, 'Hasło może mieć maksymalnie 128 znaków.'),
 });
 
-router.post('/register', zValidator('json', registerSchema), async (c) => {
-  await enforceAuthRateLimit(c.env, getClientIp(c));
-  const db = c.get('db');
-  const body = c.req.valid('json');
+router.post(
+  '/register',
+  zValidator('json', registerSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(
+        {
+          detail:
+            result.error.issues[0]?.message ?? 'Niepoprawne dane formularza.',
+        },
+        400
+      );
+    }
+  }),
+  async (c) => {
+    await enforceAuthRateLimit(c.env, getClientIp(c));
+    const db = c.get('db');
+    const body = c.req.valid('json');
 
-  const existing = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, body.email))
-    .limit(1);
-  if (existing.length > 0) badRequest('Uzytkownik z tym adresem e-mail juz istnieje');
+    const existing = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, body.email))
+      .limit(1);
+    if (existing.length > 0)
+      badRequest('Użytkownik z tym adresem e-mail już istnieje');
 
-  const hashedPassword = await hashPassword(body.password);
+    const hashedPassword = await hashPassword(body.password);
 
-  const result = await db.insert(users).values({
-    email: body.email,
-    hashedPassword,
-    role: 'user',
-    isActive: false,
-    authProvider: 'local',
-  });
+    await db.insert(users).values({
+      email: body.email,
+      hashedPassword,
+      role: 'user',
+      isActive: false,
+      authProvider: 'local',
+    });
 
-  const created = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, result[0].insertId))
-    .limit(1);
-  return c.json({ message: 'Konto wymaga zatwierdzenia przez administratora' }, 201);
-});
+    return c.json(
+      { message: 'Konto wymaga zatwierdzenia przez administratora' },
+      201
+    );
+  }
+);
 
 const loginSchema = z.object({
   email: z
     .string()
-    .email()
+    .email('Podaj prawidłowy adres e-mail.')
     .transform((value) => value.trim().toLowerCase()),
   password: z.string().min(1).max(128),
 });
 
-router.post('/login', zValidator('json', loginSchema), async (c) => {
-  await enforceAuthRateLimit(c.env, getClientIp(c));
-  const db = c.get('db');
-  const { email, password } = c.req.valid('json');
-  const userRows = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-  const user = userRows[0];
+router.post(
+  '/login',
+  zValidator('json', loginSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(
+        {
+          detail:
+            result.error.issues[0]?.message ?? 'Niepoprawne dane formularza.',
+        },
+        400
+      );
+    }
+  }),
+  async (c) => {
+    await enforceAuthRateLimit(c.env, getClientIp(c));
+    const db = c.get('db');
+    const { email, password } = c.req.valid('json');
+    const userRows = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    const user = userRows[0];
 
-  if (!user?.hashedPassword) unauthorized('Nieprawidlowy e-mail lub haslo');
-  let passwordValid = await verifyPassword(password, user.hashedPassword);
-  if (
-    !passwordValid &&
-    (await verifyLegacyPassword(password, user.hashedPassword))
-  ) {
-    passwordValid = true;
-    await db
-      .update(users)
-      .set({ hashedPassword: await hashPassword(password) })
-      .where(eq(users.id, user.id));
-  }
-  if (!passwordValid) {
-    unauthorized('Nieprawidlowy e-mail lub haslo');
-  }
-  if (!user.isActive)
-    unauthorized('Konto wymaga zatwierdzenia przez administratora');
+    if (!user?.hashedPassword) unauthorized('Nieprawidłowy e-mail lub hasło');
+    let passwordValid = await verifyPassword(password, user.hashedPassword);
+    if (
+      !passwordValid &&
+      (await verifyLegacyPassword(password, user.hashedPassword))
+    ) {
+      passwordValid = true;
+      await db
+        .update(users)
+        .set({ hashedPassword: await hashPassword(password) })
+        .where(eq(users.id, user.id));
+    }
+    if (!passwordValid) {
+      unauthorized('Nieprawidłowy e-mail lub hasło');
+    }
+    if (!user.isActive)
+      unauthorized('Konto wymaga zatwierdzenia przez administratora');
 
-  return c.json(await authResponse(user, c.env.JWT_SECRET));
-});
+    return c.json(await authResponse(user, c.env.JWT_SECRET));
+  }
+);
 
 // ─── Google Workspace SSO ───────────────────────────────────────────────────
 //
@@ -152,7 +179,7 @@ interface GoogleIdToken {
 
 const allowedGoogleWorkspaceDomains = ['agh.edu.pl', 'student.agh.edu.pl'];
 const allowedGoogleWorkspaceDomainMessage =
-  'Only @agh.edu.pl or @student.agh.edu.pl Google Workspace accounts are allowed';
+  'Dozwolone są tylko konta Google Workspace w domenie @agh.edu.pl albo @student.agh.edu.pl';
 
 const googleLoginSchema = z.object({
   credential: z.string().min(1), // Google ID token (or dev bypass email)
@@ -357,7 +384,8 @@ router.get('/users', authMiddleware, async (c) => {
   const db = c.get('db');
   const rows = await db
     .select({ id: users.id, email: users.email })
-    .from(users);
+    .from(users)
+    .where(eq(users.isActive, true));
   return c.json(rows);
 });
 

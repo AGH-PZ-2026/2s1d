@@ -33,7 +33,7 @@ const createSchema = z
       context.addIssue({
         code: 'custom',
         path: ['externalBorrower'],
-        message: 'Podaj odbiorcÄ™ zewnÄ™trznego',
+        message: 'Podaj odbiorcę zewnętrznego',
       });
     }
   });
@@ -83,6 +83,31 @@ async function updateItemStatusBySlug(
   await db.update(items).set({ statusId }).where(eq(items.id, itemId));
 }
 
+async function refreshItemStatusFromBorrowings(
+  db: MySql2Database<Record<string, never>>,
+  itemId: number
+): Promise<void> {
+  const active = await db
+    .select({ status: borrowings.status })
+    .from(borrowings)
+    .where(
+      and(
+        eq(borrowings.itemId, itemId),
+        inArray(borrowings.status, ['pending', 'reserved', 'borrowed'])
+      )
+    );
+
+  const slug = active.some((row) => row.status === 'borrowed')
+    ? 'wypozyczony'
+    : active.some((row) => row.status === 'reserved')
+      ? 'zarezerwowany'
+      : active.some((row) => row.status === 'pending')
+        ? 'oczekuje-zatwierdzenia'
+        : 'dostepny';
+
+  await updateItemStatusBySlug(db, itemId, slug);
+}
+
 router.get('/', async (c) => {
   const db = c.get('db');
   const status = c.req.query('status');
@@ -130,7 +155,7 @@ router.get('/overdue', async (c) => {
       .where(baseCondition)
       .orderBy(borrowings.plannedReturnAt);
   } else {
-    // owner â€” tylko przedmioty ktĂłrych jest wĹ‚aĹ›cicielem
+    // owner - tylko przedmioty, których jest właścicielem
     const ownedItems = await db
       .select({ id: items.id })
       .from(items)
@@ -173,7 +198,7 @@ router.get('/overdue', async (c) => {
       .from(items)
       .where(eq(items.id, r.itemId))
       .limit(1);
-    r.itemName = item[0]?.name ?? 'Unknown';
+    r.itemName = item[0]?.name ?? 'Nieznany przedmiot';
     if (r.borrowerId) {
       const user = await db
         .select({ email: users.email })
@@ -235,7 +260,7 @@ router.get('/overdue.csv', async (c) => {
       .from(items)
       .where(eq(items.id, b.itemId))
       .limit(1);
-    const itemName = item[0]?.name ?? 'Unknown';
+    const itemName = item[0]?.name ?? 'Nieznany przedmiot';
     let borrower = b.externalBorrower ?? '';
     if (b.borrowerId) {
       const user = await db
@@ -252,7 +277,7 @@ router.get('/overdue.csv', async (c) => {
       : 0;
     const plannedReturn = b.plannedReturnAt
       ? new Date(b.plannedReturnAt).toLocaleString('pl-PL')
-      : 'â€”';
+      : '—';
     csv += `${b.id};${csvCell(itemName)};${csvCell(borrower)};${csvCell(plannedReturn)};${daysOverdue}\n`;
   }
 
@@ -287,7 +312,9 @@ router.post('/', zValidator('json', createSchema), async (c) => {
     const isAdmin = c.get('userRole') === 'admin';
     const isOwner = itemRows[0].ownerId === c.get('userId');
     if (!isAdmin && !isOwner) {
-      forbidden('Tylko administrator albo opiekun przedmiotu może utworzyć wypożyczenie zewnętrzne');
+      forbidden(
+        'Tylko administrator albo opiekun przedmiotu może utworzyć wypożyczenie zewnętrzne'
+      );
     }
   }
   if (
@@ -296,25 +323,45 @@ router.post('/', zValidator('json', createSchema), async (c) => {
     body.borrowerId !== c.get('userId') &&
     c.get('userRole') !== 'admin'
   ) {
-    forbidden('Tylko administrator może utworzyć wypożyczenie dla innego użytkownika');
+    forbidden(
+      'Tylko administrator może utworzyć wypożyczenie dla innego użytkownika'
+    );
   }
   if (!body.plannedReturnAt) {
-    badRequest('Poda datÄ™ planowanego zwrotu');
+    badRequest('Podaj datę planowanego zwrotu');
   }
   const plannedReturnAt = new Date(body.plannedReturnAt);
   if (plannedReturnAt.getTime() <= Date.now())
-    badRequest('Planned return date must be in the future');
-  const active = await db
-    .select()
+    badRequest('Planowany zwrot musi być w przyszłości');
+  const unavailable = await db
+    .select({ id: borrowings.id })
     .from(borrowings)
     .where(
       and(
         eq(borrowings.itemId, body.itemId),
-        inArray(borrowings.status, ['pending', 'reserved', 'borrowed'])
+        inArray(borrowings.status, ['reserved', 'borrowed'])
       )
     )
     .limit(1);
-  if (active.length > 0) badRequest('Przedmiot jest już wypożyczony lub ma aktywny wniosek');
+  if (unavailable.length > 0)
+    badRequest('Przedmiot jest już zarezerwowany albo wypożyczony');
+
+  if (body.mode !== 'external') {
+    const borrowerId = body.borrowerId ?? c.get('userId');
+    const duplicate = await db
+      .select({ id: borrowings.id })
+      .from(borrowings)
+      .where(
+        and(
+          eq(borrowings.itemId, body.itemId),
+          eq(borrowings.borrowerId, borrowerId),
+          eq(borrowings.status, 'pending')
+        )
+      )
+      .limit(1);
+    if (duplicate.length > 0)
+      badRequest('Masz już aktywny wniosek dla tego przedmiotu');
+  }
   const values: Record<string, unknown> = {
     itemId: body.itemId,
     borrowerId:
@@ -330,11 +377,7 @@ router.post('/', zValidator('json', createSchema), async (c) => {
   const result = await db
     .insert(borrowings)
     .values(values as typeof borrowings.$inferInsert);
-  await updateItemStatusBySlug(
-    db,
-    body.itemId,
-    body.mode === 'external' ? 'wypozyczony' : 'oczekuje-zatwierdzenia'
-  );
+  await refreshItemStatusFromBorrowings(db, body.itemId);
   const created = await db
     .select()
     .from(borrowings)
@@ -370,7 +413,9 @@ router.patch('/:id/approve', async (c) => {
     .limit(1);
 
   if (c.get('userRole') !== 'admin' && item[0]?.ownerId !== userId) {
-    forbidden('Tylko administrator albo opiekun przedmiotu może zatwierdzić wniosek');
+    forbidden(
+      'Tylko administrator albo opiekun przedmiotu może zatwierdzić wniosek'
+    );
   }
 
   const existing = await db
@@ -379,7 +424,8 @@ router.patch('/:id/approve', async (c) => {
     .where(eq(borrowings.id, id))
     .limit(1);
   if (existing.length === 0) notFound('Wypożyczenie nie istnieje');
-  if (existing[0].status !== 'pending') badRequest('Wniosek nie oczekuje na zatwierdzenie');
+  if (existing[0].status !== 'pending')
+    badRequest('Wniosek nie oczekuje na zatwierdzenie');
   const conflicting = await db
     .select({ id: borrowings.id })
     .from(borrowings)
@@ -397,7 +443,7 @@ router.patch('/:id/approve', async (c) => {
     .update(borrowings)
     .set({ status: 'reserved', approvedAt: sql`NOW()` })
     .where(eq(borrowings.id, id));
-  await updateItemStatusBySlug(db, existing[0].itemId, 'zarezerwowany');
+  await refreshItemStatusFromBorrowings(db, existing[0].itemId);
   const updated = await db
     .select()
     .from(borrowings)
@@ -433,7 +479,9 @@ router.patch('/:id/reject', async (c) => {
     .limit(1);
 
   if (c.get('userRole') !== 'admin' && item[0]?.ownerId !== userId) {
-    forbidden('Tylko administrator albo opiekun przedmiotu może odrzucić wniosek');
+    forbidden(
+      'Tylko administrator albo opiekun przedmiotu może odrzucić wniosek'
+    );
   }
   const existing = await db
     .select()
@@ -441,12 +489,13 @@ router.patch('/:id/reject', async (c) => {
     .where(eq(borrowings.id, id))
     .limit(1);
   if (existing.length === 0) notFound('Wypożyczenie nie istnieje');
-  if (existing[0].status !== 'pending') badRequest('Wniosek nie oczekuje na zatwierdzenie');
+  if (existing[0].status !== 'pending')
+    badRequest('Wniosek nie oczekuje na zatwierdzenie');
   await db
     .update(borrowings)
     .set({ status: 'rejected' })
     .where(eq(borrowings.id, id));
-  await updateItemStatusBySlug(db, existing[0].itemId, 'dostepny');
+  await refreshItemStatusFromBorrowings(db, existing[0].itemId);
   const updated = await db
     .select()
     .from(borrowings)
@@ -477,7 +526,7 @@ router.patch('/:id/handover', async (c) => {
       )
     )
     .limit(1);
-  if (conflicting.length > 0) badRequest('Przedmiot jest już wypożyczony lub ma aktywny wniosek');
+  if (conflicting.length > 0) badRequest('Przedmiot jest już wypożyczony');
 
   const userId = c.get('userId');
   const item = await db
@@ -502,7 +551,7 @@ router.patch('/:id/handover', async (c) => {
     .update(borrowings)
     .set({ status: 'borrowed', handedOverAt: sql`NOW()` })
     .where(eq(borrowings.id, id));
-  await updateItemStatusBySlug(db, existing[0].itemId, 'wypozyczony');
+  await refreshItemStatusFromBorrowings(db, existing[0].itemId);
   const updated = await db
     .select()
     .from(borrowings)
@@ -554,10 +603,14 @@ router.patch('/:id/return', zValidator('json', returnSchema), async (c) => {
   const isOwner = item[0]?.ownerId === userId;
 
   if (isClassic && !isAdmin && !isOwner) {
-    forbidden('W trybie klasycznym tylko administrator albo opiekun może potwierdzić zwrot');
+    forbidden(
+      'W trybie klasycznym tylko administrator albo opiekun może potwierdzić zwrot'
+    );
   }
   if (!isClassic && !isAdmin && !isOwner && !isBorrower) {
-    forbidden('Tylko administrator, opiekun albo wypożyczający może zwrócić przedmiot');
+    forbidden(
+      'Tylko administrator, opiekun albo wypożyczający może zwrócić przedmiot'
+    );
   }
 
   await db
@@ -566,10 +619,12 @@ router.patch('/:id/return', zValidator('json', returnSchema), async (c) => {
       status: 'returned',
       returnedAt: sql`NOW()`,
       returnComment:
-        c.req.valid('json').returnComment ?? c.req.valid('json').comment ?? null,
+        c.req.valid('json').returnComment ??
+        c.req.valid('json').comment ??
+        null,
     })
     .where(eq(borrowings.id, id));
-  await updateItemStatusBySlug(db, existing[0].itemId, 'dostepny');
+  await refreshItemStatusFromBorrowings(db, existing[0].itemId);
   const updated = await db
     .select()
     .from(borrowings)
