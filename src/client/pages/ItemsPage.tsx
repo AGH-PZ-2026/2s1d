@@ -6,6 +6,7 @@ import type { AuthUser } from '../services/authService';
 import {
   itemService,
   type CreateLocationPayload,
+  type UpdateLocationPayload,
 } from '../services/itemService';
 import { itemPhotoService, type ItemPhoto } from '../services/itemPhotoService';
 import { delegationService } from '../services/delegationService';
@@ -427,6 +428,36 @@ export default function ItemsPage() {
     }
   };
 
+  const handleUpdateLocationPoint = async (
+    locationId: number,
+    payload: UpdateLocationPayload
+  ) => {
+    try {
+      await itemService.updateLocationPoint(locationId, payload);
+      await fetchItems();
+      setSuccessMessage('Lokalizacja zostala zaktualizowana.');
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Nie udalo sie zaktualizowac lokalizacji.'
+      );
+    }
+  };
+
+  const handleDeleteLocationPoint = async (locationId: number) => {
+    if (!window.confirm('Usunac te lokalizacje?')) return;
+    try {
+      await itemService.deleteLocationPoint(locationId);
+      await fetchItems();
+      setSuccessMessage('Lokalizacja zostala usunieta.');
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Nie udalo sie usunac lokalizacji.'
+      );
+    }
+  };
+
   return (
     <div className="page">
       <div className="page-header">
@@ -590,10 +621,13 @@ export default function ItemsPage() {
                 location={selectedLocation}
                 locations={locations}
                 onCreateLocation={handleCreateLocation}
+                onUpdateLocation={handleUpdateLocationPoint}
+                onDeleteLocation={handleDeleteLocationPoint}
                 onLocationChange={handleLocationChange}
                 ownerName={getOwnerName(selectedItem)}
                 statusName={getStatusName(selectedItem.statusId)}
                 canEdit={canManageLocation}
+                canEditItem={permissionLevel !== null}
                 canDelete={user?.role === 'admin'}
                 deleteLoading={deleteLoading}
                 onDelete={handleDeleteSelected}
@@ -829,10 +863,13 @@ function LocationMapPanel({
   location,
   locations,
   onCreateLocation,
+  onUpdateLocation,
+  onDeleteLocation,
   onLocationChange,
   ownerName,
   statusName,
   canEdit,
+  canEditItem,
   canDelete,
   deleteLoading,
   onDelete,
@@ -842,10 +879,13 @@ function LocationMapPanel({
   location: Location | undefined;
   locations: Location[];
   onCreateLocation: (p: CreateLocationPayload) => void;
+  onUpdateLocation: (id: number, p: UpdateLocationPayload) => void;
+  onDeleteLocation: (id: number) => void;
   onLocationChange: (locationId: number) => void;
   ownerName: string;
   statusName: string;
   canEdit: boolean;
+  canEditItem: boolean;
   canDelete: boolean;
   deleteLoading: boolean;
   onDelete: () => void;
@@ -865,6 +905,31 @@ function LocationMapPanel({
     x: number;
     y: number;
   } | null>(null);
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [locationDraft, setLocationDraft] = useState({
+    name: location?.name ?? '',
+    kind: location?.kind ?? 'internal',
+    building: location?.building ?? '',
+    room: location?.room ?? '',
+    cabinet: location?.cabinet ?? '',
+    shelf: location?.shelf ?? '',
+    mapX: location?.mapX?.toString() ?? '',
+    mapY: location?.mapY?.toString() ?? '',
+  });
+
+  useEffect(() => {
+    setEditingLocation(false);
+    setLocationDraft({
+      name: location?.name ?? '',
+      kind: location?.kind ?? 'internal',
+      building: location?.building ?? '',
+      room: location?.room ?? '',
+      cabinet: location?.cabinet ?? '',
+      shelf: location?.shelf ?? '',
+      mapX: location?.mapX?.toString() ?? '',
+      mapY: location?.mapY?.toString() ?? '',
+    });
+  }, [location]);
   return (
     <section
       className="location-panel"
@@ -885,9 +950,11 @@ function LocationMapPanel({
             <h2>{item.name}</h2>
           </div>
           <div className="td-actions">
-            <button className="btn btn-secondary" onClick={onEdit}>
-              Edytuj przedmiot
-            </button>
+            {canEditItem ? (
+              <button className="btn btn-secondary" onClick={onEdit}>
+                Edytuj przedmiot
+              </button>
+            ) : null}
             {canDelete ? (
               <button
                 className="btn btn-danger"
@@ -939,6 +1006,14 @@ function LocationMapPanel({
           <div>
             <dt>Status</dt>
             <dd>{statusName}</dd>
+          </div>
+          <div>
+            <dt>Data dodania</dt>
+            <dd>{formatItemDate(item.addedAt)}</dd>
+          </div>
+          <div>
+            <dt>Data zakupu</dt>
+            <dd>{formatItemDate(item.purchaseDate)}</dd>
           </div>
           <div>
             <dt>Opiekun</dt>
@@ -1006,6 +1081,156 @@ function LocationMapPanel({
               ))}
             </select>
           </div>
+          {location ? (
+            <div className="form">
+              <div className="td-actions">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setEditingLocation((current) => !current)}
+                  type="button"
+                >
+                  {editingLocation
+                    ? 'Anuluj edycje lokalizacji'
+                    : 'Edytuj lokalizacje'}
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={() => onDeleteLocation(location.id)}
+                  type="button"
+                >
+                  Usun lokalizacje
+                </button>
+              </div>
+              {editingLocation ? (
+                <div className="location-controls__grid">
+                  <input
+                    aria-label="Nazwa lokalizacji"
+                    className="form-input"
+                    onChange={(event) =>
+                      setLocationDraft((current) => ({
+                        ...current,
+                        name: event.target.value,
+                      }))
+                    }
+                    placeholder="Nazwa"
+                    value={locationDraft.name}
+                  />
+                  <select
+                    aria-label="Typ lokalizacji"
+                    className="form-input"
+                    onChange={(event) =>
+                      setLocationDraft((current) => ({
+                        ...current,
+                        kind: event.target.value as 'internal' | 'external',
+                      }))
+                    }
+                    value={locationDraft.kind}
+                  >
+                    <option value="internal">Wewnetrzna</option>
+                    <option value="external">Zewnetrzna</option>
+                  </select>
+                  <input
+                    aria-label="Budynek"
+                    className="form-input"
+                    onChange={(event) =>
+                      setLocationDraft((current) => ({
+                        ...current,
+                        building: event.target.value,
+                      }))
+                    }
+                    placeholder="Budynek"
+                    value={locationDraft.building}
+                  />
+                  <input
+                    aria-label="Pokoj"
+                    className="form-input"
+                    onChange={(event) =>
+                      setLocationDraft((current) => ({
+                        ...current,
+                        room: event.target.value,
+                      }))
+                    }
+                    placeholder="Pokoj"
+                    value={locationDraft.room}
+                  />
+                  <input
+                    aria-label="Szafa"
+                    className="form-input"
+                    onChange={(event) =>
+                      setLocationDraft((current) => ({
+                        ...current,
+                        cabinet: event.target.value,
+                      }))
+                    }
+                    placeholder="Szafa"
+                    value={locationDraft.cabinet}
+                  />
+                  <input
+                    aria-label="Polka"
+                    className="form-input"
+                    onChange={(event) =>
+                      setLocationDraft((current) => ({
+                        ...current,
+                        shelf: event.target.value,
+                      }))
+                    }
+                    placeholder="Polka"
+                    value={locationDraft.shelf}
+                  />
+                  <input
+                    aria-label="mapX"
+                    className="form-input"
+                    onChange={(event) =>
+                      setLocationDraft((current) => ({
+                        ...current,
+                        mapX: event.target.value,
+                      }))
+                    }
+                    type="number"
+                    step="any"
+                    value={locationDraft.mapX}
+                  />
+                  <input
+                    aria-label="mapY"
+                    className="form-input"
+                    onChange={(event) =>
+                      setLocationDraft((current) => ({
+                        ...current,
+                        mapY: event.target.value,
+                      }))
+                    }
+                    type="number"
+                    step="any"
+                    value={locationDraft.mapY}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    disabled={!locationDraft.name.trim()}
+                    onClick={() => {
+                      onUpdateLocation(location.id, {
+                        name: locationDraft.name.trim(),
+                        kind: locationDraft.kind as 'internal' | 'external',
+                        building: locationDraft.building.trim() || undefined,
+                        room: locationDraft.room.trim() || undefined,
+                        cabinet: locationDraft.cabinet.trim() || undefined,
+                        shelf: locationDraft.shelf.trim() || undefined,
+                        mapX: locationDraft.mapX
+                          ? Number(locationDraft.mapX)
+                          : undefined,
+                        mapY: locationDraft.mapY
+                          ? Number(locationDraft.mapY)
+                          : undefined,
+                      });
+                      setEditingLocation(false);
+                    }}
+                    type="button"
+                  >
+                    Zapisz lokalizacje
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="form">
             <label className="form-label" htmlFor="new-location-name">
               Nowy punkt na mapie (kliknij na mapie by wybrać współrzędne)
@@ -1187,6 +1412,11 @@ function formatLocationDetails(location: Location | undefined): string {
   return (
     details || (location.kind === 'external' ? 'Lokalizacja zewnętrzna' : '—')
   );
+}
+
+function formatItemDate(value: string | undefined): string {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('pl-PL');
 }
 
 function ItemPhotosPanel({

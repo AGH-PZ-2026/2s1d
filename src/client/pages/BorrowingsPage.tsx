@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { borrowingService } from '../services/borrowingService';
 import { itemService } from '../services/itemService';
+import { useAuth } from '../hooks/useAuth';
 import type {
   Borrowing,
   BorrowingMode,
@@ -35,6 +36,7 @@ const modeLabels: Record<BorrowingMode, string> = {
 const activeStatuses: BorrowingStatus[] = ['pending', 'reserved', 'borrowed'];
 
 export default function BorrowingsPage() {
+  const { user } = useAuth();
   const [borrowings, setBorrowings] = useState<Borrowing[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
@@ -228,22 +230,46 @@ export default function BorrowingsPage() {
                 <div className="borrowing-column__list">
                   {activeBorrowings
                     .filter((borrowing) => borrowing.status === status)
-                    .map((borrowing) => (
-                      <BorrowingCard
-                        actionLoading={actionLoading}
-                        borrowerName={borrowerName(borrowing)}
-                        borrowing={borrowing}
-                        itemName={itemName(borrowing.itemId)}
-                        key={borrowing.id}
-                        onApprove={() => runAction(borrowing, 'approve')}
-                        onHandover={() => runAction(borrowing, 'handover')}
-                        onReject={() => runAction(borrowing, 'reject')}
-                        onReturn={() => {
-                          setFormError(null);
-                          setModal({ mode: 'return', borrowing });
-                        }}
-                      />
-                    ))}
+                    .map((borrowing) => {
+                      const item = items.find(
+                        (current) => current.id === borrowing.itemId
+                      );
+                      const isAdmin = user?.role === 'admin';
+                      const isOwner = item?.ownerId === user?.id;
+                      const isBorrower = borrowing.borrowerId === user?.id;
+                      return (
+                        <BorrowingCard
+                          actionLoading={actionLoading}
+                          borrowerName={borrowerName(borrowing)}
+                          borrowing={borrowing}
+                          canApprove={Boolean(isAdmin || isOwner)}
+                          canHandover={Boolean(
+                            isAdmin ||
+                              isOwner ||
+                              (borrowing.mode === 'asynchronous' && isBorrower)
+                          )}
+                          canReturn={Boolean(
+                            isAdmin ||
+                              isOwner ||
+                              (borrowing.mode !== 'classic' && isBorrower)
+                          )}
+                          handoverLabel={
+                            borrowing.mode === 'asynchronous' && isBorrower
+                              ? 'Odbierz'
+                              : 'Wydaj'
+                          }
+                          itemName={itemName(borrowing.itemId)}
+                          key={borrowing.id}
+                          onApprove={() => runAction(borrowing, 'approve')}
+                          onHandover={() => runAction(borrowing, 'handover')}
+                          onReject={() => runAction(borrowing, 'reject')}
+                          onReturn={() => {
+                            setFormError(null);
+                            setModal({ mode: 'return', borrowing });
+                          }}
+                        />
+                      );
+                    })}
                   {activeBorrowings.every(
                     (borrowing) => borrowing.status !== status
                   ) ? (
@@ -266,6 +292,7 @@ export default function BorrowingsPage() {
                 <th>Tryb</th>
                 <th>Status</th>
                 <th>Planowany zwrot</th>
+                <th>Komentarz zwrotu</th>
                 <th>Utworzono</th>
               </tr>
             </thead>
@@ -289,6 +316,7 @@ export default function BorrowingsPage() {
                       </span>
                     </td>
                     <td>{formatDate(borrowing.plannedReturnAt)}</td>
+                    <td>{borrowing.returnComment || '—'}</td>
                     <td>{formatDate(borrowing.createdAt)}</td>
                   </tr>
                 ))
@@ -343,6 +371,10 @@ function BorrowingCard({
   actionLoading,
   borrowerName,
   borrowing,
+  canApprove,
+  canHandover,
+  canReturn,
+  handoverLabel,
   itemName,
   onApprove,
   onHandover,
@@ -352,6 +384,10 @@ function BorrowingCard({
   actionLoading: string | null;
   borrowerName: string;
   borrowing: Borrowing;
+  canApprove: boolean;
+  canHandover: boolean;
+  canReturn: boolean;
+  handoverLabel: string;
   itemName: string;
   onApprove: () => void;
   onHandover: () => void;
@@ -382,7 +418,7 @@ function BorrowingCard({
         </div>
       </dl>
       <div className="borrowing-card__actions">
-        {borrowing.status === 'pending' ? (
+        {borrowing.status === 'pending' && canApprove ? (
           <>
             <button
               className="btn btn-sm btn-primary"
@@ -404,7 +440,7 @@ function BorrowingCard({
             </button>
           </>
         ) : null}
-        {borrowing.status === 'reserved' ? (
+        {borrowing.status === 'reserved' && canHandover ? (
           <button
             className="btn btn-sm btn-primary"
             disabled={actionLoading !== null}
@@ -413,10 +449,10 @@ function BorrowingCard({
           >
             {actionLoading === `${borrowing.id}:handover`
               ? 'Zapis...'
-              : 'Wydaj'}
+              : handoverLabel}
           </button>
         ) : null}
-        {borrowing.status === 'borrowed' ? (
+        {borrowing.status === 'borrowed' && canReturn ? (
           <button
             className="btn btn-sm btn-secondary"
             disabled={actionLoading !== null}

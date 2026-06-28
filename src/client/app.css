@@ -520,6 +520,7 @@ a:hover {
 }
 .td-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
@@ -813,6 +814,10 @@ textarea.form-input {
 }
 select.form-input {
   cursor: pointer;
+}
+select.form-input option {
+  background: var(--surface);
+  color: var(--text);
 }
 .form-input--compact {
   min-width: 120px;

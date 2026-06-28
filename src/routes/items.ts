@@ -13,7 +13,7 @@ import { createObjectStorage } from '../lib/storage';
 type Variables = {
   db: MySql2Database<Record<string, never>>;
   userId: number;
-  userRole: 'admin' | 'user';
+  userRole: 'none' | 'admin' | 'user';
   isAuthenticated: boolean;
 };
 

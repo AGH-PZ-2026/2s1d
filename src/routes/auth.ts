@@ -46,9 +46,12 @@ function getClientIp(c: {
 const registerSchema = z.object({
   email: z
     .string()
-    .email()
+    .email('Podaj prawidlowy adres e-mail.')
     .transform((v) => v.trim().toLowerCase()),
-  password: z.string().min(8).max(128),
+  password: z
+    .string()
+    .min(8, 'Haslo musi miec co najmniej 8 znakow.')
+    .max(128, 'Haslo moze miec maksymalnie 128 znakow.'),
 });
 
 router.post('/register', zValidator('json', registerSchema), async (c) => {
@@ -61,7 +64,7 @@ router.post('/register', zValidator('json', registerSchema), async (c) => {
     .from(users)
     .where(eq(users.email, body.email))
     .limit(1);
-  if (existing.length > 0) badRequest('User with this email already exists');
+  if (existing.length > 0) badRequest('Uzytkownik z tym adresem e-mail juz istnieje');
 
   const hashedPassword = await hashPassword(body.password);
 
@@ -69,6 +72,7 @@ router.post('/register', zValidator('json', registerSchema), async (c) => {
     email: body.email,
     hashedPassword,
     role: 'user',
+    isActive: false,
     authProvider: 'local',
   });
 
@@ -77,7 +81,7 @@ router.post('/register', zValidator('json', registerSchema), async (c) => {
     .from(users)
     .where(eq(users.id, result[0].insertId))
     .limit(1);
-  return c.json({ message: 'Konto utworzone' }, 201);
+  return c.json({ message: 'Konto wymaga zatwierdzenia przez administratora' }, 201);
 });
 
 const loginSchema = z.object({
@@ -99,7 +103,7 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
     .limit(1);
   const user = userRows[0];
 
-  if (!user?.hashedPassword) unauthorized('Invalid email or password');
+  if (!user?.hashedPassword) unauthorized('Nieprawidlowy e-mail lub haslo');
   let passwordValid = await verifyPassword(password, user.hashedPassword);
   if (
     !passwordValid &&
@@ -112,9 +116,10 @@ router.post('/login', zValidator('json', loginSchema), async (c) => {
       .where(eq(users.id, user.id));
   }
   if (!passwordValid) {
-    unauthorized('Invalid email or password');
+    unauthorized('Nieprawidlowy e-mail lub haslo');
   }
-  if (!user.isActive) unauthorized('Account is deactivated');
+  if (!user.isActive)
+    unauthorized('Konto wymaga zatwierdzenia przez administratora');
 
   return c.json(await authResponse(user, c.env.JWT_SECRET));
 });
@@ -303,6 +308,7 @@ router.post(
           authProvider: 'google',
           hashedPassword: null,
           role: 'user',
+          isActive: false,
         });
         const created = await db
           .select()
@@ -314,7 +320,8 @@ router.post(
     }
 
     const user = userRows[0];
-    if (!user.isActive) unauthorized('Account is deactivated');
+    if (!user.isActive)
+      unauthorized('Konto wymaga zatwierdzenia przez administratora');
 
     return c.json(await authResponse(user, c.env.JWT_SECRET));
   }

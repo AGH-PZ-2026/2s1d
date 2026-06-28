@@ -91,6 +91,30 @@ router.patch('/:id/deactivate', async (c) => {
   return c.json(updated[0]);
 });
 
+router.patch('/:id/activate', async (c) => {
+  if (c.get('userRole') !== 'admin') forbidden('Only admins can activate users');
+  const db = c.get('db');
+  const id = Number(c.req.param('id'));
+  const existing = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
+  if (existing.length === 0) notFound('User not found');
+  await db.update(users).set({ isActive: true }).where(eq(users.id, id));
+  const updated = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      role: users.role,
+      isActive: users.isActive,
+    })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
+  return c.json(updated[0]);
+});
+
 router.patch('/:id/role', zValidator('json', updateRoleSchema), async (c) => {
   if (c.get('userRole') !== 'admin') forbidden('Only admins can change roles');
   const db = c.get('db');
