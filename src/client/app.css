@@ -1518,11 +1518,24 @@ select.form-input optgroup {
   .sidebar.open {
     left: 0;
   }
+  .sidebar.open .sidebar-brand {
+    padding-left: 72px;
+  }
   .main-content {
     padding: 72px 16px 24px;
   }
   .mobile-nav-toggle {
     display: flex !important;
+  }
+  button.mobile-nav-toggle {
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    min-height: 48px;
+    margin: 0;
+    padding: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
   }
   .page-header {
     display: grid;
@@ -1658,6 +1671,12 @@ select.form-input optgroup {
   .form-input--compact {
     min-height: 44px;
     width: 100%;
+  }
+  button.mobile-nav-toggle {
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    min-height: 48px;
   }
   .login-session dl,
   .qr-details,
