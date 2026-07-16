@@ -1518,9 +1518,6 @@ select.form-input optgroup {
   .sidebar.open {
     left: 0;
   }
-  .sidebar.open .sidebar-brand {
-    padding-left: 72px;
-  }
   .main-content {
     padding: 72px 16px 24px;
   }
@@ -1634,6 +1631,13 @@ select.form-input optgroup {
   }
   .quick-actions {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 781px) {
+  button.mobile-nav-toggle {
+    display: none !important;
+    pointer-events: none;
   }
 }
 

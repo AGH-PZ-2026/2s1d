@@ -166,19 +166,23 @@ export const Layout = () => {
       <a className="skip-link" href="#main-content">
         Przejdź do treści
       </a>
-      <button
-        className="btn btn-ghost mobile-nav-toggle"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        aria-controls="main-navigation"
-        aria-expanded={sidebarOpen}
-        aria-label="Menu"
-        type="button"
-      >
-        <Menu size={20} />
-      </button>
+      {!sidebarOpen && (
+        <button
+          className="btn btn-ghost mobile-nav-toggle"
+          onClick={() => setSidebarOpen(true)}
+          aria-controls="main-navigation"
+          aria-expanded={false}
+          aria-label="Menu"
+          type="button"
+        >
+          <Menu size={20} />
+        </button>
+      )}
 
       {sidebarOpen && (
         <div
+          className="sidebar-backdrop"
+          data-testid="sidebar-backdrop"
           style={{
             position: 'fixed',
             inset: 0,
@@ -280,9 +284,7 @@ export const Layout = () => {
                 <div className="sidebar-user-info">
                   <div className="sidebar-user-name">{user.email}</div>
                   <div className="sidebar-user-role">
-                    {user.role === 'admin'
-                      ? 'Administrator'
-                      : 'Pracownik'}
+                    {user.role === 'admin' ? 'Administrator' : 'Pracownik'}
                   </div>
                 </div>
               </div>
