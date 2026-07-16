@@ -32,6 +32,50 @@ const owners = [
 
 const groups = [{ id: 1, name: 'Zespół aparatury' }];
 
+test('mobilne menu nie zasłania brandingu i zamyka się po kliknięciu poza panelem', async ({
+  page,
+}) => {
+  await signIn(page, adminUser);
+  await mockInventoryApi(page, {
+    initialItems: [
+      {
+        id: 90,
+        systemId: 'ITEM-AGH-0090',
+        name: 'Przedmiot menu mobilnego',
+        manufacturer: 'AGH',
+        categoryId: 1,
+        statusId: 1,
+        locationId: 1,
+        ownerId: 1,
+      },
+    ],
+  });
+
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.goto('/items');
+  await expect(
+    page.getByRole('button', { name: 'Menu', exact: true })
+  ).toHaveCount(0);
+
+  await page.setViewportSize({ width: 438, height: 900 });
+  await page.reload();
+  const menuButton = page.getByRole('button', {
+    name: 'Menu',
+    exact: true,
+  });
+  await expect(menuButton).toHaveCount(1);
+  await menuButton.click();
+  await expect(menuButton).toHaveCount(0);
+  await expect(page.locator('.sidebar.open')).toHaveCount(1);
+
+  const backdrop = page.getByTestId('sidebar-backdrop');
+  await expect(backdrop).toHaveCount(1);
+  await backdrop.click({ position: { x: 400, y: 100 } });
+  await expect(
+    page.getByRole('button', { name: 'Menu', exact: true })
+  ).toHaveCount(1);
+});
+
 test('rejestracja pokazuje czytelny komunikat walidacji z API', async ({
   page,
 }) => {

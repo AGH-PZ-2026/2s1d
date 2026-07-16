@@ -19,7 +19,10 @@ import {
   LogOut,
 } from 'lucide-react';
 import { authService } from '../services/authService';
+import { notificationService } from '../services/notificationService';
 import { useAuth } from '../hooks/useAuth';
+
+const NOTIFICATIONS_SEEN_AT_KEY = 'notifications-seen-at';
 
 interface NavItem {
   to: string;
@@ -106,6 +109,7 @@ const navItems: NavItem[] = [
 export const Layout = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -119,24 +123,66 @@ export const Layout = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [sidebarOpen]);
 
+  useEffect(() => {
+    if (!user) {
+      setNotificationCount(0);
+      return;
+    }
+    let cancelled = false;
+    const loadNotifications = async () => {
+      try {
+        const events = await notificationService.listEvents();
+        const seenAt = Date.parse(
+          window.localStorage.getItem(NOTIFICATIONS_SEEN_AT_KEY) ?? ''
+        );
+        const unread = events.filter(
+          (event) =>
+            !Number.isFinite(seenAt) || Date.parse(event.createdAt) > seenAt
+        ).length;
+        if (!cancelled) setNotificationCount(unread);
+      } catch {
+        if (!cancelled) setNotificationCount(0);
+      }
+    };
+    void loadNotifications();
+    const intervalId = window.setInterval(loadNotifications, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [user]);
+
+  const markNotificationsSeen = () => {
+    window.localStorage.setItem(
+      NOTIFICATIONS_SEEN_AT_KEY,
+      new Date().toISOString()
+    );
+    setNotificationCount(0);
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
         Przejdź do treści
       </a>
-      <button
-        className="btn btn-ghost mobile-nav-toggle"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        aria-controls="main-navigation"
-        aria-expanded={sidebarOpen}
-        aria-label="Menu"
-        type="button"
-      >
-        <Menu size={20} />
-      </button>
+      {!sidebarOpen && (
+        <button
+          className="btn btn-ghost mobile-nav-toggle"
+          onClick={() => setSidebarOpen(true)}
+          aria-controls="main-navigation"
+          aria-expanded={false}
+          aria-label="Menu"
+          type="button"
+        >
+          <Menu size={20} />
+        </button>
+      )}
 
       {sidebarOpen && (
         <div
+          className="sidebar-backdrop"
+          data-testid="sidebar-backdrop"
           style={{
             position: 'fixed',
             inset: 0,
@@ -190,12 +236,24 @@ export const Layout = () => {
                     <Link
                       to={item.to}
                       className={`nav-link ${isActive ? 'active' : ''}`}
-                      onClick={() => setSidebarOpen(false)}
+                      onClick={
+                        item.to === '/notifications'
+                          ? markNotificationsSeen
+                          : () => setSidebarOpen(false)
+                      }
                     >
                       <span className="nav-link-icon">
                         <item.icon size={18} />
                       </span>
                       {item.label}
+                      {item.to === '/notifications' && notificationCount > 0 ? (
+                        <span
+                          className="notification-badge"
+                          aria-label={`${notificationCount} nowych powiadomień`}
+                        >
+                          {notificationCount > 99 ? '99+' : notificationCount}
+                        </span>
+                      ) : null}
                     </Link>
                   </div>
                 </div>
@@ -226,9 +284,7 @@ export const Layout = () => {
                 <div className="sidebar-user-info">
                   <div className="sidebar-user-name">{user.email}</div>
                   <div className="sidebar-user-role">
-                    {user.role === 'admin'
-                      ? 'Administrator'
-                      : 'Pracownik'}
+                    {user.role === 'admin' ? 'Administrator' : 'Pracownik'}
                   </div>
                 </div>
               </div>
